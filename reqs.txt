@@ -1,0 +1,22 @@
+Id like you to create a new app for reading in many file formats
+The app should be be testable with unit tests and anything youre able to do here.
+
+1. it should be similar to shosetsu reader, moonreader, readera kinda thing.
+2. I want it to support epub, md, txt, pdf, and many other standard formats
+3. the app should allow customising he appearance of the app, theme etc. similar to the daily checklist
+4. reader should be customisable: font, size, colour, background colour, line spacing, word spacing, characater spacing, paragraph spacing, justification. this should be saveable and loadable as themes
+5. it should also allow customising scrolling options, so i want a continuous stream of lines i can scroll up or down? or perhaps i want it in pages that i can swipe up and down on, or left and right, or right and left?, maybe i just want to tap on some customisable region of the screen for different actions. (this should have a preview option to show the regions). or maybe i dont want any regions at all and its just swiping
+6. add an option `enable selectable text` which when not checked prevents selecting any text
+8. it should have a nice displayed library of the books you add, you can either add them by pointing individual ones or multiple, or pointing to and the app looks in there folder.
+9. you should support light novels wherein there may be even like 500 individual files as chapters of a single book, you can just have a special way to choose that,
+10. progress through a book/chapter/lightnovel should be stored, displayed to the user while reading and while viewing the book/chapter. if the user opens it it should open back where it left off
+11. it should have a search functionality to quickly find books, chapters, or specific text within the books.
+12. it should support bookmarks, allowing users to mark specific locations in the text for easy reference later.
+13. you should be able to edit the data of an imported book, title, author, cover image any data you want, it shouldnt edit the file though. its app stored data
+14. allow choosing a main folder where it will auto discover books in so users can simply place new ones there, and one for light novels, maybe a subfolder not sure?
+15. it should support import/exporting of books and their metadata.
+16. it should support import/exporting of reading progress, bookmarks, and app settings.
+17. include a keep screen awake option
+18. add an option for custom css styling, as well as an option fo disable css styling from say epubs
+19. add categories you can swipe between and add books too, customisable name and default
+20. add an analytics page that records how many books have been read, reading time, words read, wpm reading speed etc.
