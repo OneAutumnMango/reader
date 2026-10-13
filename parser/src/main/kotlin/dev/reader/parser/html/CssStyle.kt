@@ -22,10 +22,10 @@ private val NAMED_COLORS = mapOf(
 )
 
 private const val BOLD_WEIGHT_THRESHOLD = 700
-private val DECLARATION_PATTERN = Regex("([a-zA-Z-]+)\\s*:\\s*([^;]+)")
-private val CLASS_RULE_PATTERN = Regex("\\.([a-zA-Z0-9_-]+)\\s*\\{([^}]*)}")
+private val DECLARATION_PATTERN by lazy { Regex("([a-zA-Z-]+)\\s*:\\s*([^;]+)") }
+private val CLASS_RULE_PATTERN by lazy { Regex("\\.([a-zA-Z0-9_-]+)\\s*\\{([^}]*)\\}") }
 
-internal fun parseCssDeclarations(declarations: String): CssStyle {
+internal fun parseCssDeclarations(declarations: String): CssStyle = runCatching {
     var color: Long? = null
     var bold: Boolean? = null
     var italic: Boolean? = null
@@ -46,8 +46,8 @@ internal fun parseCssDeclarations(declarations: String): CssStyle {
             "text-align" -> textAlign = if (value == "justify") Justification.JUSTIFY else Justification.START
         }
     }
-    return CssStyle(color, bold, italic, underline, textAlign)
-}
+    CssStyle(color, bold, italic, underline, textAlign)
+}.getOrDefault(CssStyle())
 
 private const val OPAQUE_ALPHA = 0xFF000000L
 private const val SHORTHAND_HEX_LENGTH = 3
@@ -74,20 +74,20 @@ internal fun CssStyle.mergeOver(base: CssStyle): CssStyle = CssStyle(
 )
 
 /** `.class { ... }` rules only — tag/id selectors, nesting and media queries are out of scope. */
-internal fun parseStylesheetClassRules(document: org.jsoup.nodes.Document): Map<String, CssStyle> {
+internal fun parseStylesheetClassRules(document: org.jsoup.nodes.Document): Map<String, CssStyle> = runCatching {
     val rules = mutableMapOf<String, CssStyle>()
     document.select("style").forEach { styleTag ->
         CLASS_RULE_PATTERN.findAll(styleTag.data()).forEach { match ->
             rules[match.groupValues[1]] = parseCssDeclarations(match.groupValues[2])
         }
     }
-    return rules
-}
+    rules
+}.getOrDefault(emptyMap())
 
-internal fun styleOf(element: org.jsoup.nodes.Element, classRules: Map<String, CssStyle>): CssStyle {
+internal fun styleOf(element: org.jsoup.nodes.Element, classRules: Map<String, CssStyle>): CssStyle = runCatching {
     val fromClasses = element.classNames()
         .mapNotNull { classRules[it] }
         .fold(CssStyle()) { acc, style -> style.mergeOver(acc) }
     val inline = parseCssDeclarations(element.attr("style"))
-    return inline.mergeOver(fromClasses)
-}
+    inline.mergeOver(fromClasses)
+}.getOrDefault(CssStyle())

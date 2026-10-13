@@ -1,5 +1,6 @@
 package dev.reader.app.ui
 
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -12,6 +13,15 @@ import androidx.compose.ui.platform.LocalContext
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
 import kotlinx.coroutines.launch
+
+private const val LOG_TAG = "ReaderImport"
+
+/** Logs the full stack trace and returns the deepest, most specific error message. */
+internal fun describeImportError(error: Throwable): String {
+    Log.e(LOG_TAG, "Import failed", error)
+    val root = generateSequence(error) { it.cause }.last()
+    return root.message?.takeIf { it.isNotBlank() } ?: root.javaClass.simpleName
+}
 
 class ImportActions(val status: String, val addFiles: () -> Unit, val addFolder: () -> Unit)
 
@@ -34,7 +44,7 @@ fun rememberImportActions(graph: ReaderGraph): ImportActions {
                 }
                 runCatching { graph.importer.importFile(file, pdfContext = context) }
                     .onSuccess { imported++ }
-                    .onFailure { lastError = it.message ?: it.toString() }
+                    .onFailure { lastError = describeImportError(it) }
             }
             status = when {
                 imported == uris.size -> "Imported $imported of ${uris.size} file(s)"
@@ -53,7 +63,7 @@ fun rememberImportActions(graph: ReaderGraph): ImportActions {
                 runCatching { graph.importer.importLightNovelFolder(folder) }
                     .fold(
                         onSuccess = { "Imported light novel" },
-                        onFailure = { "Could not import that folder — ${it.message ?: it}" },
+                        onFailure = { "Could not import that folder — ${describeImportError(it)}" },
                     )
             }
         }

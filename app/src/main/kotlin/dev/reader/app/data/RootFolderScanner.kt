@@ -3,6 +3,7 @@ package dev.reader.app.data
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import dev.reader.app.ui.describeImportError
 import dev.reader.data.repo.SettingsRepository
 import kotlinx.coroutines.flow.first
 
@@ -35,10 +36,15 @@ class RootFolderScanner(
 
             val success = if (child.isDirectory) {
                 val folder = ContentFileCopier.copyFolderToCache(context, child)
-                runCatching { importer.importLightNovelFolder(folder) }.isSuccess
+                runCatching { importer.importLightNovelFolder(folder) }
+                    .onFailure { describeImportError(it) }
+                    .isSuccess
             } else {
                 val file = ContentFileCopier.copyDocumentToCache(context, child)
-                file != null && runCatching { importer.importFile(file, pdfContext = context) }.isSuccess
+                file != null &&
+                    runCatching { importer.importFile(file, pdfContext = context) }
+                        .onFailure { describeImportError(it) }
+                        .isSuccess
             }
 
             if (success) imported++

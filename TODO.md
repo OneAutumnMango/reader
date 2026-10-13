@@ -10,9 +10,9 @@ original requirements this plan implements.
 | `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 13 |
 | `:parser` | M2 complete + CSS subset. | 10 |
 | `:data` | M3, M5 importer, M7 export/import complete. | 13 |
-| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors, nav drawer/settings UI polish, tap-zone picker redesign, root-folder auto-import. | 54 |
+| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors, nav drawer/settings UI polish, tap-zone picker redesign, root-folder auto-import. | 56 |
 
-91 tests total. Run everything: `./scripts/test.sh --lint`.
+93 tests total. Run everything: `./scripts/test.sh --lint`.
 
 ---
 
@@ -195,7 +195,15 @@ action from a list below; `AppearanceRoute` and `SettingsScreen` are now built f
 Library FAB now reads "Add book"/"Add light novel"; Settings has a new "Root folders"
 section — add a folder once and every file/subfolder in it is auto-imported, both
 immediately and again on every app launch (`RootFolderScanner`, tracked via a persisted
-`importedRootEntries` set so the same file is never re-imported). What's left:
+`importedRootEntries` set so the same file is never re-imported); found and fixed a real
+class-poisoning bug in the HTML/CSS parser — `CssStyle.kt`'s regexes were eagerly-initialized
+top-level vals, so if they ever failed once on a real device, the `CssStyleKt` class stayed
+permanently broken for the rest of the app process, making every subsequent markdown/html/
+epub import fail with "could not initialize class ...CssStyleKt" regardless of file content.
+Those regexes are now lazy (so a failure can be retried) and the CSS parsing entry points fall
+back to "no styling" instead of throwing; import error messages now show the deepest cause
+(not just a wrapper exception's often-blank top message) and are also logged via `Log.e` so
+the full stack trace is in logcat. What's left:
 
 - **PDF / CBZ / CBR aren't wired into the reader screen**: `ChapterLoader` only handles
   txt/md/html/epub; opening a PDF or comic book from the library will fail to load. The
