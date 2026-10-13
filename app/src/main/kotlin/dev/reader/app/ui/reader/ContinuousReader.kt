@@ -27,7 +27,7 @@ fun ContinuousReader(
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
         ) {
-            items(document.blocks) { block -> ReaderBlock(block, theme) }
+            items(document.blocks) { block -> ReaderBlock(block, theme, settings.useBookStyling) }
         }
     }
 
@@ -39,21 +39,21 @@ fun ContinuousReader(
 }
 
 @Composable
-private fun ReaderBlock(block: Block, theme: ReaderTheme) {
+private fun ReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean) {
     when (block) {
         is Block.Paragraph -> Text(
-            text = block.spans.toAnnotatedString(theme.wordSpacingSp),
-            style = theme.bodyTextStyle(),
+            text = block.spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling),
+            style = theme.bodyTextStyle(block.textAlign, useBookStyling),
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         is Block.Heading -> Text(
-            text = block.spans.toAnnotatedString(),
-            style = theme.headingTextStyle(),
+            text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
+            style = theme.headingTextStyle(block.textAlign, useBookStyling),
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         is Block.ListItem -> Text(
-            text = block.spans.toAnnotatedString(),
-            style = theme.bodyTextStyle(),
+            text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
+            style = theme.bodyTextStyle(useBookStyling = useBookStyling),
             modifier = Modifier.padding(start = 24.dp, end = 16.dp),
         )
         is Block.Image -> Unit // Rendered by the caller once cover/image caching exists (M5).

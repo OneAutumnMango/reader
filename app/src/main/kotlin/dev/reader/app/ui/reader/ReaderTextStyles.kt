@@ -17,23 +17,38 @@ import dev.reader.core.theme.ReaderTheme
 
 private const val HEADING_SCALE = 1.2f
 
-fun ReaderTheme.bodyTextStyle(): TextStyle = TextStyle(
+fun ReaderTheme.bodyTextStyle(
+    blockAlign: Justification? = null,
+    useBookStyling: Boolean = false,
+): TextStyle = TextStyle(
     color = Color(textColor),
     fontSize = fontSizeSp.sp,
     lineHeight = (fontSizeSp * lineSpacing).sp,
     letterSpacing = letterSpacingSp.sp,
-    textAlign = if (justification == Justification.JUSTIFY) TextAlign.Justify else TextAlign.Start,
+    textAlign = resolveTextAlign(blockAlign, useBookStyling),
 )
 
-fun ReaderTheme.headingTextStyle(): TextStyle =
-    bodyTextStyle().copy(fontWeight = FontWeight.Bold, fontSize = (fontSizeSp * HEADING_SCALE).sp)
+fun ReaderTheme.headingTextStyle(blockAlign: Justification? = null, useBookStyling: Boolean = false): TextStyle {
+    val scaledSize = (fontSizeSp * HEADING_SCALE).sp
+    return bodyTextStyle(blockAlign, useBookStyling).copy(fontWeight = FontWeight.Bold, fontSize = scaledSize)
+}
 
 fun ReaderTheme.backgroundColor(): Color = Color(backgroundColor)
 
-fun List<Span>.toAnnotatedString(wordSpacingSp: Float = 0f): AnnotatedString = buildAnnotatedString {
+private fun ReaderTheme.resolveTextAlign(blockAlign: Justification?, useBookStyling: Boolean): TextAlign {
+    val effective = if (useBookStyling) blockAlign ?: justification else justification
+    return if (effective == Justification.JUSTIFY) TextAlign.Justify else TextAlign.Start
+}
+
+fun List<Span>.toAnnotatedString(
+    wordSpacingSp: Float = 0f,
+    useBookStyling: Boolean = false,
+): AnnotatedString = buildAnnotatedString {
     forEachIndexed { index, span ->
+        val color = span.color.takeIf { useBookStyling }?.let { Color(it) } ?: Color.Unspecified
         withStyle(
             SpanStyle(
+                color = color,
                 fontWeight = if (span.bold) FontWeight.Bold else FontWeight.Normal,
                 fontStyle = if (span.italic) FontStyle.Italic else FontStyle.Normal,
                 textDecoration = if (span.underline) TextDecoration.Underline else TextDecoration.None,
