@@ -10,7 +10,7 @@ original requirements this plan implements.
 | `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 13 |
 | `:parser` | M2 complete. | 6 |
 | `:data` | M3 + importer (M5) complete. | 12 |
-| `:app` | M4 + library UI (M5) complete. | 15 |
+| `:app` | M4, M5, M6 complete. | 28 |
 
 Run everything: `./scripts/test.sh` (or `--core-only` before `:parser`/`:data`/`:app` need the Android SDK).
 
@@ -128,11 +128,26 @@ this file.
 
 ## M6 — Search, bookmarks, appearance editor (`:app`)
 
-- [ ] Global search: library metadata + in-book FTS text search.
-- [ ] Bookmark create/list/jump-to.
-- [ ] Appearance screen: app theme (seed colour, light/dark/amoled), reader theme editor
-      (font/size/colour/bg/spacing/justification) saved as named presets.
-- [ ] Tap-zone editor with live preview overlay.
+- [x] Library search: `filterBooksByQuery` (title/author, case-insensitive) + `SearchScreen`.
+      In-book FTS search already exists in `:data` (`SearchRepository`, M3) — wiring the two
+      together behind one search bar is a small `:app` integration task left open.
+- [x] `BookmarksScreen`: jump-to and delete actions per bookmark.
+- [x] `ReaderThemeEditor`: font family field, font/line/word/letter/paragraph spacing sliders,
+      justification picker — edits a `ReaderTheme` live.
+- [x] `ReaderSettingsEditor`: reading-mode picker, selectable-text toggle, keep-screen-awake
+      picker, and the "use book styling (CSS)" toggle deferred from M4.
+- [x] `TapZoneEditor`: tap a cell to cycle its action, grid always labelled (acts as its own preview).
+- [ ] App-wide `AppTheme` (seed colour palette, light/dark/amoled) editor — `AppTheme` model
+      exists (M1) but has no editor UI yet; deferred, since it needs a palette-generation
+      helper (daily-checklist's `PaletteFactory` equivalent) that hasn't been ported.
+- [ ] Named theme-preset save/load UI (the `PreferencesFile.themePresets` list exists in `:data`
+      since M3; a picker/save-as UI for it is still open).
+- [x] 15 Compose UI tests (search, bookmarks, theme/settings/tap-zone editors) + 2 pure-JVM
+      search-filter tests. detekt clean.
+
+**Gotcha hit while testing**: a `Slider` placed above other clickable rows in the same `Column`
+can silently swallow clicks on those rows under Robolectric — fixed by ordering pickers/switches
+before sliders. Recorded in repo memory for next time.
 
 ## M7 — Import/export UI + analytics (`:app`)
 
