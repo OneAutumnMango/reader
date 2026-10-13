@@ -8,11 +8,11 @@ original requirements this plan implements.
 | Module | State | Tests |
 | --- | --- | --- |
 | `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 13 |
-| `:parser` | M2 complete. | 6 |
+| `:parser` | M2 complete + CSS subset. | 10 |
 | `:data` | M3, M5 importer, M7 export/import complete. | 13 |
-| `:app` | M4, M5, M6, M7 complete. | 35 |
+| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors. | 47 |
 
-67 tests total. Run everything: `./scripts/test.sh --lint`.
+83 tests total. Run everything: `./scripts/test.sh --lint`.
 
 ---
 
@@ -185,35 +185,32 @@ what's left and why.
 
 ## Open questions for review
 
-- **No navigation graph / app entry point yet**: every screen built in M4–M7 is a standalone,
-  independently-testable composable (`ReaderScreen`, `LibraryScreen`, `BookDetailScreen`,
-  `SearchScreen`, `BookmarksScreen`, appearance editors, `StatsScreen`, `ImportExportScreen`).
-  `MainActivity` still only shows the M0 placeholder — nothing wires these screens together,
-  threads real `LibraryRepository`/`ProgressRepository`/`SettingsRepository` instances through
-  them, or lets you navigate library → book detail → reader. This is the single biggest
-  remaining gap before the app is actually usable on a device.
-- **Add-book, folder-auto-discovery, and export/import file pickers**: `BookImporter` and
-  `ExportRepository` work against plain `java.io.File`s and are fully tested; the SAF
-  (`ActivityResultContracts`) UI to actually pick a file/folder/export destination doesn't
-  exist yet and can't be meaningfully exercised under Robolectric. Needs on-device
-  verification once wired up.
-- **App-wide `AppTheme` (seed-colour palette, light/dark/amoled) has no editor UI** —
-  the model exists (M1), but a picker needs a palette-generation helper equivalent to
-  daily-checklist's `PaletteFactory`, which was never ported. Named `ReaderTheme` preset
-  save/load UI is similarly missing (the data model and storage exist; no picker).
-- **Custom CSS subset**: `ReaderSettings.customCss`/`useBookStyling` exist and the editor
-  toggle is wired (M6), but nothing in the reflow renderer actually *applies* a parsed CSS
-  subset yet — EPUB/HTML styling beyond bold/italic/headings/lists isn't mapped at all.
-- **requirement 21** (added to `reqs.txt` after planning started): "progress tracker while
-  reading, like page 14/100, 14%, chapter X" — the plumbing exists (`onPageChanged` callback,
-  `ProgressRepository`), but there's no on-screen indicator widget, pending the navigation
-  graph above.
+Resolved since the last pass: navigation now connects every screen (`ReaderApp` +
+`Navigator`, library → detail → reader/bookmarks, bottom nav for library/search/stats/
+appearance/import-export), SAF file pickers are wired for add-files/add-folder/export/
+import, the CSS subset is applied in the renderer, pagination is now measured rather
+than block-chunked, and there's an `AppTheme` palette editor plus a named `ReaderTheme`
+preset picker. What's left:
+
+- **PDF / CBZ / CBR aren't wired into the reader screen**: `ChapterLoader` only handles
+  txt/md/html/epub; opening a PDF or comic book from the library will fail to load. The
+  parsers and `PdfPageRenderer`/`ComicArchiveParser` exist (M2) but the `ImagePager` UI
+  (M4) was never connected to a real image/bitmap source for them.
+- **Bookmark "jump" doesn't restore the saved scroll position**: `BookmarksRoute.onJump`
+  opens the right chapter but always starts from the top; `Bookmark.position` isn't
+  applied yet.
+- **No reading-session analytics are recorded during actual reading**: `StatsRepository`
+  and the stats screen work from whatever's in the `reading_sessions` table, but nothing
+  in `ReaderRoute` calls `recordSession(...)` yet, so the stats page will show zeros on
+  a real device until that's wired up.
+- **Added categories have no UI**: `CategoryTabs` reads categories but there's no "create
+  category" button, and newly imported books aren't assigned to one.
+- **requirement 21** ("progress tracker... page 14/100, 14%, chapter X"): `Progress` is
+  now persisted per page change, but there's no on-screen indicator widget in the reader
+  UI showing it live.
 - **cbr (RAR comics)**: implemented via junrar, but has no automated test — no tool in this
   environment can author a `.rar` fixture. Confirm you're fine with junrar's license, or say the
   word to drop cbr support and keep cbz only.
-- **Pagination accuracy (M4)**: paged reading modes currently group a fixed number of blocks
-  per page rather than measuring actual text layout against screen size/font. Pages will not
-  land on a clean boundary the way ReadEra/Moon+ Reader do.
 - **Golden-image screenshot testing (M4)**: the plan originally called for daily-checklist's
   pixel-diff golden-image technique to verify reader themes visually. This pass used
   semantics-tree assertions (`onNodeWithText`, tap-zone hit testing) instead, which verify

@@ -20,10 +20,11 @@ fun ReaderScreen(
     showTapZoneLabels: Boolean = false,
     onTapAction: (TapAction) -> Unit = {},
     onPageChanged: (index: Int, pageCount: Int) -> Unit = { _, _ -> },
+    modifier: Modifier = Modifier,
 ) {
     KeepScreenAwakeEffect(settings.keepScreenAwake)
 
-    Box(modifier = Modifier.fillMaxSize().background(theme.backgroundColor())) {
+    Box(modifier = modifier.fillMaxSize().background(theme.backgroundColor())) {
         when (settings.readingMode) {
             ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(document, theme, settings, Modifier.fillMaxSize())
             else -> PagedReader(document, theme, settings, Modifier.fillMaxSize(), onPageChanged)
