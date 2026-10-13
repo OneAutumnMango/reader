@@ -12,6 +12,9 @@ interface ProgressDao {
     @Query("SELECT * FROM progress WHERE bookId = :bookId")
     fun observe(bookId: String): Flow<ProgressEntity?>
 
+    @Query("SELECT * FROM progress")
+    fun observeAll(): Flow<List<ProgressEntity>>
+
     @Upsert
     suspend fun upsert(progress: ProgressEntity)
 

@@ -54,6 +54,7 @@ fun AppearanceRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
                         prefs.copy(themePresets = updated)
                     }
                 },
+                showPreview = true,
             )
             Spacer(modifier = Modifier.height(16.dp))
             ReaderThemePresetPicker(

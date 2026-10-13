@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -25,12 +26,15 @@ import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.RichDocument
 import dev.reader.core.theme.ReaderTheme
 
+private val READER_TOP_SPACING = 48.dp
+
 @Composable
 fun PagedReader(
     document: RichDocument,
     theme: ReaderTheme,
     settings: ReaderSettings,
     modifier: Modifier = Modifier,
+    initialPositionFraction: Float = 0f,
     onPageChanged: (index: Int, pageCount: Int) -> Unit = { _, _ -> },
 ) {
     BoxWithConstraints(modifier = modifier) {
@@ -53,13 +57,16 @@ fun PagedReader(
             }
             buildPages(heights, maxHeightPx.toFloat()).map { range -> document.blocks.slice(range) }
         }
-        val pagerState = rememberPagerState(pageCount = { pages.size })
+        val initialPage = (initialPositionFraction * pages.size)
+            .toInt()
+            .coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+        val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { pages.size })
 
         LaunchedEffect(pagerState.currentPage) { onPageChanged(pagerState.currentPage, pagerState.pageCount) }
 
         val pageContent: @Composable (Int) -> Unit = { index ->
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(top = READER_TOP_SPACING),
                 verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
             ) {
                 pages[index].forEach { block -> PagedReaderBlock(block, theme, settings.useBookStyling) }

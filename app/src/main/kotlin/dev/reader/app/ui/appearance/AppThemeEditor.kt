@@ -1,21 +1,15 @@
 package dev.reader.app.ui.appearance
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import dev.reader.core.theme.AppTheme
 import dev.reader.core.theme.AppThemeMode
 
@@ -32,8 +26,14 @@ fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modi
     Column(modifier = modifier) {
         Row {
             SEED_PRESETS.forEach { seed ->
-                SeedSwatch(seed, selected = theme.seedColor == seed) { onChange(theme.copy(seedColor = seed)) }
+                ColorSwatch(
+                    seed,
+                    selected = theme.seedColor == seed,
+                    onClick = { onChange(theme.copy(seedColor = seed)) },
+                    modifier = Modifier.testTag("seed-swatch-${"%08X".format(seed)}"),
+                )
             }
+            PickColorButton(theme.seedColor, "Seed colour") { onChange(theme.copy(seedColor = it)) }
         }
 
         OutlinedTextField(
@@ -58,21 +58,5 @@ fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modi
                 }
             }
         }
-    }
-}
-
-private const val SWATCH_SIZE_DP = 32
-
-@Composable
-private fun SeedSwatch(seed: Long, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .testTag("seed-swatch-${"%08X".format(seed)}")
-            .size(SWATCH_SIZE_DP.dp)
-            .clip(CircleShape)
-            .background(Color(seed))
-            .clickable(onClick = onClick),
-    ) {
-        if (selected) Text("✓")
     }
 }

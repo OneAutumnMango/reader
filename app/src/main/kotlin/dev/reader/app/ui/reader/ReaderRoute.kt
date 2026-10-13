@@ -25,6 +25,7 @@ import dev.reader.core.model.ChapterId
 import dev.reader.core.model.Progress
 import dev.reader.core.reader.TapAction
 import dev.reader.core.theme.ReaderTheme
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.time.Clock
@@ -49,12 +50,18 @@ fun ReaderRoute(
     var loadFailed by remember(bookId, chapterId) { mutableStateOf(false) }
     var showMenu by remember(bookId, chapterId) { mutableStateOf(false) }
     var position by remember(bookId, chapterId) { mutableStateOf(0 to 0) }
+    var initialPositionFraction by remember(bookId, chapterId) { mutableStateOf<Float?>(null) }
 
     LaunchedEffect(book, chapter) {
         val b = book ?: return@LaunchedEffect
         val c = chapter ?: return@LaunchedEffect
         content = ChapterLoader.load(context, b, c)
         loadFailed = content == null
+    }
+
+    LaunchedEffect(bookId, chapterId) {
+        val saved = graph.progress.observe(bookId).first()
+        initialPositionFraction = saved?.takeIf { it.chapterId == chapterId }?.position ?: 0f
     }
 
     fun onTapAction(action: TapAction) {
@@ -93,15 +100,17 @@ fun ReaderRoute(
 
     val prefs = preferences
     val loaded = content
+    val startFraction = initialPositionFraction
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
-            loaded is ChapterContent.Text && prefs != null -> {
+            loaded is ChapterContent.Text && prefs != null && startFraction != null -> {
                 val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
                 ReaderScreen(
                     document = loaded.document,
                     theme = theme,
                     settings = prefs.readerSettings,
+                    initialPositionFraction = startFraction,
                     onTapAction = ::onTapAction,
                     onPageChanged = ::onPageChanged,
                     modifier = Modifier.fillMaxSize(),

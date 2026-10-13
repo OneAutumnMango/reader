@@ -44,6 +44,8 @@ fun LibraryRoute(
     graph: ReaderGraph,
     onOpenBook: (Book) -> Unit,
     onSearchClick: () -> Unit,
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState =
+        androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -51,6 +53,7 @@ fun LibraryRoute(
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
     val preferences by graph.settings.preferences.collectAsState(initial = null)
+    val progressByBook by graph.progress.observeAll().collectAsState(initial = emptyMap())
     var selectedCategory by remember { mutableStateOf<CategoryId?>(null) }
     val importActions = rememberImportActions(graph)
     var showQuickAddMenu by remember { mutableStateOf(false) }
@@ -77,7 +80,8 @@ fun LibraryRoute(
             books = books,
             categories = categories,
             selectedCategory = selectedCategory,
-            progressFor = { null },
+            progressFor = { id -> progressByBook[id]?.takeUnless { it.finished }?.position },
+            finishedFor = { id -> progressByBook[id]?.finished ?: false },
             onCategorySelected = { selectedCategory = it },
             onBookClick = onOpenBook,
             onBookLongClick = { longPressedBook = it },
@@ -90,6 +94,7 @@ fun LibraryRoute(
                 }
             },
             layout = preferences?.libraryLayout ?: LibraryLayout.MEDIUM,
+            gridState = gridState,
         )
 
         longPressedBook?.let { book ->

@@ -1,6 +1,7 @@
 package dev.reader.app.ui.library
 
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -14,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
@@ -44,5 +46,24 @@ class BookDetailScreenTest {
         composeRule.onNodeWithText("Two").performScrollTo().performClick()
 
         assertEquals(chapters[1], clicked)
+    }
+
+    @Test
+    fun `clicking resume reports it`() {
+        var resumed = false
+        composeRule.setContent {
+            BookDetailScreen(
+                book,
+                chapters,
+                emptyList(),
+                onChapterClick = {},
+                resumeLabel = "Resume",
+                onResume = { resumed = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("resume-button").performClick()
+
+        assertTrue(resumed)
     }
 }

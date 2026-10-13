@@ -68,6 +68,7 @@ private fun titleFor(destination: Destination): String = when (destination) {
 @Composable
 fun ReaderApp(graph: ReaderGraph) {
     val navigator = remember { Navigator() }
+    val libraryGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
 
     LaunchedEffect(Unit) { graph.rootFolderScanner.scanAll() }
 
@@ -83,6 +84,7 @@ fun ReaderApp(graph: ReaderGraph) {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = false,
         drawerContent = {
             ModalDrawerSheet {
                 DRAWER_DESTINATIONS.forEach { (destination, labelAndIcon) ->
@@ -133,6 +135,7 @@ fun ReaderApp(graph: ReaderGraph) {
                     graph,
                     onOpenBook = { navigator.push(Destination.BookDetail(it.id)) },
                     onSearchClick = { navigator.push(Destination.Search) },
+                    gridState = libraryGridState,
                     modifier = content,
                 )
                 Destination.Search -> SearchRoute(

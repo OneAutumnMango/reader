@@ -127,4 +127,16 @@ class BookImporterTest {
         assertEquals("My Story", cleanTitle("My Story"))
         assertEquals("01 - Chapter One", cleanTitle("01 - Chapter One"))
     }
+
+    @Test
+    fun `importing the same file twice does not create a duplicate book`() = runBlocking {
+        val file = File(tempDir, "My Story.txt").apply { writeText("First paragraph.") }
+
+        val first = importer.importFile(file)
+        val second = importer.importFile(file)
+
+        assertEquals(first.id, second.id)
+        val allBooks = LibraryRepository(database).observeBooks().first()
+        assertEquals(1, allBooks.size)
+    }
 }

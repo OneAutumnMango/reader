@@ -1,6 +1,7 @@
 package dev.reader.app.ui.reader
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,15 +18,22 @@ import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.RichDocument
 import dev.reader.core.theme.ReaderTheme
 
+private val READER_TOP_SPACING = 48.dp
+private val READER_BOTTOM_SPACING = 24.dp
+
 @Composable
 fun ContinuousReader(
     document: RichDocument,
     theme: ReaderTheme,
     settings: ReaderSettings,
     modifier: Modifier = Modifier,
+    initialPositionFraction: Float = 0f,
     onPositionChanged: (index: Int, total: Int) -> Unit = { _, _ -> },
 ) {
-    val listState = rememberLazyListState()
+    val initialIndex = (initialPositionFraction * document.blocks.size)
+        .toInt()
+        .coerceIn(0, (document.blocks.size - 1).coerceAtLeast(0))
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     LaunchedEffect(listState.firstVisibleItemIndex, document.blocks.size) {
         onPositionChanged(listState.firstVisibleItemIndex, document.blocks.size)
     }
@@ -34,6 +42,7 @@ fun ContinuousReader(
         LazyColumn(
             state = listState,
             modifier = modifier,
+            contentPadding = PaddingValues(top = READER_TOP_SPACING, bottom = READER_BOTTOM_SPACING),
             verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
         ) {
             items(document.blocks) { block -> ReaderBlock(block, theme, settings.useBookStyling) }

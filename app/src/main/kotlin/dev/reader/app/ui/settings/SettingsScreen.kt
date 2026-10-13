@@ -43,7 +43,9 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(top = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         MenuSection("Library") {

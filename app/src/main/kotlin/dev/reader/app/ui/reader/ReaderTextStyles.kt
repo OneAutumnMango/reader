@@ -37,7 +37,11 @@ fun ReaderTheme.backgroundColor(): Color = Color(backgroundColor)
 
 private fun ReaderTheme.resolveTextAlign(blockAlign: Justification?, useBookStyling: Boolean): TextAlign {
     val effective = if (useBookStyling) blockAlign ?: justification else justification
-    return if (effective == Justification.JUSTIFY) TextAlign.Justify else TextAlign.Start
+    return when (effective) {
+        Justification.JUSTIFY -> TextAlign.Justify
+        Justification.END -> TextAlign.End
+        Justification.START -> TextAlign.Start
+    }
 }
 
 fun List<Span>.toAnnotatedString(

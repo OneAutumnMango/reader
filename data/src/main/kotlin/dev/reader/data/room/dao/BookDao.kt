@@ -25,6 +25,9 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE id = :id")
     suspend fun getById(id: String): BookEntity?
 
+    @Query("SELECT * FROM books WHERE sourcePath = :sourcePath LIMIT 1")
+    suspend fun findBySourcePath(sourcePath: String): BookEntity?
+
     @Upsert
     suspend fun upsert(book: BookEntity)
 

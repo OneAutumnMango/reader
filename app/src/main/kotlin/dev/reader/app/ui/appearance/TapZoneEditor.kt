@@ -99,6 +99,20 @@ fun TapZoneEditor(config: TapZoneConfig, onChange: (TapZoneConfig) -> Unit, modi
             Text("Add zone")
         }
 
+        OutlinedButton(
+            onClick = {
+                onChange(
+                    config.copy(
+                        zones = listOf(TapZone(0f, 0f, 1f, 1f, TapAction.OPEN_MENU)),
+                    ),
+                )
+                selectedZone = null
+            },
+            modifier = Modifier.testTag("whole-screen-menu-button"),
+        ) {
+            Text("Whole screen = open menu")
+        }
+
         Legend()
 
         val zone = selectedZone

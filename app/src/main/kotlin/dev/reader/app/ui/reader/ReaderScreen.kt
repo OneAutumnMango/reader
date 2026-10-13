@@ -18,6 +18,7 @@ fun ReaderScreen(
     theme: ReaderTheme,
     settings: ReaderSettings,
     showTapZoneLabels: Boolean = false,
+    initialPositionFraction: Float = 0f,
     onTapAction: (TapAction) -> Unit = {},
     onPageChanged: (index: Int, pageCount: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
@@ -31,9 +32,17 @@ fun ReaderScreen(
                 theme,
                 settings,
                 Modifier.fillMaxSize(),
+                initialPositionFraction,
                 onPageChanged,
             )
-            else -> PagedReader(document, theme, settings, Modifier.fillMaxSize(), onPageChanged)
+            else -> PagedReader(
+                document,
+                theme,
+                settings,
+                Modifier.fillMaxSize(),
+                initialPositionFraction,
+                onPageChanged,
+            )
         }
         TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize())
     }

@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -32,6 +34,8 @@ fun LibraryScreen(
     onSearchClick: () -> Unit,
     onAddCategory: (String) -> Unit,
     layout: LibraryLayout = LibraryLayout.MEDIUM,
+    finishedFor: (BookId) -> Boolean = { false },
+    gridState: LazyGridState = rememberLazyGridState(),
     modifier: Modifier = Modifier,
 ) {
     val visibleBooks = if (selectedCategory == null) books else books.filter { selectedCategory in it.categoryIds }
@@ -42,6 +46,7 @@ fun LibraryScreen(
         SearchBarButton(onClick = onSearchClick, modifier = Modifier.padding(bottom = 8.dp))
         CategoryTabs(categories, selectedCategory, onCategorySelected, onAddCategory)
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Adaptive(minSize = layout.gridColumnMinWidthDp.dp),
             contentPadding = PaddingValues(8.dp),
             modifier = Modifier
@@ -69,6 +74,7 @@ fun LibraryScreen(
                 BookCard(
                     book = book,
                     progress = progressFor(book.id),
+                    finished = finishedFor(book.id),
                     onClick = { onBookClick(book) },
                     onLongClick = { onBookLongClick(book) },
                     modifier = Modifier.padding(4.dp),

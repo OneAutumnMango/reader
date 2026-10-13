@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.appearance.ReaderSettingsEditor
@@ -35,6 +36,7 @@ import dev.reader.core.reader.ReadingMode
 import dev.reader.core.theme.ReaderTheme
 
 private val EXPANDED_PANEL_MAX_HEIGHT = 420.dp
+private val MENU_SHADOW_ELEVATION = 8.dp
 private const val PERCENT_MAX = 100
 
 /** Formats chapter position as "Page X of Y" for paged modes, or a percentage for continuous scroll. */
@@ -64,7 +66,7 @@ fun ReaderMenuOverlay(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth().shadow(MENU_SHADOW_ELEVATION)) {
         AnimatedVisibility(visible = expanded) {
             Surface(tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -83,23 +85,26 @@ fun ReaderMenuOverlay(
         }
 
         Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.testTag("reader-menu-back")) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(progressLabel, style = MaterialTheme.typography.labelLarge)
-                IconButton(
-                    onClick = { expanded = !expanded },
-                    modifier = Modifier.testTag("reader-menu-expand"),
+            Column {
+                HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Icon(
-                        if (expanded) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
-                        contentDescription = if (expanded) "Collapse" else "Expand",
-                    )
+                    IconButton(onClick = onBack, modifier = Modifier.testTag("reader-menu-back")) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                    Text(progressLabel, style = MaterialTheme.typography.labelLarge)
+                    IconButton(
+                        onClick = { expanded = !expanded },
+                        modifier = Modifier.testTag("reader-menu-expand"),
+                    ) {
+                        Icon(
+                            if (expanded) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
+                            contentDescription = if (expanded) "Collapse" else "Expand",
+                        )
+                    }
                 }
             }
         }

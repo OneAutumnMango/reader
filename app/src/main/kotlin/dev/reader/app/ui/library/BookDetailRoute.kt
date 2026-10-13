@@ -23,6 +23,8 @@ fun BookDetailRoute(
     val book = books.find { it.id == bookId } ?: return
     val chapters by graph.library.observeChapters(bookId).collectAsState(initial = emptyList())
     val bookmarks by graph.bookmarks.observe(bookId).collectAsState(initial = emptyList())
+    val progress by graph.progress.observe(bookId).collectAsState(initial = null)
+    val currentChapter = chapters.find { it.id == progress?.chapterId }
 
     Column(modifier = modifier) {
         if (bookmarks.isNotEmpty()) {
@@ -33,6 +35,9 @@ fun BookDetailRoute(
             chapters = chapters,
             bookmarks = bookmarks,
             onChapterClick = onOpenChapter,
+            currentChapterOrderIndex = currentChapter?.orderIndex,
+            resumeLabel = if (currentChapter != null) "Resume" else "Start reading",
+            onResume = { (currentChapter ?: chapters.firstOrNull())?.let(onOpenChapter) },
         )
     }
 }

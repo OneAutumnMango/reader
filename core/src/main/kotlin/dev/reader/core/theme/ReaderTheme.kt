@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 enum class Justification {
     START,
     JUSTIFY,
+    END,
 }
 
 /** A saveable, loadable set of reader typography and spacing options. */

@@ -34,16 +34,17 @@ class BookImporter(
             "unsupported extension: ${file.extension}"
         }
         val parsed = parse(file, format, pdfContext)
-        val bookId = BookId(newId())
+        val existing = library.findBySourcePath(file.path)
+        val bookId = existing?.id ?: BookId(newId())
         val book = Book(
             id = bookId,
-            title = cleanTitle(parsed.title),
+            title = existing?.title ?: cleanTitle(parsed.title),
             author = parsed.author,
-            coverPath = materializeCover(file, format, bookId, parsed.coverPath),
+            coverPath = existing?.coverPath ?: materializeCover(file, format, bookId, parsed.coverPath),
             format = format,
             sourcePath = file.path,
-            categoryIds = categoryIds,
-            addedAt = now(),
+            categoryIds = existing?.categoryIds ?: categoryIds,
+            addedAt = existing?.addedAt ?: now(),
         )
         val chapters = parsed.chapters.mapIndexed { index, chapter -> chapter.toChapterModel(bookId, index) }
         library.upsertBook(book, chapters)
@@ -54,7 +55,8 @@ class BookImporter(
         val files = (folder.listFiles { f -> f.isFile } ?: emptyArray())
             .sortedWith(compareBy(NaturalSortComparator) { it.name })
 
-        val bookId = BookId(newId())
+        val existing = library.findBySourcePath(folder.path)
+        val bookId = existing?.id ?: BookId(newId())
         val chapters = files.mapIndexedNotNull { index, file ->
             val format = BookFormat.fromExtension(file.extension) ?: return@mapIndexedNotNull null
             val parsed = parse(file, format, pdfContext = null)
@@ -71,14 +73,15 @@ class BookImporter(
 
         val book = Book(
             id = bookId,
-            title = cleanTitle(folder.name),
+            title = existing?.title ?: cleanTitle(folder.name),
+            coverPath = existing?.coverPath,
             format = chapters.firstOrNull()
                 ?.let { BookFormat.fromExtension(File(it.sourcePath).extension) }
                 ?: BookFormat.TXT,
             sourcePath = folder.path,
             isLightNovel = true,
-            categoryIds = categoryIds,
-            addedAt = now(),
+            categoryIds = existing?.categoryIds ?: categoryIds,
+            addedAt = existing?.addedAt ?: now(),
         )
         library.upsertBook(book, chapters)
         return book

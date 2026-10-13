@@ -1,11 +1,16 @@
 package dev.reader.app.ui.appearance
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.center
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import dev.reader.core.reader.TapAction
 import dev.reader.core.reader.TapZoneConfig
@@ -66,11 +71,13 @@ class TapZoneEditorTest {
     fun `removing a zone drops it from the config`() {
         var config = TapZoneConfig()
         composeRule.setContent {
-            TapZoneEditor(config, onChange = { config = it })
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                TapZoneEditor(config, onChange = { config = it })
+            }
         }
 
         composeRule.onNodeWithTag("tap-zone-editor-0").performClick()
-        composeRule.onNodeWithTag("remove-zone-button").performClick()
+        composeRule.onNodeWithTag("remove-zone-button").performScrollTo().performClick()
 
         assertEquals(2, config.zones.size)
     }
@@ -85,6 +92,21 @@ class TapZoneEditorTest {
         composeRule.onNodeWithTag("add-zone-button").performClick()
 
         composeRule.onNodeWithTag("zone-region-picker").assertExists()
+    }
+
+    @Test
+    fun `whole screen button sets a single open-menu zone`() {
+        var config = TapZoneConfig()
+        composeRule.setContent {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                TapZoneEditor(config, onChange = { config = it })
+            }
+        }
+
+        composeRule.onNodeWithTag("whole-screen-menu-button").performScrollTo().performClick()
+
+        assertEquals(1, config.zones.size)
+        assertEquals(TapAction.OPEN_MENU, config.zones.single().action)
     }
 
     @Test

@@ -1,10 +1,11 @@
 package dev.reader.app.ui.reader
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import dev.reader.core.reader.TapAction
 import dev.reader.core.reader.TapZoneConfig
 import org.junit.Rule
@@ -26,7 +27,8 @@ class TapZoneOverlayTest {
             TapZoneOverlay(config = TapZoneConfig(), showLabels = false, onAction = { lastAction = it })
         }
 
-        composeRule.onNodeWithTag("tap-zone-0").performClick()
+        composeRule.onNodeWithTag("tap-zone-overlay")
+            .performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.1f, height * 0.5f)) }
 
         assertEquals(TapAction.PREVIOUS, lastAction)
     }
@@ -38,7 +40,8 @@ class TapZoneOverlayTest {
             TapZoneOverlay(config = TapZoneConfig(), showLabels = false, onAction = { lastAction = it })
         }
 
-        composeRule.onNodeWithTag("tap-zone-2").performClick()
+        composeRule.onNodeWithTag("tap-zone-overlay")
+            .performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.9f, height * 0.5f)) }
 
         assertEquals(TapAction.NEXT, lastAction)
     }
@@ -50,7 +53,7 @@ class TapZoneOverlayTest {
             TapZoneOverlay(config = TapZoneConfig(enabled = false), showLabels = false, onAction = { lastAction = it })
         }
 
-        composeRule.onAllNodesWithTag("tap-zone-0").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("tap-zone-overlay").assertCountEquals(0)
         assertEquals(null, lastAction)
     }
 }
