@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.core.model.BookId
@@ -13,6 +14,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
@@ -37,7 +39,16 @@ class LibraryScreenTest {
     fun `shows all books when no category selected`() {
         val books = listOf(book("1", "Alpha", setOf(novels)), book("2", "Beta"))
         composeRule.setContent {
-            LibraryScreen(books, categories, null, progressFor = { null }, onCategorySelected = {}, onBookClick = {})
+            LibraryScreen(
+                books,
+                categories,
+                null,
+                progressFor = { null },
+                onCategorySelected = {},
+                onBookClick = {},
+                onSearchClick = {},
+                onAddCategory = {},
+            )
         }
 
         composeRule.onNodeWithText("Alpha").assertExists()
@@ -48,10 +59,40 @@ class LibraryScreenTest {
     fun `filters to the selected category`() {
         val books = listOf(book("1", "Alpha", setOf(novels)), book("2", "Beta"))
         composeRule.setContent {
-            LibraryScreen(books, categories, novels, progressFor = { null }, onCategorySelected = {}, onBookClick = {})
+            LibraryScreen(
+                books,
+                categories,
+                novels,
+                progressFor = { null },
+                onCategorySelected = {},
+                onBookClick = {},
+                onSearchClick = {},
+                onAddCategory = {},
+            )
         }
 
         composeRule.onNodeWithText("Alpha").assertExists()
         composeRule.onAllNodesWithText("Beta").assertCountEquals(0)
+    }
+
+    @Test
+    fun `clicking the search bar reports the click`() {
+        var clicked = false
+        composeRule.setContent {
+            LibraryScreen(
+                emptyList(),
+                categories,
+                null,
+                progressFor = { null },
+                onCategorySelected = {},
+                onBookClick = {},
+                onSearchClick = { clicked = true },
+                onAddCategory = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Search books, chapters...").performClick()
+
+        assertTrue(clicked)
     }
 }

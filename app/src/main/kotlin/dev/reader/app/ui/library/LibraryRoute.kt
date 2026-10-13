@@ -1,10 +1,14 @@
 package dev.reader.app.ui.library
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -13,48 +17,32 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import dev.reader.app.data.ContentFileCopier
+import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
+import dev.reader.app.ui.rememberImportActions
 import dev.reader.core.model.Book
+import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 @Composable
-fun LibraryRoute(graph: ReaderGraph, onOpenBook: (Book) -> Unit, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
+fun LibraryRoute(
+    graph: ReaderGraph,
+    onOpenBook: (Book) -> Unit,
+    onSearchClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val scope = rememberCoroutineScope()
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
     var selectedCategory by remember { mutableStateOf<CategoryId?>(null) }
-    var status by remember { mutableStateOf("") }
+    val importActions = rememberImportActions(graph)
+    var showQuickAddMenu by remember { mutableStateOf(false) }
 
-    val addFilesLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        scope.launch {
-            var imported = 0
-            uris.forEach { uri ->
-                val file = ContentFileCopier.copyToCache(context, uri) ?: return@forEach
-                if (runCatching { graph.importer.importFile(file) }.isSuccess) imported++
-            }
-            status = "Imported $imported of ${uris.size} file(s)"
-        }
-    }
-    val addFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { treeUri ->
-        if (treeUri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val folder = ContentFileCopier.copyTreeToCache(context, treeUri)
-            val imported = folder?.let { runCatching { graph.importer.importLightNovelFolder(it) }.isSuccess } == true
-            status = if (imported) "Imported light novel" else "Could not import that folder"
-        }
-    }
-
-    Column(modifier = modifier) {
-        Row {
-            Button(onClick = { addFilesLauncher.launch(arrayOf("*/*")) }) { Text("Add files") }
-            Button(onClick = { addFolderLauncher.launch(null) }) { Text("Add light novel folder") }
-        }
-        if (status.isNotBlank()) Text(status)
+    Box(modifier = modifier.fillMaxSize()) {
         LibraryScreen(
             books = books,
             categories = categories,
@@ -62,6 +50,36 @@ fun LibraryRoute(graph: ReaderGraph, onOpenBook: (Book) -> Unit, modifier: Modif
             progressFor = { null },
             onCategorySelected = { selectedCategory = it },
             onBookClick = onOpenBook,
+            onSearchClick = onSearchClick,
+            onAddCategory = { name ->
+                scope.launch {
+                    graph.library.upsertCategory(
+                        Category(id = CategoryId(UUID.randomUUID().toString()), name = name),
+                    )
+                }
+            },
         )
+
+        Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
+            FloatingActionButton(onClick = { showQuickAddMenu = true }) {
+                Icon(Icons.Filled.Add, contentDescription = "Add book")
+            }
+            DropdownMenu(expanded = showQuickAddMenu, onDismissRequest = { showQuickAddMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Add files") },
+                    onClick = {
+                        showQuickAddMenu = false
+                        importActions.addFiles()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Add light novel folder") },
+                    onClick = {
+                        showQuickAddMenu = false
+                        importActions.addFolder()
+                    },
+                )
+            }
+        }
     }
 }

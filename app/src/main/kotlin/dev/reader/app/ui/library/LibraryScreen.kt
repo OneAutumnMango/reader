@@ -24,12 +24,15 @@ fun LibraryScreen(
     progressFor: (BookId) -> Float?,
     onCategorySelected: (CategoryId?) -> Unit,
     onBookClick: (Book) -> Unit,
+    onSearchClick: () -> Unit,
+    onAddCategory: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val visibleBooks = if (selectedCategory == null) books else books.filter { selectedCategory in it.categoryIds }
 
     Column(modifier = modifier) {
-        CategoryTabs(categories, selectedCategory, onCategorySelected)
+        SearchBarButton(onClick = onSearchClick, modifier = Modifier.padding(bottom = 8.dp))
+        CategoryTabs(categories, selectedCategory, onCategorySelected, onAddCategory)
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = GRID_COLUMN_MIN_WIDTH_DP.dp),
             contentPadding = PaddingValues(8.dp),

@@ -10,9 +10,9 @@ original requirements this plan implements.
 | `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 13 |
 | `:parser` | M2 complete + CSS subset. | 10 |
 | `:data` | M3, M5 importer, M7 export/import complete. | 13 |
-| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors. | 47 |
+| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors, nav drawer/settings UI polish. | 51 |
 
-83 tests total. Run everything: `./scripts/test.sh --lint`.
+88 tests total. Run everything: `./scripts/test.sh --lint`.
 
 ---
 
@@ -185,12 +185,14 @@ what's left and why.
 
 ## Open questions for review
 
-Resolved since the last pass: navigation now connects every screen (`ReaderApp` +
-`Navigator`, library → detail → reader/bookmarks, bottom nav for library/search/stats/
-appearance/import-export), SAF file pickers are wired for add-files/add-folder/export/
-import, the CSS subset is applied in the renderer, pagination is now measured rather
-than block-chunked, and there's an `AppTheme` palette editor plus a named `ReaderTheme`
-preset picker. What's left:
+Resolved since the last pass: navigation now uses a swipeable `ModalNavigationDrawer`
+(hamburger icon on root screens, back arrow on pushed screens) with drawer items for
+Library/Appearance/Stats/Import-Export/Settings; the Library screen has a clickable
+search bar at the top (pushes `Destination.Search`) and a `+` FAB with a dropdown for
+quick-adding files or a light-novel folder; a new Settings screen holds the add-files/
+add-folder buttons; `CategoryTabs` has a trailing "+" tab that opens a dialog to create
+a new category; non-Reader screens get a consistent horizontal content margin, while the
+Reader destination stays edge-to-edge with no drawer/top bar. What's left:
 
 - **PDF / CBZ / CBR aren't wired into the reader screen**: `ChapterLoader` only handles
   txt/md/html/epub; opening a PDF or comic book from the library will fail to load. The
@@ -203,8 +205,6 @@ preset picker. What's left:
   and the stats screen work from whatever's in the `reading_sessions` table, but nothing
   in `ReaderRoute` calls `recordSession(...)` yet, so the stats page will show zeros on
   a real device until that's wired up.
-- **Added categories have no UI**: `CategoryTabs` reads categories but there's no "create
-  category" button, and newly imported books aren't assigned to one.
 - **requirement 21** ("progress tracker... page 14/100, 14%, chapter X"): `Progress` is
   now persisted per page change, but there's no on-screen indicator widget in the reader
   UI showing it live.
