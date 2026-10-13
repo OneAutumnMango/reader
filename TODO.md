@@ -7,10 +7,10 @@ original requirements this plan implements.
 
 | Module | State | Tests |
 | --- | --- | --- |
-| `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 11 |
+| `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 13 |
 | `:parser` | M2 complete. | 6 |
-| `:data` | M3 complete. | 10 |
-| `:app` | M4 (reader rendering core) complete. | 8 |
+| `:data` | M3 + importer (M5) complete. | 12 |
+| `:app` | M4 + library UI (M5) complete. | 15 |
 
 Run everything: `./scripts/test.sh` (or `--core-only` before `:parser`/`:data`/`:app` need the Android SDK).
 
@@ -108,12 +108,23 @@ this file.
 
 ## M5 — Library & book management (`:app`)
 
-- [ ] Shosetsu-style library grid/list: cover, title, progress bar.
-- [ ] Swipeable category tabs — add/rename/reorder, default "All" category.
-- [ ] Add books: single file, multiple files, folder picker (auto-discovery), light-novel
-      folder import (one folder = one book, files = chapters).
-- [ ] Book detail screen: chapter list with progress, bookmarks.
-- [ ] Edit metadata overrides (title/author/cover) without touching the source file.
+- [x] `BookImporter` (`:data`): single-file import (txt/md/html/epub/cbz/cbr/pdf) and
+      light-novel folder import (one folder = one book, each file = one chapter,
+      naturally sorted). Generates `Book`/`Chapter` and saves via `LibraryRepository`.
+- [x] Shosetsu-style library grid: `BookCard`/`BookCover` (cover image via Coil, or a
+      lettered placeholder), progress bar when in progress.
+- [x] Swipeable category tabs (`CategoryTabs`, `PrimaryScrollableTabRow`) — "All" plus
+      one tab per `Category`; `LibraryScreen` filters books by the selected category.
+- [x] Book detail screen (`BookDetailScreen`): chapter list with click-through, bookmark count.
+- [x] 7 Compose UI tests (card click/content, category filtering, chapter click) +
+      2 `BookImporter` Robolectric tests. detekt clean.
+- [ ] Add-book UI (file/folder pickers via SAF `ActivityResultContracts`) — the import
+      *logic* exists (`BookImporter`), but the picker UI itself needs a real Activity and
+      is best verified manually/on-device; not meaningfully testable under Robolectric.
+- [ ] Folder auto-discovery scanning (watch a folder, re-scan on demand) — still deferred,
+      now to M7 alongside import/export, since both need the same SAF plumbing.
+- [ ] Edit metadata overrides (title/author/cover) without touching the source file —
+      deferred to M6 alongside the appearance editor's dialog patterns.
 
 ## M6 — Search, bookmarks, appearance editor (`:app`)
 

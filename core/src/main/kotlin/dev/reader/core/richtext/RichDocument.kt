@@ -16,3 +16,15 @@ data class Span(
     val italic: Boolean = false,
     val underline: Boolean = false,
 )
+
+fun RichDocument.wordCount(): Int = blocks.sumOf { it.wordCount() }
+
+private fun Block.wordCount(): Int = when (this) {
+    is Block.Paragraph -> spans.wordCount()
+    is Block.Heading -> spans.wordCount()
+    is Block.ListItem -> spans.wordCount()
+    is Block.Image -> 0
+}
+
+private fun List<Span>.wordCount(): Int =
+    sumOf { span -> span.text.trim().split(Regex("\\s+")).count { it.isNotBlank() } }
