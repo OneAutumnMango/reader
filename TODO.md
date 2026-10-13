@@ -9,8 +9,10 @@ original requirements this plan implements.
 | --- | --- | --- |
 | `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 13 |
 | `:parser` | M2 complete. | 6 |
-| `:data` | M3 + importer (M5) complete. | 12 |
-| `:app` | M4, M5, M6 complete. | 28 |
+| `:data` | M3, M5 importer, M7 export/import complete. | 13 |
+| `:app` | M4, M5, M6, M7 complete. | 35 |
+
+67 tests total. Run everything: `./scripts/test.sh --lint`.
 
 Run everything: `./scripts/test.sh` (or `--core-only` before `:parser`/`:data`/`:app` need the Android SDK).
 
@@ -151,9 +153,21 @@ before sliders. Recorded in repo memory for next time.
 
 ## M7 — Import/export UI + analytics (`:app`)
 
-- [ ] Export/import screens for the M3 bundle format.
-- [ ] Analytics/Stats page: books finished, total reading time, total words read,
-      average WPM, streaks — replayed from the `reading_sessions` log.
+- [x] `ExportBundle`/`ExportRepository` (`:data`): serializes every book, chapter, category,
+      bookmark, progress row and the preferences file to one JSON blob; `import()` restores
+      all of it into a (possibly fresh) database + settings store. Round-trip tested.
+- [x] `ImportExportScreen` (`:app`): export/import buttons + status message; the actual
+      file-save/open picker (SAF `ActivityResultContracts.CreateDocument`/`OpenDocument`) is
+      the caller's job and isn't meaningfully testable under Robolectric — same reasoning as
+      the M5 add-book pickers.
+- [x] `StatsScreen`: books finished, total reading time (`Duration.toReadableDuration()`,
+      e.g. "2h 15m"), total words read, average WPM, current streak — replayed from
+      `StatsRepository`/`StatsCalculator` (M1/M3).
+- [x] 7 tests (duration formatting, stats display, import/export button wiring), detekt clean.
+
+With M7 done, every milestone in this file that doesn't depend on a real file picker or a
+ported palette-generation helper is complete. See "Open questions for review" below for
+what's left and why.
 
 ## Future (do not do unless specifically told)
 
