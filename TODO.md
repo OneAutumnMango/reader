@@ -8,7 +8,7 @@ original requirements this plan implements.
 | Module | State | Tests |
 | --- | --- | --- |
 | `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 11 |
-| `:parser` | Not started. | 0 |
+| `:parser` | M2 complete. | 6 |
 | `:data` | Not started. | 0 |
 | `:app` | Scaffold only (MainActivity stub). | 0 |
 
@@ -45,16 +45,21 @@ Run everything: `./scripts/test.sh` (or `--core-only` before `:parser`/`:data`/`
 
 ## M2 — Format parsers (`:parser`)
 
-- [ ] Unified `ParsedBook` model (metadata + chapters as `RichDocument` or image pages).
-- [ ] `TxtParser` — paragraphs split on blank lines.
-- [ ] `MarkdownParser` (commonmark-java) — headings/lists/emphasis to `RichDocument`.
-- [ ] `HtmlParser` (Jsoup) — reused by both standalone HTML files and EPUB chapters.
-- [ ] `EpubParser` (`java.util.zip` + Jsoup over OPF/NCX) — metadata, cover, chapter order.
-- [ ] `ComicArchiveParser` — cbz via zip; cbr via junrar, flagged experimental (licensing).
-- [ ] `PdfTextParser` (pdfbox-android) — reflow-mode text extraction.
-- [ ] `PdfPageRenderer` (`android.graphics.pdf.PdfRenderer`) — fixed-page mode; Android-only,
-      weak Robolectric coverage, verify manually rather than by unit test.
-- [ ] Per-format fixture files under `src/test/resources`, unit tests per parser.
+- [x] Unified `ParsedBook`/`ParsedChapter` model (text chapters as `RichDocument`, image
+      chapters as an ordered page list).
+- [x] `TxtParser` — paragraphs split on blank lines.
+- [x] `MarkdownParser` (commonmark-java) — renders to HTML, reuses the HTML converter.
+- [x] `HtmlParser` (Jsoup) + shared `parseHtmlToRichDocument` — reused by Markdown and EPUB too.
+- [x] `EpubParser` (`java.util.zip` + Jsoup XML parser over container.xml/OPF) — metadata,
+      cover (`<meta name=cover>` or `properties=cover-image`), spine-ordered chapters.
+- [x] `ComicArchiveParser` — cbz via `java.util.zip`; cbr via junrar. cbr has no automated
+      fixture test (no tooling to author a `.rar` in this environment) — cbr stays experimental
+      pending a real-world fixture.
+- [x] `PdfTextParser` (pdfbox-android, reflow mode) — text extraction, paragraph-split like Txt.
+- [x] `PdfPageRenderer` (`android.graphics.pdf.PdfRenderer`, fixed-page mode) — implemented,
+      not covered by an automated test (PdfRenderer needs a real FD/surface); verify manually.
+- [x] Unit tests: Txt/Html/Markdown/Epub/Cbz run as plain JVM tests; Pdf runs under Robolectric
+      (round-trips a pdfbox-android-generated PDF — confirms the library works under Robolectric).
 
 ## M3 — Data layer (`:data`)
 
