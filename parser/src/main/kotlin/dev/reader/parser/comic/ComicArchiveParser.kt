@@ -44,4 +44,21 @@ object ComicArchiveParser {
                 .map { it.fileName }
                 .filter { it.substringAfterLast('.', "").lowercase() in IMAGE_EXTENSIONS }
         }
+
+    /** Reads one page's raw image bytes out of the archive, by its entry/file name. */
+    fun readPage(file: File, format: BookFormat, pageName: String): ByteArray = when (format) {
+        BookFormat.CBZ -> ZipFile(file).use { zip ->
+            val entry = requireNotNull(zip.getEntry(pageName)) { "no such page: $pageName" }
+            zip.getInputStream(entry).use { it.readBytes() }
+        }
+        BookFormat.CBR -> Archive(file).use { archive ->
+            val header = requireNotNull(archive.fileHeaders.firstOrNull { it.fileName == pageName }) {
+                "no such page: $pageName"
+            }
+            val output = java.io.ByteArrayOutputStream()
+            archive.extractFile(header, output)
+            output.toByteArray()
+        }
+        else -> error("not a comic archive: $format")
+    }
 }

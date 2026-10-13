@@ -14,6 +14,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import dev.reader.app.data.ChapterContent
 import dev.reader.app.data.ChapterLoader
 import dev.reader.app.data.ReaderGraph
 import dev.reader.core.model.BookId
@@ -22,7 +24,6 @@ import dev.reader.core.model.BookmarkId
 import dev.reader.core.model.ChapterId
 import dev.reader.core.model.Progress
 import dev.reader.core.reader.TapAction
-import dev.reader.core.richtext.RichDocument
 import dev.reader.core.theme.ReaderTheme
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -36,6 +37,7 @@ fun ReaderRoute(
     onOpenMenu: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val chapters by graph.library.observeChapters(bookId).collectAsState(initial = emptyList())
@@ -43,59 +45,79 @@ fun ReaderRoute(
     val chapter = chapters.find { it.id == chapterId }
     val preferences by graph.settings.preferences.collectAsState(initial = null)
 
-    var document by remember(bookId, chapterId) { mutableStateOf<RichDocument?>(null) }
+    var content by remember(bookId, chapterId) { mutableStateOf<ChapterContent?>(null) }
     var loadFailed by remember(bookId, chapterId) { mutableStateOf(false) }
 
     LaunchedEffect(book, chapter) {
         val b = book ?: return@LaunchedEffect
         val c = chapter ?: return@LaunchedEffect
-        document = ChapterLoader.load(b, c)
-        loadFailed = document == null
+        content = ChapterLoader.load(context, b, c)
+        loadFailed = content == null
+    }
+
+    fun onTapAction(action: TapAction) {
+        when (action) {
+            TapAction.OPEN_MENU -> onOpenMenu()
+            TapAction.TOGGLE_BOOKMARK -> scope.launch {
+                graph.bookmarks.add(
+                    Bookmark(
+                        id = BookmarkId(UUID.randomUUID().toString()),
+                        bookId = bookId,
+                        chapterId = chapterId,
+                        position = 0f,
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            }
+            else -> Unit
+        }
+    }
+
+    fun onPageChanged(index: Int, pageCount: Int) {
+        if (pageCount > 0) {
+            scope.launch {
+                graph.progress.update(
+                    Progress(
+                        bookId = bookId,
+                        chapterId = chapterId,
+                        position = index.toFloat() / pageCount,
+                        updatedAt = Clock.System.now(),
+                    ),
+                )
+            }
+        }
     }
 
     val prefs = preferences
-    val doc = document
+    val loaded = content
     when {
-        doc != null && prefs != null -> {
+        loaded is ChapterContent.Text && prefs != null -> {
             val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
             ReaderScreen(
-                document = doc,
+                document = loaded.document,
                 theme = theme,
                 settings = prefs.readerSettings,
-                onTapAction = { action ->
-                    when (action) {
-                        TapAction.OPEN_MENU -> onOpenMenu()
-                        TapAction.TOGGLE_BOOKMARK -> scope.launch {
-                            graph.bookmarks.add(
-                                Bookmark(
-                                    id = BookmarkId(UUID.randomUUID().toString()),
-                                    bookId = bookId,
-                                    chapterId = chapterId,
-                                    position = 0f,
-                                    createdAt = Clock.System.now(),
-                                ),
-                            )
-                        }
-                        else -> Unit
-                    }
-                },
-                onPageChanged = { index, pageCount ->
-                    if (pageCount > 0) {
-                        scope.launch {
-                            graph.progress.update(
-                                Progress(
-                                    bookId = bookId,
-                                    chapterId = chapterId,
-                                    position = index.toFloat() / pageCount,
-                                    updatedAt = Clock.System.now(),
-                                ),
-                            )
-                        }
-                    }
-                },
+                onTapAction = ::onTapAction,
+                onPageChanged = ::onPageChanged,
                 modifier = modifier,
             )
         }
+        loaded is ChapterContent.Comic && prefs != null -> ComicReaderScreen(
+            file = loaded.file,
+            format = loaded.format,
+            pages = loaded.pages,
+            tapZones = prefs.readerSettings.tapZones,
+            onTapAction = ::onTapAction,
+            onPageChanged = ::onPageChanged,
+            modifier = modifier,
+        )
+        loaded is ChapterContent.Pdf && prefs != null -> PdfReaderScreen(
+            file = loaded.file,
+            tapZones = prefs.readerSettings.tapZones,
+            onTapAction = ::onTapAction,
+            onPageChanged = ::onPageChanged,
+            modifier = modifier,
+        )
         loadFailed -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Couldn't load this chapter.")
         }

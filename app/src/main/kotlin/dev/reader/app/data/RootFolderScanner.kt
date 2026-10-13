@@ -23,6 +23,7 @@ class RootFolderScanner(
         for (rootUri in prefs.rootFolders) {
             imported += scanRoot(Uri.parse(rootUri))
         }
+        if (imported > 0) AppLog.record("Root folder scan imported $imported new item(s)")
         return imported
     }
 

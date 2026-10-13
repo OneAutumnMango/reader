@@ -31,4 +31,13 @@ class ComicArchiveParserTest {
         assertEquals(listOf("page1.jpg", "page2.jpg", "page10.jpg"), chapter.pages)
         assertEquals("page1.jpg", book.coverPath)
     }
+
+    @Test
+    fun `readPage returns the raw bytes of a named entry`() {
+        val file = buildCbz()
+
+        val bytes = ComicArchiveParser.readPage(file, BookFormat.CBZ, "page1.jpg")
+
+        assertEquals("x", String(bytes))
+    }
 }

@@ -11,26 +11,35 @@ enum class TapAction {
     TOGGLE_BOOKMARK,
 }
 
-/** A 3x3 grid of tap regions overlaid on the reader, row-major from top-left. */
+/** A rectangular tap region, normalized to the reader's size (0f..1f on both axes). */
+@Serializable
+data class TapZone(
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float,
+    val action: TapAction,
+)
+
+/** User-customizable tap regions overlaid on the reader. Later zones win on overlap. */
 @Serializable
 data class TapZoneConfig(
     val enabled: Boolean = true,
-    val zones: List<TapAction> = defaultZones,
+    val zones: List<TapZone> = defaultZones,
 ) {
-    init {
-        require(zones.size == GRID_SIZE * GRID_SIZE) { "tap zone grid must be ${GRID_SIZE}x$GRID_SIZE" }
-    }
-
-    fun actionAt(row: Int, column: Int): TapAction = zones[row * GRID_SIZE + column]
+    /** [x] and [y] are normalized (0f..1f) coordinates within the reader surface. */
+    fun actionAt(x: Float, y: Float): TapAction =
+        zones.lastOrNull { x in it.left..it.right && y in it.top..it.bottom }?.action ?: TapAction.NONE
 
     companion object {
-        const val GRID_SIZE = 3
+        private const val THIRD = 1f / 3f
+        private const val TWO_THIRDS = 2f / 3f
 
-        // Classic reader layout: left column back, right column forward, centre opens the menu.
+        // Classic reader layout: left third back, right third forward, centre opens the menu.
         val defaultZones = listOf(
-            TapAction.PREVIOUS, TapAction.OPEN_MENU, TapAction.NEXT,
-            TapAction.PREVIOUS, TapAction.OPEN_MENU, TapAction.NEXT,
-            TapAction.PREVIOUS, TapAction.OPEN_MENU, TapAction.NEXT,
+            TapZone(0f, 0f, THIRD, 1f, TapAction.PREVIOUS),
+            TapZone(THIRD, 0f, TWO_THIRDS, 1f, TapAction.OPEN_MENU),
+            TapZone(TWO_THIRDS, 0f, 1f, 1f, TapAction.NEXT),
         )
     }
 }

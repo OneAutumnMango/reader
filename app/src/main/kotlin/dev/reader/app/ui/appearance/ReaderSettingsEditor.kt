@@ -1,7 +1,9 @@
 package dev.reader.app.ui.appearance
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -10,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.KeepScreenAwake
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode
@@ -19,7 +22,7 @@ import dev.reader.core.reader.ReadingMode
 fun ReaderSettingsEditor(settings: ReaderSettings, onChange: (ReaderSettings) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Text("Reading mode")
-        Row {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             ReadingMode.entries.forEach { mode ->
                 Row(
                     modifier = Modifier
@@ -43,7 +46,7 @@ fun ReaderSettingsEditor(settings: ReaderSettings, onChange: (ReaderSettings) ->
         }
 
         Text("Keep screen awake")
-        Row {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             KeepScreenAwake.entries.forEach { option ->
                 Row(
                     modifier = Modifier

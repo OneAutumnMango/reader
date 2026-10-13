@@ -3,6 +3,7 @@ package dev.reader.app.ui.library
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.core.model.BookId
@@ -44,5 +45,21 @@ class BookCardTest {
         composeRule.onNodeWithText("My Book").performClick()
 
         assertTrue(clicked)
+    }
+
+    @Test
+    fun `long-pressing the card triggers the long-click callback`() {
+        var longClicked = false
+        composeRule.setContent {
+            BookCard(book = book, progress = null, onClick = {}, onLongClick = { longClicked = true })
+        }
+
+        composeRule.onNodeWithText("My Book").performTouchInput {
+            down(center)
+            advanceEventTime(600L)
+            up()
+        }
+
+        assertTrue(longClicked)
     }
 }

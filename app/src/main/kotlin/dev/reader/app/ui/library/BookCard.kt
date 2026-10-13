@@ -1,5 +1,7 @@
 package dev.reader.app.ui.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,9 +16,16 @@ import androidx.compose.ui.unit.dp
 import dev.reader.core.model.Book
 
 /** A Shosetsu-style library card: cover, title and a progress bar when the book is in progress. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BookCard(book: Book, progress: Float?, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Card(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+fun BookCard(
+    book: Book,
+    progress: Float?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: () -> Unit = {},
+) {
+    Card(modifier = modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
         Column(modifier = Modifier.padding(8.dp)) {
             BookCover(book, modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO))
             Text(book.title, maxLines = 2, overflow = TextOverflow.Ellipsis)

@@ -5,17 +5,22 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.TapAction
+import dev.reader.core.reader.TapZone
 import dev.reader.core.reader.TapZoneConfig
 
 private val ZONE_PREVIEW_HEIGHT = 200.dp
@@ -53,11 +59,12 @@ private fun tapActionLabel(action: TapAction): String = when (action) {
 
 /**
  * Tap a zone on the mini screen preview to select it, then pick what it should do from the
- * action list below — no more guessing what a cell in a rigid grid means.
+ * action list below. "Add zone" opens a full-screen overlay to draw a brand new custom region.
  */
 @Composable
 fun TapZoneEditor(config: TapZoneConfig, onChange: (TapZoneConfig) -> Unit, modifier: Modifier = Modifier) {
     var selectedZone by remember { mutableStateOf<Int?>(null) }
+    var showRegionPicker by remember { mutableStateOf(false) }
 
     Column(modifier = modifier) {
         Text(
@@ -73,29 +80,29 @@ fun TapZoneEditor(config: TapZoneConfig, onChange: (TapZoneConfig) -> Unit, modi
                 .clip(RoundedCornerShape(16.dp))
                 .border(2.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                for (row in 0 until TapZoneConfig.GRID_SIZE) {
-                    Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        for (column in 0 until TapZoneConfig.GRID_SIZE) {
-                            val flatIndex = row * TapZoneConfig.GRID_SIZE + column
-                            ZoneCell(
-                                action = config.zones[flatIndex],
-                                selected = selectedZone == flatIndex,
-                                onClick = { selectedZone = flatIndex },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("tap-zone-editor-$row-$column"),
-                            )
-                        }
-                    }
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                config.zones.forEachIndexed { index, zone ->
+                    ZoneCell(
+                        action = zone.action,
+                        selected = selectedZone == index,
+                        onClick = { selectedZone = index },
+                        modifier = Modifier
+                            .offset(x = maxWidth * zone.left, y = maxHeight * zone.top)
+                            .size(maxWidth * (zone.right - zone.left), maxHeight * (zone.bottom - zone.top))
+                            .testTag("tap-zone-editor-$index"),
+                    )
                 }
             }
+        }
+
+        OutlinedButton(onClick = { showRegionPicker = true }, modifier = Modifier.testTag("add-zone-button")) {
+            Text("Add zone")
         }
 
         Legend()
 
         val zone = selectedZone
-        if (zone != null) {
+        if (zone != null && zone < config.zones.size) {
             Text(
                 "This zone does:",
                 style = MaterialTheme.typography.titleSmall,
@@ -109,15 +116,37 @@ fun TapZoneEditor(config: TapZoneConfig, onChange: (TapZoneConfig) -> Unit, modi
                 TapAction.entries.forEach { action ->
                     ActionChip(
                         action = action,
-                        selected = config.zones[zone] == action,
+                        selected = config.zones[zone].action == action,
                         onClick = {
-                            val zones = config.zones.toMutableList().also { it[zone] = action }
+                            val zones = config.zones.toMutableList()
+                                .also { it[zone] = it[zone].copy(action = action) }
                             onChange(config.copy(zones = zones))
                         },
                     )
                 }
             }
+            TextButton(
+                onClick = {
+                    val zones = config.zones.toMutableList().also { it.removeAt(zone) }
+                    onChange(config.copy(zones = zones))
+                    selectedZone = null
+                },
+                modifier = Modifier.testTag("remove-zone-button"),
+            ) {
+                Text("Remove this zone")
+            }
         }
+    }
+
+    if (showRegionPicker) {
+        ZoneRegionPicker(
+            onConfirm = { newZone: TapZone ->
+                onChange(config.copy(zones = config.zones + newZone))
+                selectedZone = config.zones.size
+                showRegionPicker = false
+            },
+            onDismiss = { showRegionPicker = false },
+        )
     }
 }
 
@@ -125,7 +154,6 @@ fun TapZoneEditor(config: TapZoneConfig, onChange: (TapZoneConfig) -> Unit, modi
 private fun ZoneCell(action: TapAction, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .fillMaxWidth()
             .border(
                 if (selected) ZONE_SELECTED_BORDER_WIDTH else ZONE_BORDER_WIDTH,
                 if (selected) Color.White else Color.White.copy(alpha = 0.4f),

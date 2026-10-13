@@ -20,7 +20,7 @@ import dev.reader.data.store.PreferencesFile
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
+fun SettingsRoute(graph: ReaderGraph, onViewLogHistory: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val actions = rememberImportActions(graph)
@@ -54,6 +54,7 @@ fun SettingsRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         onRemoveRootFolder = { uri ->
             scope.launch { graph.settings.update { it.copy(rootFolders = it.rootFolders - uri) } }
         },
+        onViewLogHistory = onViewLogHistory,
         modifier = modifier,
     )
 }

@@ -20,25 +20,25 @@ class TapZoneOverlayTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `tapping the left column triggers previous`() {
+    fun `tapping the left third triggers previous`() {
         var lastAction: TapAction? = null
         composeRule.setContent {
             TapZoneOverlay(config = TapZoneConfig(), showLabels = false, onAction = { lastAction = it })
         }
 
-        composeRule.onNodeWithTag("tap-zone-1-0").performClick()
+        composeRule.onNodeWithTag("tap-zone-0").performClick()
 
         assertEquals(TapAction.PREVIOUS, lastAction)
     }
 
     @Test
-    fun `tapping the right column triggers next`() {
+    fun `tapping the right third triggers next`() {
         var lastAction: TapAction? = null
         composeRule.setContent {
             TapZoneOverlay(config = TapZoneConfig(), showLabels = false, onAction = { lastAction = it })
         }
 
-        composeRule.onNodeWithTag("tap-zone-0-2").performClick()
+        composeRule.onNodeWithTag("tap-zone-2").performClick()
 
         assertEquals(TapAction.NEXT, lastAction)
     }
@@ -50,7 +50,7 @@ class TapZoneOverlayTest {
             TapZoneOverlay(config = TapZoneConfig(enabled = false), showLabels = false, onAction = { lastAction = it })
         }
 
-        composeRule.onAllNodesWithTag("tap-zone-0-0").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("tap-zone-0").assertCountEquals(0)
         assertEquals(null, lastAction)
     }
 }

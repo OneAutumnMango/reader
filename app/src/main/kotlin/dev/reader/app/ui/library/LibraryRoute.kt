@@ -28,8 +28,11 @@ import dev.reader.app.ui.rememberImportActions
 import dev.reader.core.model.Book
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
+import dev.reader.core.model.Progress
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.time.Clock
 
 @Composable
 fun LibraryRoute(
@@ -44,6 +47,7 @@ fun LibraryRoute(
     var selectedCategory by remember { mutableStateOf<CategoryId?>(null) }
     val importActions = rememberImportActions(graph)
     var showQuickAddMenu by remember { mutableStateOf(false) }
+    var longPressedBook by remember { mutableStateOf<Book?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(importActions.status) {
@@ -58,6 +62,7 @@ fun LibraryRoute(
             progressFor = { null },
             onCategorySelected = { selectedCategory = it },
             onBookClick = onOpenBook,
+            onBookLongClick = { longPressedBook = it },
             onSearchClick = onSearchClick,
             onAddCategory = { name ->
                 scope.launch {
@@ -67,6 +72,34 @@ fun LibraryRoute(
                 }
             },
         )
+
+        longPressedBook?.let { book ->
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = { ids ->
+                    scope.launch { graph.library.updateCategories(book.id, ids) }
+                },
+                onMarkAllRead = {
+                    scope.launch {
+                        val lastChapter = graph.library.observeChapters(book.id).first().lastOrNull()
+                        if (lastChapter != null) {
+                            graph.progress.update(
+                                Progress(
+                                    bookId = book.id,
+                                    chapterId = lastChapter.id,
+                                    position = 1f,
+                                    updatedAt = Clock.System.now(),
+                                    finished = true,
+                                ),
+                            )
+                        }
+                    }
+                },
+                onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
+                onDismiss = { longPressedBook = null },
+            )
+        }
 
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
 

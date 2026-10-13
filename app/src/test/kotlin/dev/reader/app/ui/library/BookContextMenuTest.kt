@@ -1,0 +1,101 @@
+package dev.reader.app.ui.library
+
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import dev.reader.core.model.Book
+import dev.reader.core.model.BookFormat
+import dev.reader.core.model.BookId
+import dev.reader.core.model.Category
+import dev.reader.core.model.CategoryId
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.time.Instant
+
+@RunWith(RobolectricTestRunner::class)
+class BookContextMenuTest {
+
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    private val novels = CategoryId("novels")
+    private val comics = CategoryId("comics")
+    private val categories = listOf(Category(novels, "Novels"), Category(comics, "Comics"))
+
+    private val book = Book(
+        id = BookId("book-1"),
+        title = "My Book",
+        format = BookFormat.EPUB,
+        sourcePath = "/books/my-book.epub",
+        categoryIds = setOf(novels),
+        addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+    )
+
+    @Test
+    fun `mark all read triggers the callback and dismisses`() {
+        var marked = false
+        var dismissed = false
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = {},
+                onMarkAllRead = { marked = true },
+                onRemove = {},
+                onDismiss = { dismissed = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-mark-read").performClick()
+
+        assertTrue(marked)
+        assertTrue(dismissed)
+    }
+
+    @Test
+    fun `remove triggers the callback and dismisses`() {
+        var removed = false
+        var dismissed = false
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = {},
+                onMarkAllRead = {},
+                onRemove = { removed = true },
+                onDismiss = { dismissed = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-remove").performClick()
+
+        assertTrue(removed)
+        assertTrue(dismissed)
+    }
+
+    @Test
+    fun `changing category reports the new selection`() {
+        var newCategories: Set<CategoryId>? = null
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = { newCategories = it },
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-change-category").performClick()
+        composeRule.onNodeWithTag("category-picker-${comics.value}").performClick()
+        composeRule.onNodeWithText("Save").performClick()
+
+        assertEquals(setOf(novels, comics), newCategories)
+    }
+}

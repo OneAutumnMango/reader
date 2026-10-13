@@ -10,6 +10,7 @@ sealed interface Destination {
     data object Appearance : Destination
     data object ImportExport : Destination
     data object Settings : Destination
+    data object LogHistory : Destination
     data class BookDetail(val bookId: BookId) : Destination
     data class Bookmarks(val bookId: BookId) : Destination
     data class Reader(val bookId: BookId, val chapterId: ChapterId) : Destination

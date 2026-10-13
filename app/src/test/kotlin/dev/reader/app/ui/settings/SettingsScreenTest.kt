@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,6 +29,7 @@ class SettingsScreenTest {
                 onAddLightNovel = {},
                 onAddRootFolder = {},
                 onRemoveRootFolder = {},
+                onViewLogHistory = {},
             )
         }
 
@@ -47,6 +49,7 @@ class SettingsScreenTest {
                 onAddLightNovel = { clicked = true },
                 onAddRootFolder = {},
                 onRemoveRootFolder = {},
+                onViewLogHistory = {},
             )
         }
 
@@ -66,6 +69,7 @@ class SettingsScreenTest {
                 onAddLightNovel = {},
                 onAddRootFolder = { clicked = true },
                 onRemoveRootFolder = {},
+                onViewLogHistory = {},
             )
         }
 
@@ -85,6 +89,7 @@ class SettingsScreenTest {
                 onAddLightNovel = {},
                 onAddRootFolder = {},
                 onRemoveRootFolder = { removed = it },
+                onViewLogHistory = {},
             )
         }
 
@@ -103,9 +108,30 @@ class SettingsScreenTest {
                 onAddLightNovel = {},
                 onAddRootFolder = {},
                 onRemoveRootFolder = {},
+                onViewLogHistory = {},
             )
         }
 
         composeRule.onNodeWithText("Imported 3 of 3 file(s)").assertExists()
+    }
+
+    @Test
+    fun `clicking view log history triggers the callback`() {
+        var clicked = false
+        composeRule.setContent {
+            SettingsScreen(
+                status = "",
+                rootFolders = emptyList(),
+                onAddBook = {},
+                onAddLightNovel = {},
+                onAddRootFolder = {},
+                onRemoveRootFolder = {},
+                onViewLogHistory = { clicked = true },
+            )
+        }
+
+        composeRule.onNodeWithText("View error/log history").performScrollTo().performClick()
+
+        assertTrue(clicked)
     }
 }

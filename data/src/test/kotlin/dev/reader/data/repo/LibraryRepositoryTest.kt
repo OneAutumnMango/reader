@@ -84,4 +84,27 @@ class LibraryRepositoryTest {
         assertEquals(emptyList(), repository.observeBooks().first())
         assertEquals(emptyList(), repository.observeChapters(book.id).first())
     }
+
+    @Test
+    fun `updateCategories replaces a book's category links`() = runBlocking {
+        val novels = CategoryId("novels")
+        val comics = CategoryId("comics")
+        repository.upsertCategory(Category(novels, "Novels"))
+        repository.upsertCategory(Category(comics, "Comics"))
+
+        val book = Book(
+            id = BookId("book-1"),
+            title = "Recategorized",
+            format = BookFormat.TXT,
+            sourcePath = "/books/recat.txt",
+            categoryIds = setOf(novels),
+            addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+        repository.upsertBook(book, emptyList())
+
+        repository.updateCategories(book.id, setOf(comics))
+
+        assertEquals(emptyList(), repository.observeBooksInCategory(novels).first())
+        assertEquals(listOf(book.id), repository.observeBooksInCategory(comics).first().map { it.id })
+    }
 }

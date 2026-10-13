@@ -7,12 +7,12 @@ original requirements this plan implements.
 
 | Module | State | Tests |
 | --- | --- | --- |
-| `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 13 |
-| `:parser` | M2 complete + CSS subset. | 10 |
-| `:data` | M3, M5 importer, M7 export/import complete. | 13 |
-| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors, nav drawer/settings UI polish, tap-zone picker redesign, root-folder auto-import. | 56 |
+| `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 15 |
+| `:parser` | M2 complete + CSS subset + comic page extraction. | 11 |
+| `:data` | M3, M5 importer, M7 export/import complete + category updates. | 14 |
+| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors, nav drawer/settings UI polish, draw-your-own tap zones, root-folder auto-import, PDF/comic reader, book context menu, log history. | 67 |
 
-93 tests total. Run everything: `./scripts/test.sh --lint`.
+107 tests total. Run everything: `./scripts/test.sh --lint`.
 
 ---
 
@@ -203,12 +203,18 @@ epub import fail with "could not initialize class ...CssStyleKt" regardless of f
 Those regexes are now lazy (so a failure can be retried) and the CSS parsing entry points fall
 back to "no styling" instead of throwing; import error messages now show the deepest cause
 (not just a wrapper exception's often-blank top message) and are also logged via `Log.e` so
-the full stack trace is in logcat. What's left:
+the full stack trace is in logcat. Since then: tap zones are now fully custom rectangles —
+"Add zone" opens a full-screen drag-to-draw overlay, so you're not limited to the old 3x3
+grid at all; `ReaderSettingsEditor`'s reading-mode/keep-awake rows now wrap (`FlowRow`)
+instead of squashing on narrow screens; the app's top bar title is clickable from anywhere
+to jump back to Library, and swiping left/right on the library grid moves between
+categories; long-pressing a book opens a context menu (change category, mark all chapters
+read, remove from library); Settings has a new "Logs" section showing every import
+success/failure (`AppLog`, viewable and clearable); and PDF/CBZ/CBR are now fully wired into
+the reader — `ChapterLoader` returns a `ChapterContent` (`Text`/`Comic`/`Pdf`) and the reader
+route renders `ComicReaderScreen`/`PdfReaderScreen` (swipeable page images) for them instead
+of failing. What's left:
 
-- **PDF / CBZ / CBR aren't wired into the reader screen**: `ChapterLoader` only handles
-  txt/md/html/epub; opening a PDF or comic book from the library will fail to load. The
-  parsers and `PdfPageRenderer`/`ComicArchiveParser` exist (M2) but the `ImagePager` UI
-  (M4) was never connected to a real image/bitmap source for them.
 - **Bookmark "jump" doesn't restore the saved scroll position**: `BookmarksRoute.onJump`
   opens the right chapter but always starts from the top; `Bookmark.position` isn't
   applied yet.
@@ -222,6 +228,10 @@ the full stack trace is in logcat. What's left:
 - **Root folder scanning is one level deep only**: `RootFolderScanner` looks at direct
   children of a root folder (files = books, subfolders = light novels); it doesn't recurse
   into nested category subfolders. Say the word if you want recursive scanning instead.
+- **PDF fixed-page rendering (`PdfPageRenderer`) and the new `PdfReaderScreen`/
+  `ComicReaderScreen` bitmap decoding have no automated test** — `android.graphics.pdf.
+  PdfRenderer` and real bitmap decoding need a real device/emulator to verify meaningfully;
+  only the surrounding wiring (tap zones, page counts) is covered by Robolectric tests.
 - **cbr (RAR comics)**: implemented via junrar, but has no automated test — no tool in this
   environment can author a `.rar` fixture. Confirm you're fine with junrar's license, or say the
   word to drop cbr support and keep cbz only.

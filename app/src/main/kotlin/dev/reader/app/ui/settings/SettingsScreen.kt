@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
@@ -31,9 +33,13 @@ fun SettingsScreen(
     onAddLightNovel: () -> Unit,
     onAddRootFolder: () -> Unit,
     onRemoveRootFolder: (String) -> Unit,
+    onViewLogHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
         MenuSection("Library") {
             Button(onClick = onAddBook, modifier = Modifier.fillMaxWidth()) { Text("Add book") }
             Spacer(modifier = Modifier.height(8.dp))
@@ -67,6 +73,17 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(onClick = onAddRootFolder, modifier = Modifier.fillMaxWidth()) {
                 Text("Add root folder")
+            }
+        }
+
+        MenuSection("Logs") {
+            Text(
+                "See everything that's been imported or failed to import.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = onViewLogHistory, modifier = Modifier.fillMaxWidth()) {
+                Text("View error/log history")
             }
         }
 

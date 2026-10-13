@@ -41,6 +41,11 @@ class LibraryRepository(private val database: ReaderDatabase) {
         database.books().clearCategories(bookId.value)
     }
 
+    suspend fun updateCategories(bookId: BookId, categoryIds: Set<CategoryId>) {
+        database.books().clearCategories(bookId.value)
+        database.books().insertCategoryRefs(categoryIds.map { BookCategoryCrossRef(bookId.value, it.value) })
+    }
+
     suspend fun upsertCategory(category: Category) = database.categories().upsert(category.toEntity())
 
     private suspend fun List<dev.reader.data.room.entity.BookEntity>.toBooks(): List<Book> =

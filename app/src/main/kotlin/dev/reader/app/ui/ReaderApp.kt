@@ -1,6 +1,8 @@
 package dev.reader.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -34,6 +36,7 @@ import dev.reader.app.ui.library.BookDetailRoute
 import dev.reader.app.ui.library.LibraryRoute
 import dev.reader.app.ui.reader.ReaderRoute
 import dev.reader.app.ui.search.SearchRoute
+import dev.reader.app.ui.settings.LogHistoryRoute
 import dev.reader.app.ui.settings.SettingsRoute
 import dev.reader.app.ui.stats.StatsRoute
 import kotlinx.coroutines.launch
@@ -55,6 +58,7 @@ private fun titleFor(destination: Destination): String = when (destination) {
     Destination.Appearance -> "Appearance"
     Destination.ImportExport -> "Import / export"
     Destination.Settings -> "Settings"
+    Destination.LogHistory -> "Log history"
     is Destination.BookDetail -> "Book"
     is Destination.Bookmarks -> "Bookmarks"
     is Destination.Reader -> ""
@@ -99,7 +103,14 @@ fun ReaderApp(graph: ReaderGraph) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(titleFor(navigator.current)) },
+                    title = {
+                        Text(
+                            titleFor(navigator.current),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { navigator.switchRoot(Destination.Library) },
+                        )
+                    },
                     navigationIcon = {
                         if (navigator.canGoBack) {
                             IconButton(onClick = { navigator.pop() }) {
@@ -132,7 +143,12 @@ fun ReaderApp(graph: ReaderGraph) {
                 Destination.Stats -> StatsRoute(graph, content)
                 Destination.Appearance -> AppearanceRoute(graph, content)
                 Destination.ImportExport -> ImportExportRoute(graph, content)
-                Destination.Settings -> SettingsRoute(graph, content)
+                Destination.Settings -> SettingsRoute(
+                    graph,
+                    onViewLogHistory = { navigator.push(Destination.LogHistory) },
+                    modifier = content,
+                )
+                Destination.LogHistory -> LogHistoryRoute(content)
                 is Destination.BookDetail -> BookDetailRoute(
                     graph,
                     destination.bookId,

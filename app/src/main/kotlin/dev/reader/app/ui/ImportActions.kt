@@ -10,17 +10,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import dev.reader.app.data.AppLog
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
 import kotlinx.coroutines.launch
 
 private const val LOG_TAG = "ReaderImport"
 
-/** Logs the full stack trace and returns the deepest, most specific error message. */
+/** Logs the full stack trace, records it to [AppLog], and returns the deepest error message. */
 internal fun describeImportError(error: Throwable): String {
     Log.e(LOG_TAG, "Import failed", error)
     val root = generateSequence(error) { it.cause }.last()
-    return root.message?.takeIf { it.isNotBlank() } ?: root.javaClass.simpleName
+    val message = root.message?.takeIf { it.isNotBlank() } ?: root.javaClass.simpleName
+    AppLog.record("Import failed: $message")
+    return message
 }
 
 class ImportActions(val status: String, val addFiles: () -> Unit, val addFolder: () -> Unit)
@@ -51,6 +54,7 @@ fun rememberImportActions(graph: ReaderGraph): ImportActions {
                 lastError != null -> "Imported $imported of ${uris.size} file(s) — $lastError"
                 else -> "Imported $imported of ${uris.size} file(s)"
             }
+            AppLog.record(status)
         }
     }
     val addFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { treeUri ->
@@ -66,6 +70,7 @@ fun rememberImportActions(graph: ReaderGraph): ImportActions {
                         onFailure = { "Could not import that folder — ${describeImportError(it)}" },
                     )
             }
+            AppLog.record(status)
         }
     }
 
