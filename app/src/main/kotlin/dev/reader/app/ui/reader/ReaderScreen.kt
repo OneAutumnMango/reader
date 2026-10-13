@@ -26,24 +26,25 @@ fun ReaderScreen(
     KeepScreenAwakeEffect(settings.keepScreenAwake)
 
     Box(modifier = modifier.fillMaxSize().background(theme.backgroundColor())) {
-        when (settings.readingMode) {
-            ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(
-                document,
-                theme,
-                settings,
-                Modifier.fillMaxSize(),
-                initialPositionFraction,
-                onPageChanged,
-            )
-            else -> PagedReader(
-                document,
-                theme,
-                settings,
-                Modifier.fillMaxSize(),
-                initialPositionFraction,
-                onPageChanged,
-            )
+        TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
+            when (settings.readingMode) {
+                ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(
+                    document,
+                    theme,
+                    settings,
+                    Modifier.fillMaxSize(),
+                    initialPositionFraction,
+                    onPageChanged,
+                )
+                else -> PagedReader(
+                    document,
+                    theme,
+                    settings,
+                    Modifier.fillMaxSize(),
+                    initialPositionFraction,
+                    onPageChanged,
+                )
+            }
         }
-        TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize())
     }
 }

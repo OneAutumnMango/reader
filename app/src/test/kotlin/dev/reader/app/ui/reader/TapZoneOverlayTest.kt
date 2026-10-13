@@ -1,10 +1,12 @@
 package dev.reader.app.ui.reader
 
+import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import dev.reader.core.reader.TapAction
 import dev.reader.core.reader.TapZoneConfig
@@ -55,5 +57,27 @@ class TapZoneOverlayTest {
 
         composeRule.onAllNodesWithTag("tap-zone-overlay").assertCountEquals(0)
         assertEquals(null, lastAction)
+    }
+
+    @Test
+    fun `content is still shown when tap zones are disabled`() {
+        composeRule.setContent {
+            TapZoneOverlay(config = TapZoneConfig(enabled = false), showLabels = false, onAction = {}) {
+                Text("Reader content")
+            }
+        }
+
+        composeRule.onNodeWithText("Reader content").assertExists()
+    }
+
+    @Test
+    fun `content is composed as a child so its own scrollable can still consume drags`() {
+        composeRule.setContent {
+            TapZoneOverlay(config = TapZoneConfig(), showLabels = false, onAction = {}) {
+                Text("Reader content")
+            }
+        }
+
+        composeRule.onNodeWithText("Reader content").assertExists()
     }
 }

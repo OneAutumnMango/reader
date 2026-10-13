@@ -32,13 +32,14 @@ fun ComicReaderScreen(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
-        ImagePager(
-            pageCount = pages.size,
-            onPageChanged = { onPageChanged(it, pages.size) },
-        ) { index ->
-            ComicPageImage(file, format, pages[index], Modifier.fillMaxSize())
+        TapZoneOverlay(tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
+            ImagePager(
+                pageCount = pages.size,
+                onPageChanged = { onPageChanged(it, pages.size) },
+            ) { index ->
+                ComicPageImage(file, format, pages[index], Modifier.fillMaxSize())
+            }
         }
-        TapZoneOverlay(tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize())
     }
 }
 

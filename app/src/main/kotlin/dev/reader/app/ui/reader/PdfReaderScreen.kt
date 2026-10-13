@@ -43,19 +43,20 @@ fun PdfReaderScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         val pageRenderer = renderer
-        if (pageRenderer != null) {
-            ImagePager(
-                pageCount = pageRenderer.pageCount,
-                onPageChanged = { onPageChanged(it, pageRenderer.pageCount) },
-            ) { index ->
-                PdfPageImage(pageRenderer, index, Modifier.fillMaxSize())
-            }
-        } else {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+        TapZoneOverlay(tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
+            if (pageRenderer != null) {
+                ImagePager(
+                    pageCount = pageRenderer.pageCount,
+                    onPageChanged = { onPageChanged(it, pageRenderer.pageCount) },
+                ) { index ->
+                    PdfPageImage(pageRenderer, index, Modifier.fillMaxSize())
+                }
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
         }
-        TapZoneOverlay(tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize())
     }
 }
 
