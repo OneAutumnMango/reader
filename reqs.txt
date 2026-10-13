@@ -20,3 +20,5 @@ The app should be be testable with unit tests and anything youre able to do here
 18. add an option for custom css styling, as well as an option fo disable css styling from say epubs
 19. add categories you can swipe between and add books too, customisable name and default
 20. add an analytics page that records how many books have been read, reading time, words read, wpm reading speed etc.
+
+21. add a progress tracker while reading, like page 14/100 14% chapter X

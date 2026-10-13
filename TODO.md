@@ -9,7 +9,7 @@ original requirements this plan implements.
 | --- | --- | --- |
 | `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 11 |
 | `:parser` | M2 complete. | 6 |
-| `:data` | Not started. | 0 |
+| `:data` | M3 complete. | 10 |
 | `:app` | Scaffold only (MainActivity stub). | 0 |
 
 Run everything: `./scripts/test.sh` (or `--core-only` before `:parser`/`:data`/`:app` need the Android SDK).
@@ -63,17 +63,25 @@ Run everything: `./scripts/test.sh` (or `--core-only` before `:parser`/`:data`/`
 
 ## M3 — Data layer (`:data`)
 
-- [ ] Room schema: `books`, `chapters`, `categories`, `book_categories`, `bookmarks`,
+- [x] Room schema: `books`, `chapters`, `categories`, `book_categories`, `bookmarks`,
       `progress`, `reading_sessions` (append-only event log).
-- [ ] FTS4 virtual table over chapter plain text for in-book search.
-- [ ] DataStore (Okio + kotlinx-serialization JSON): settings, `ReaderSettings`,
-      `ReaderTheme`/`AppTheme` presets, tap-zone config, category order.
-- [ ] Repositories exposing Flows: library, progress, bookmarks, settings, stats.
+- [x] FTS4 virtual table (`chapter_fts`) over chapter plain text for in-book search.
+- [x] DataStore (Okio + kotlinx-serialization JSON, `ReaderStores`/`JsonSerializer`/
+      `PreferencesFile` mirroring daily-checklist's store pattern): `AppTheme`,
+      `ReaderSettings`, `ReaderTheme` presets + active preset name.
+- [x] Repositories exposing Flows: `LibraryRepository`, `ProgressRepository`,
+      `BookmarkRepository`, `StatsRepository`, `SearchRepository`, `SettingsRepository`.
+- [x] Entity <-> core model mappers (`BookMappers.kt`, `ProgressMappers.kt`).
+- [x] Robolectric in-memory Room tests (library/progress/bookmarks/stats/search) + Okio
+      `FakeFileSystem` DataStore tests (restart survival, corrupt file, unknown fields). 10 tests.
 - [ ] Folder scanning: SAF persisted-uri + `DocumentFile` tree walk, extension matching,
       upsert into Room. Light-novel "folder = book, files = chapters" import variant.
 - [ ] Import/export bundle: metadata + progress + bookmarks + settings as JSON, optional
       zipped copies of source files.
-- [ ] Robolectric + in-memory Room tests, Okio `FakeFileSystem` tests for DataStore.
+
+**Deferred to a later pass**: folder auto-discovery scanning and the import/export bundle
+need `:app`-level file-picker/SAF plumbing to be useful, so they move with M5/M7 instead
+of blocking the rest of M3.
 
 ## M4 — Reader rendering core (`:app`)
 

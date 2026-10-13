@@ -1,5 +1,8 @@
 package dev.reader.core.reader
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class TapAction {
     NONE,
     NEXT,
@@ -9,6 +12,7 @@ enum class TapAction {
 }
 
 /** A 3x3 grid of tap regions overlaid on the reader, row-major from top-left. */
+@Serializable
 data class TapZoneConfig(
     val enabled: Boolean = true,
     val zones: List<TapAction> = defaultZones,

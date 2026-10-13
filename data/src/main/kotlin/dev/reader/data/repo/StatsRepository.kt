@@ -1,0 +1,22 @@
+package dev.reader.data.repo
+
+import dev.reader.core.stats.ReadingSessionEvent
+import dev.reader.core.stats.StatsCalculator
+import dev.reader.core.stats.StatsSummary
+import dev.reader.data.room.ReaderDatabase
+import dev.reader.data.room.toEntity
+import dev.reader.data.room.toEvent
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+
+class StatsRepository(private val database: ReaderDatabase) {
+
+    fun observeSummary(): Flow<StatsSummary> = combine(
+        database.sessions().observeAll(),
+        database.progress().observeFinishedCount(),
+    ) { sessions, finished ->
+        StatsCalculator.summarize(sessions.map { it.toEvent() }, finished)
+    }
+
+    suspend fun recordSession(session: ReadingSessionEvent) = database.sessions().insert(session.toEntity())
+}

@@ -1,5 +1,8 @@
 package dev.reader.core.reader
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class ReadingMode {
     CONTINUOUS_SCROLL,
     PAGED_VERTICAL,
@@ -7,6 +10,7 @@ enum class ReadingMode {
     PAGED_HORIZONTAL_RTL,
 }
 
+@Serializable
 enum class PdfRenderMode {
     REFLOW_TEXT,
     FIXED_PAGE,

@@ -1,11 +1,15 @@
 package dev.reader.core.theme
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class Justification {
     START,
     JUSTIFY,
 }
 
 /** A saveable, loadable set of reader typography and spacing options. */
+@Serializable
 data class ReaderTheme(
     val name: String,
     val fontFamily: String = "serif",

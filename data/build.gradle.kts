@@ -25,3 +25,9 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.room.testing)
 }
+
+kotlin {
+    compilerOptions {
+        optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi")
+    }
+}
