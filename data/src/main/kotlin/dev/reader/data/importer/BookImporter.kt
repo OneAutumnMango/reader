@@ -37,9 +37,9 @@ class BookImporter(
         val bookId = BookId(newId())
         val book = Book(
             id = bookId,
-            title = parsed.title,
+            title = cleanTitle(parsed.title),
             author = parsed.author,
-            coverPath = parsed.coverPath,
+            coverPath = materializeCover(file, format, bookId, parsed.coverPath),
             format = format,
             sourcePath = file.path,
             categoryIds = categoryIds,
@@ -71,7 +71,7 @@ class BookImporter(
 
         val book = Book(
             id = bookId,
-            title = folder.name,
+            title = cleanTitle(folder.name),
             format = chapters.firstOrNull()
                 ?.let { BookFormat.fromExtension(File(it.sourcePath).extension) }
                 ?: BookFormat.TXT,
@@ -93,6 +93,21 @@ class BookImporter(
         BookFormat.PDF -> PdfTextParser(requireNotNull(pdfContext) { "PDF import needs a Context" }).parse(file)
     }
 
+    /** Extracts an archive-internal cover image (epub/cbz/cbr) to a real file next to the source. */
+    private fun materializeCover(file: File, format: BookFormat, bookId: BookId, entryName: String?): String? {
+        entryName ?: return null
+        val bytes = when (format) {
+            BookFormat.EPUB -> EpubParser.extractCover(file, entryName)
+            BookFormat.CBZ, BookFormat.CBR -> runCatching { ComicArchiveParser.readPage(file, format, entryName) }
+                .getOrNull()
+            else -> null
+        } ?: return null
+        val extension = entryName.substringAfterLast('.', "jpg")
+        val coverFile = File(file.parentFile ?: file, "${bookId.value}_cover.$extension")
+        coverFile.writeBytes(bytes)
+        return coverFile.path
+    }
+
     private fun ParsedChapter.toChapterModel(bookId: BookId, orderIndex: Int): Chapter = Chapter(
         id = ChapterId(newId()),
         bookId = bookId,
@@ -101,4 +116,12 @@ class BookImporter(
         orderIndex = orderIndex,
         wordCount = (this as? ParsedChapter.TextChapter)?.document?.wordCount() ?: 0,
     )
+}
+
+private val LEADING_ID_PATTERN = Regex("^[0-9]{3,}[.\\-_\\s]+")
+
+/** Strips a leading numeric id (e.g. a download/site id) like "1791901.....-" off a raw file name. */
+internal fun cleanTitle(raw: String): String {
+    val stripped = raw.replace(LEADING_ID_PATTERN, "")
+    return stripped.replace('_', ' ').trim().ifBlank { raw }
 }

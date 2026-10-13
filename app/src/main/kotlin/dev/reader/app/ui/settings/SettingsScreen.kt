@@ -1,5 +1,6 @@
 package dev.reader.app.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,12 +19,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.MenuSection
+import dev.reader.core.theme.LibraryLayout
 
 @Composable
 fun SettingsScreen(
@@ -34,6 +38,8 @@ fun SettingsScreen(
     onAddRootFolder: () -> Unit,
     onRemoveRootFolder: (String) -> Unit,
     onViewLogHistory: () -> Unit,
+    libraryLayout: LibraryLayout,
+    onLibraryLayoutChange: (LibraryLayout) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -45,6 +51,21 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(onClick = onAddLightNovel, modifier = Modifier.fillMaxWidth()) {
                 Text("Add light novel")
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Cover size", style = MaterialTheme.typography.bodyMedium)
+            Row {
+                LibraryLayout.entries.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .testTag("library-layout-${option.name}")
+                            .clickable { onLibraryLayoutChange(option) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = libraryLayout == option, onClick = null)
+                        Text(option.name)
+                    }
+                }
             }
         }
 

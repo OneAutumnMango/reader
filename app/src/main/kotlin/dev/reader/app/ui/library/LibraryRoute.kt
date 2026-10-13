@@ -1,5 +1,7 @@
 package dev.reader.app.ui.library
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -22,13 +24,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.rememberImportActions
 import dev.reader.core.model.Book
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
 import dev.reader.core.model.Progress
+import dev.reader.core.theme.LibraryLayout
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -41,14 +46,27 @@ fun LibraryRoute(
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
+    val preferences by graph.settings.preferences.collectAsState(initial = null)
     var selectedCategory by remember { mutableStateOf<CategoryId?>(null) }
     val importActions = rememberImportActions(graph)
     var showQuickAddMenu by remember { mutableStateOf(false) }
     var longPressedBook by remember { mutableStateOf<Book?>(null) }
+    var coverTargetBook by remember { mutableStateOf<Book?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val coverPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val target = coverTargetBook
+        coverTargetBook = null
+        if (uri == null || target == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val file = ContentFileCopier.copyToCache(context, uri) ?: return@launch
+            graph.library.updateBookDetails(target.copy(coverPath = file.path))
+        }
+    }
 
     LaunchedEffect(importActions.status) {
         if (importActions.status.isNotBlank()) snackbarHostState.showSnackbar(importActions.status)
@@ -71,6 +89,7 @@ fun LibraryRoute(
                     )
                 }
             },
+            layout = preferences?.libraryLayout ?: LibraryLayout.MEDIUM,
         )
 
         longPressedBook?.let { book ->
@@ -79,6 +98,13 @@ fun LibraryRoute(
                 categories = categories,
                 onChangeCategories = { ids ->
                     scope.launch { graph.library.updateCategories(book.id, ids) }
+                },
+                onRename = { newTitle ->
+                    scope.launch { graph.library.updateBookDetails(book.copy(title = newTitle)) }
+                },
+                onChangeCover = {
+                    coverTargetBook = book
+                    coverPickerLauncher.launch(arrayOf("image/*"))
                 },
                 onMarkAllRead = {
                     scope.launch {

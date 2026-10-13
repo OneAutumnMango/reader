@@ -1,6 +1,7 @@
 package dev.reader.app.data
 
 import android.content.Context
+import android.util.Log
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.core.model.Chapter
@@ -16,19 +17,29 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private const val LOG_TAG = "ChapterLoader"
+
 /** Re-parses a chapter's source file on demand; chapter content is never cached in Room. */
 object ChapterLoader {
 
     suspend fun load(context: Context, book: Book, chapter: Chapter): ChapterContent? =
         withContext(Dispatchers.IO) {
-            runCatching {
+            val result = runCatching {
                 val sourceFile = File(if (book.isLightNovel) chapter.sourcePath else book.sourcePath)
                 when (book.format) {
                     BookFormat.CBZ, BookFormat.CBR -> loadComic(sourceFile, book.format)
                     BookFormat.PDF -> loadPdf(context, sourceFile, book.pdfRenderMode)
                     else -> loadText(sourceFile, book.format, book.isLightNovel, chapter.orderIndex)
                 }
-            }.getOrNull()
+            }
+            result.onFailure { Log.e(LOG_TAG, "Failed to load chapter '${chapter.title}'", it) }
+            val content = result.getOrNull()
+                ?.takeUnless { it is ChapterContent.Text && it.document.blocks.isEmpty() }
+            if (content == null) {
+                val reason = result.exceptionOrNull()?.message ?: "no readable content was found"
+                AppLog.record("Couldn't load '${chapter.title}': $reason")
+            }
+            content
         }
 
     private fun loadComic(file: File, format: BookFormat): ChapterContent.Comic? {

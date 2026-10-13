@@ -4,6 +4,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.core.model.BookId
@@ -45,6 +47,8 @@ class BookContextMenuTest {
                 book = book,
                 categories = categories,
                 onChangeCategories = {},
+                onRename = {},
+                onChangeCover = {},
                 onMarkAllRead = { marked = true },
                 onRemove = {},
                 onDismiss = { dismissed = true },
@@ -66,6 +70,8 @@ class BookContextMenuTest {
                 book = book,
                 categories = categories,
                 onChangeCategories = {},
+                onRename = {},
+                onChangeCover = {},
                 onMarkAllRead = {},
                 onRemove = { removed = true },
                 onDismiss = { dismissed = true },
@@ -86,6 +92,8 @@ class BookContextMenuTest {
                 book = book,
                 categories = categories,
                 onChangeCategories = { newCategories = it },
+                onRename = {},
+                onChangeCover = {},
                 onMarkAllRead = {},
                 onRemove = {},
                 onDismiss = {},
@@ -97,5 +105,54 @@ class BookContextMenuTest {
         composeRule.onNodeWithText("Save").performClick()
 
         assertEquals(setOf(novels, comics), newCategories)
+    }
+
+    @Test
+    fun `renaming reports the new title and dismisses`() {
+        var renamedTo: String? = null
+        var dismissed = false
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = {},
+                onRename = { renamedTo = it },
+                onChangeCover = {},
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = { dismissed = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-rename").performClick()
+        composeRule.onNodeWithTag("rename-title-field").performTextClearance()
+        composeRule.onNodeWithTag("rename-title-field").performTextInput("New Title")
+        composeRule.onNodeWithText("Save").performClick()
+
+        assertEquals("New Title", renamedTo)
+        assertTrue(dismissed)
+    }
+
+    @Test
+    fun `change cover triggers the callback and dismisses`() {
+        var clicked = false
+        var dismissed = false
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = {},
+                onRename = {},
+                onChangeCover = { clicked = true },
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = { dismissed = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-change-cover").performClick()
+
+        assertTrue(clicked)
+        assertTrue(dismissed)
     }
 }

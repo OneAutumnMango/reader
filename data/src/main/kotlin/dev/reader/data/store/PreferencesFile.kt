@@ -2,6 +2,7 @@ package dev.reader.data.store
 
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.theme.AppTheme
+import dev.reader.core.theme.LibraryLayout
 import dev.reader.core.theme.ReaderTheme
 import kotlinx.serialization.Serializable
 
@@ -17,4 +18,5 @@ data class PreferencesFile(
     val activeThemePresetName: String = ReaderTheme.Default.name,
     val rootFolders: List<String> = emptyList(),
     val importedRootEntries: Set<String> = emptySet(),
+    val libraryLayout: LibraryLayout = LibraryLayout.MEDIUM,
 )

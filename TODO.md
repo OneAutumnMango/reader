@@ -7,12 +7,12 @@ original requirements this plan implements.
 
 | Module | State | Tests |
 | --- | --- | --- |
-| `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 15 |
-| `:parser` | M2 complete + CSS subset + comic page extraction. | 11 |
-| `:data` | M3, M5 importer, M7 export/import complete + category updates. | 14 |
-| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors, nav drawer/settings UI polish, draw-your-own tap zones, root-folder auto-import, PDF/comic reader, book context menu, log history. | 67 |
+| `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 16 |
+| `:parser` | M2 complete + CSS subset + comic page extraction + epub href decoding. | 12 |
+| `:data` | M3, M5 importer, M7 export/import complete + category/title/cover updates. | 18 |
+| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors, nav drawer/settings UI polish, draw-your-own tap zones, root-folder auto-import, PDF/comic reader, book context menu, log history, in-reader menu, cover images, library layout sizes. | 75 |
 
-107 tests total. Run everything: `./scripts/test.sh --lint`.
+121 tests total. Run everything: `./scripts/test.sh --lint`.
 
 ---
 
@@ -213,7 +213,23 @@ read, remove from library); Settings has a new "Logs" section showing every impo
 success/failure (`AppLog`, viewable and clearable); and PDF/CBZ/CBR are now fully wired into
 the reader — `ChapterLoader` returns a `ChapterContent` (`Text`/`Comic`/`Pdf`) and the reader
 route renders `ComicReaderScreen`/`PdfReaderScreen` (swipeable page images) for them instead
-of failing. What's left:
+of failing. Since then: found and fixed the real "epub chapters show but no text" bug —
+`EpubParser` wasn't URL-decoding percent-encoded manifest hrefs (e.g. spaces as `%20`), so
+chapter files with spaces/special characters in their names silently failed to resolve;
+broadened `CONTAINER_TAGS` (added main/header/footer) for more real-world html structures;
+`ChapterLoader` now logs failures and treats empty-content loads as a visible failure instead
+of a silent blank screen. The reader's menu button no longer navigates away — it toggles an
+in-reader `ReaderMenuOverlay` anchored to the bottom (content never shifts), showing chapter
+progress ("Page X of Y" or a % for continuous scroll) with a "^" that expands upward into the
+same font/theme/reading-mode/selectable-text controls as the Appearance screen. EPUB/CBZ/CBR
+cover images now actually show — they were previously stored as in-archive entry names (which
+Coil can't load); `BookImporter` now extracts cover bytes to a real file at import time, and
+`BookDetailScreen` shows the cover on tap. Book titles are now cleaned of leading numeric IDs
+(e.g. "1791901.....-Mother of Learning" -> "Mother of Learning"), and the long-press menu
+gained "Rename" and "Change cover" (image picker) alongside the existing category/read/remove
+options. Settings gained a library cover-size picker (Small/Medium/Large,
+`LibraryLayout`/`PreferencesFile.libraryLayout`) controlling the grid's column width. What's
+left:
 
 - **Bookmark "jump" doesn't restore the saved scroll position**: `BookmarksRoute.onJump`
   opens the right chapter but always starts from the top; `Bookmark.position` isn't
@@ -222,9 +238,6 @@ of failing. What's left:
   and the stats screen work from whatever's in the `reading_sessions` table, but nothing
   in `ReaderRoute` calls `recordSession(...)` yet, so the stats page will show zeros on
   a real device until that's wired up.
-- **requirement 21** ("progress tracker... page 14/100, 14%, chapter X"): `Progress` is
-  now persisted per page change, but there's no on-screen indicator widget in the reader
-  UI showing it live.
 - **Root folder scanning is one level deep only**: `RootFolderScanner` looks at direct
   children of a root folder (files = books, subfolders = light novels); it doesn't recurse
   into nested category subfolders. Say the word if you want recursive scanning instead.

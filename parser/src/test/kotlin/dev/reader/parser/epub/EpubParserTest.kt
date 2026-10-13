@@ -64,4 +64,46 @@ class EpubParserTest {
         val paragraph = chapter.document.blocks.filterIsInstance<Block.Paragraph>().single()
         assertEquals("Hello world.", paragraph.spans.single().text)
     }
+
+    @Test
+    fun `decodes percent-encoded hrefs so spine entries with spaces resolve`() {
+        val file = createTempFile(suffix = ".epub").toFile()
+        ZipOutputStream(file.outputStream()).use { zip ->
+            fun entry(name: String, content: String) {
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(content.toByteArray())
+                zip.closeEntry()
+            }
+
+            entry(
+                "META-INF/container.xml",
+                """
+                <?xml version="1.0"?>
+                <container><rootfiles>
+                    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+                </rootfiles></container>
+                """.trimIndent(),
+            )
+            entry(
+                "OEBPS/content.opf",
+                """
+                <?xml version="1.0"?>
+                <package>
+                    <metadata><title>Spaced</title></metadata>
+                    <manifest>
+                        <item id="ch1" href="Chapter%20One.xhtml" media-type="application/xhtml+xml"/>
+                    </manifest>
+                    <spine><itemref idref="ch1"/></spine>
+                </package>
+                """.trimIndent(),
+            )
+            entry("OEBPS/Chapter One.xhtml", "<html><body><p>Found it.</p></body></html>")
+        }
+
+        val book = EpubParser.parse(file)
+
+        val chapter = book.chapters.single() as ParsedChapter.TextChapter
+        val paragraph = chapter.document.blocks.filterIsInstance<Block.Paragraph>().single()
+        assertEquals("Found it.", paragraph.spans.single().text)
+    }
 }

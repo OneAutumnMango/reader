@@ -4,10 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.ReaderSettings
@@ -21,9 +23,16 @@ fun ContinuousReader(
     theme: ReaderTheme,
     settings: ReaderSettings,
     modifier: Modifier = Modifier,
+    onPositionChanged: (index: Int, total: Int) -> Unit = { _, _ -> },
 ) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(listState.firstVisibleItemIndex, document.blocks.size) {
+        onPositionChanged(listState.firstVisibleItemIndex, document.blocks.size)
+    }
+
     val content: @Composable () -> Unit = {
         LazyColumn(
+            state = listState,
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
         ) {

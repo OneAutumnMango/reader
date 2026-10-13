@@ -47,6 +47,8 @@ fun ReaderRoute(
 
     var content by remember(bookId, chapterId) { mutableStateOf<ChapterContent?>(null) }
     var loadFailed by remember(bookId, chapterId) { mutableStateOf(false) }
+    var showMenu by remember(bookId, chapterId) { mutableStateOf(false) }
+    var position by remember(bookId, chapterId) { mutableStateOf(0 to 0) }
 
     LaunchedEffect(book, chapter) {
         val b = book ?: return@LaunchedEffect
@@ -57,7 +59,7 @@ fun ReaderRoute(
 
     fun onTapAction(action: TapAction) {
         when (action) {
-            TapAction.OPEN_MENU -> onOpenMenu()
+            TapAction.OPEN_MENU -> showMenu = !showMenu
             TapAction.TOGGLE_BOOKMARK -> scope.launch {
                 graph.bookmarks.add(
                     Bookmark(
@@ -74,6 +76,7 @@ fun ReaderRoute(
     }
 
     fun onPageChanged(index: Int, pageCount: Int) {
+        position = index to pageCount
         if (pageCount > 0) {
             scope.launch {
                 graph.progress.update(
@@ -90,39 +93,65 @@ fun ReaderRoute(
 
     val prefs = preferences
     val loaded = content
-    when {
-        loaded is ChapterContent.Text && prefs != null -> {
-            val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
-            ReaderScreen(
-                document = loaded.document,
-                theme = theme,
-                settings = prefs.readerSettings,
+
+    Box(modifier = modifier.fillMaxSize()) {
+        when {
+            loaded is ChapterContent.Text && prefs != null -> {
+                val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
+                ReaderScreen(
+                    document = loaded.document,
+                    theme = theme,
+                    settings = prefs.readerSettings,
+                    onTapAction = ::onTapAction,
+                    onPageChanged = ::onPageChanged,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            loaded is ChapterContent.Comic && prefs != null -> ComicReaderScreen(
+                file = loaded.file,
+                format = loaded.format,
+                pages = loaded.pages,
+                tapZones = prefs.readerSettings.tapZones,
                 onTapAction = ::onTapAction,
                 onPageChanged = ::onPageChanged,
-                modifier = modifier,
+                modifier = Modifier.fillMaxSize(),
             )
+            loaded is ChapterContent.Pdf && prefs != null -> PdfReaderScreen(
+                file = loaded.file,
+                tapZones = prefs.readerSettings.tapZones,
+                onTapAction = ::onTapAction,
+                onPageChanged = ::onPageChanged,
+                modifier = Modifier.fillMaxSize(),
+            )
+            loadFailed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Couldn't load this chapter.")
+            }
+            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
         }
-        loaded is ChapterContent.Comic && prefs != null -> ComicReaderScreen(
-            file = loaded.file,
-            format = loaded.format,
-            pages = loaded.pages,
-            tapZones = prefs.readerSettings.tapZones,
-            onTapAction = ::onTapAction,
-            onPageChanged = ::onPageChanged,
-            modifier = modifier,
-        )
-        loaded is ChapterContent.Pdf && prefs != null -> PdfReaderScreen(
-            file = loaded.file,
-            tapZones = prefs.readerSettings.tapZones,
-            onTapAction = ::onTapAction,
-            onPageChanged = ::onPageChanged,
-            modifier = modifier,
-        )
-        loadFailed -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Couldn't load this chapter.")
-        }
-        else -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+
+        if (showMenu && prefs != null) {
+            val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
+            val readingMode = prefs.readerSettings.readingMode
+            ReaderMenuOverlay(
+                progressLabel = readerProgressLabel(readingMode, position.first, position.second),
+                theme = theme,
+                onThemeChange = { updated ->
+                    scope.launch {
+                        graph.settings.update { p ->
+                            val merged = p.themePresets.map { if (it.name == updated.name) updated else it }
+                            p.copy(themePresets = merged)
+                        }
+                    }
+                },
+                settings = prefs.readerSettings,
+                onSettingsChange = { updated ->
+                    scope.launch { graph.settings.update { it.copy(readerSettings = updated) } }
+                },
+                onBack = onOpenMenu,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
     }
 }

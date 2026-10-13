@@ -48,6 +48,14 @@ object EpubParser {
         }
     }
 
+    /** Reads the cover image's raw bytes out of the epub, by its manifest-resolved entry name. */
+    fun extractCover(file: File, entryName: String): ByteArray? = runCatching {
+        ZipFile(file).use { zip ->
+            val entry = zip.getEntry(entryName) ?: return@use null
+            zip.getInputStream(entry).use { it.readBytes() }
+        }
+    }.getOrNull()
+
     private fun findCoverEntry(
         opf: org.jsoup.nodes.Document,
         manifest: Map<String, String>,
@@ -59,7 +67,7 @@ object EpubParser {
     }
 
     private fun org.jsoup.nodes.Element.resolve(baseDir: String): String {
-        val href = attr("href")
+        val href = java.net.URLDecoder.decode(attr("href"), "UTF-8")
         return if (baseDir.isEmpty()) href else "$baseDir/$href"
     }
 

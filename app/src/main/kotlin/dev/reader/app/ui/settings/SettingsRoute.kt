@@ -55,6 +55,10 @@ fun SettingsRoute(graph: ReaderGraph, onViewLogHistory: () -> Unit, modifier: Mo
             scope.launch { graph.settings.update { it.copy(rootFolders = it.rootFolders - uri) } }
         },
         onViewLogHistory = onViewLogHistory,
+        libraryLayout = preferences.libraryLayout,
+        onLibraryLayoutChange = { layout ->
+            scope.launch { graph.settings.update { it.copy(libraryLayout = layout) } }
+        },
         modifier = modifier,
     )
 }

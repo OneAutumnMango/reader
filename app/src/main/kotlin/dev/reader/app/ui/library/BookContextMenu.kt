@@ -9,6 +9,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,17 +25,20 @@ import dev.reader.core.model.Book
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
 
-/** Long-press menu for a library book: change categories, mark all read, remove. */
+/** Long-press menu for a library book: rename, change cover, change categories, mark read, remove. */
 @Composable
 fun BookContextMenu(
     book: Book,
     categories: List<Category>,
     onChangeCategories: (Set<CategoryId>) -> Unit,
+    onRename: (String) -> Unit,
+    onChangeCover: () -> Unit,
     onMarkAllRead: () -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var showCategoryPicker by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
 
     if (showCategoryPicker) {
         CategoryPickerDialog(
@@ -50,11 +54,31 @@ fun BookContextMenu(
         return
     }
 
+    if (showRenameDialog) {
+        RenameDialog(
+            currentTitle = book.title,
+            onConfirm = {
+                onRename(it)
+                showRenameDialog = false
+                onDismiss()
+            },
+            onDismiss = { showRenameDialog = false },
+        )
+        return
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(book.title) },
         text = {
             Column {
+                MenuRow("Rename", Modifier.testTag("book-menu-rename")) {
+                    showRenameDialog = true
+                }
+                MenuRow("Change cover", Modifier.testTag("book-menu-change-cover")) {
+                    onChangeCover()
+                    onDismiss()
+                }
                 MenuRow("Change category", Modifier.testTag("book-menu-change-category")) {
                     showCategoryPicker = true
                 }
@@ -115,6 +139,28 @@ private fun CategoryPickerDialog(
             }
         },
         confirmButton = { TextButton(onClick = { onConfirm(picked) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun RenameDialog(currentTitle: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var title by remember { mutableStateOf(currentTitle) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename") },
+        text = {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text("Title") },
+                modifier = Modifier.testTag("rename-title-field"),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(title) }, enabled = title.isNotBlank()) { Text("Save") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

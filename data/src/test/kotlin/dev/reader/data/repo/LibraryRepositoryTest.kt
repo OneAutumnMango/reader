@@ -86,6 +86,30 @@ class LibraryRepositoryTest {
     }
 
     @Test
+    fun `updateBookDetails changes title and cover without touching chapters or categories`() = runBlocking {
+        val novels = CategoryId("novels")
+        repository.upsertCategory(Category(novels, "Novels"))
+        val book = Book(
+            id = BookId("book-1"),
+            title = "Old Title",
+            format = BookFormat.TXT,
+            sourcePath = "/books/old.txt",
+            categoryIds = setOf(novels),
+            addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+        val chapters = listOf(Chapter(ChapterId("ch-1"), book.id, "One", "ch1.txt", 0))
+        repository.upsertBook(book, chapters)
+
+        repository.updateBookDetails(book.copy(title = "New Title", coverPath = "/covers/new.jpg"))
+
+        val updated = repository.observeBooks().first().single()
+        assertEquals("New Title", updated.title)
+        assertEquals("/covers/new.jpg", updated.coverPath)
+        assertEquals(chapters.map { it.title }, repository.observeChapters(book.id).first().map { it.title })
+        assertEquals(listOf(book.id), repository.observeBooksInCategory(novels).first().map { it.id })
+    }
+
+    @Test
     fun `updateCategories replaces a book's category links`() = runBlocking {
         val novels = CategoryId("novels")
         val comics = CategoryId("comics")

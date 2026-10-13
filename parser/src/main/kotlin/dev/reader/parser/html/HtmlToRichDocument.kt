@@ -9,7 +9,9 @@ import org.jsoup.nodes.TextNode
 
 private val BOLD_TAGS = setOf("b", "strong")
 private val ITALIC_TAGS = setOf("i", "em")
-private val CONTAINER_TAGS = setOf("div", "section", "article", "body", "html", "blockquote")
+private val CONTAINER_TAGS = setOf(
+    "div", "section", "article", "main", "header", "footer", "body", "html", "blockquote",
+)
 private val HEADING_PATTERN = Regex("h[1-6]")
 
 fun parseHtmlToRichDocument(html: String): RichDocument {

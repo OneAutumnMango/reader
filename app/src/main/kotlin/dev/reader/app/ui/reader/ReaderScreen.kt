@@ -26,7 +26,13 @@ fun ReaderScreen(
 
     Box(modifier = modifier.fillMaxSize().background(theme.backgroundColor())) {
         when (settings.readingMode) {
-            ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(document, theme, settings, Modifier.fillMaxSize())
+            ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(
+                document,
+                theme,
+                settings,
+                Modifier.fillMaxSize(),
+                onPageChanged,
+            )
             else -> PagedReader(document, theme, settings, Modifier.fillMaxSize(), onPageChanged)
         }
         TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize())

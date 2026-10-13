@@ -2,9 +2,11 @@ package dev.reader.app.ui.settings
 
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import dev.reader.core.theme.LibraryLayout
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +32,8 @@ class SettingsScreenTest {
                 onAddRootFolder = {},
                 onRemoveRootFolder = {},
                 onViewLogHistory = {},
+                libraryLayout = LibraryLayout.MEDIUM,
+                onLibraryLayoutChange = {},
             )
         }
 
@@ -50,6 +54,8 @@ class SettingsScreenTest {
                 onAddRootFolder = {},
                 onRemoveRootFolder = {},
                 onViewLogHistory = {},
+                libraryLayout = LibraryLayout.MEDIUM,
+                onLibraryLayoutChange = {},
             )
         }
 
@@ -70,6 +76,8 @@ class SettingsScreenTest {
                 onAddRootFolder = { clicked = true },
                 onRemoveRootFolder = {},
                 onViewLogHistory = {},
+                libraryLayout = LibraryLayout.MEDIUM,
+                onLibraryLayoutChange = {},
             )
         }
 
@@ -90,6 +98,8 @@ class SettingsScreenTest {
                 onAddRootFolder = {},
                 onRemoveRootFolder = { removed = it },
                 onViewLogHistory = {},
+                libraryLayout = LibraryLayout.MEDIUM,
+                onLibraryLayoutChange = {},
             )
         }
 
@@ -109,6 +119,8 @@ class SettingsScreenTest {
                 onAddRootFolder = {},
                 onRemoveRootFolder = {},
                 onViewLogHistory = {},
+                libraryLayout = LibraryLayout.MEDIUM,
+                onLibraryLayoutChange = {},
             )
         }
 
@@ -127,11 +139,35 @@ class SettingsScreenTest {
                 onAddRootFolder = {},
                 onRemoveRootFolder = {},
                 onViewLogHistory = { clicked = true },
+                libraryLayout = LibraryLayout.MEDIUM,
+                onLibraryLayoutChange = {},
             )
         }
 
         composeRule.onNodeWithText("View error/log history").performScrollTo().performClick()
 
         assertTrue(clicked)
+    }
+
+    @Test
+    fun `selecting a layout size reports it`() {
+        var selected: LibraryLayout? = null
+        composeRule.setContent {
+            SettingsScreen(
+                status = "",
+                rootFolders = emptyList(),
+                onAddBook = {},
+                onAddLightNovel = {},
+                onAddRootFolder = {},
+                onRemoveRootFolder = {},
+                onViewLogHistory = {},
+                libraryLayout = LibraryLayout.MEDIUM,
+                onLibraryLayoutChange = { selected = it },
+            )
+        }
+
+        composeRule.onNodeWithTag("library-layout-${LibraryLayout.LARGE.name}").performClick()
+
+        assertEquals(LibraryLayout.LARGE, selected)
     }
 }

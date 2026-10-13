@@ -3,6 +3,7 @@ package dev.reader.app.ui.library
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.core.model.BookId
@@ -40,7 +41,7 @@ class BookDetailScreenTest {
             BookDetailScreen(book, chapters, emptyList(), onChapterClick = { clicked = it })
         }
 
-        composeRule.onNodeWithText("Two").performClick()
+        composeRule.onNodeWithText("Two").performScrollTo().performClick()
 
         assertEquals(chapters[1], clicked)
     }

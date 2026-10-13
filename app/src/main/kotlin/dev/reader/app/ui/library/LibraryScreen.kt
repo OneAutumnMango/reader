@@ -16,8 +16,8 @@ import dev.reader.core.model.Book
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
+import dev.reader.core.theme.LibraryLayout
 
-private const val GRID_COLUMN_MIN_WIDTH_DP = 120
 private const val SWIPE_CATEGORY_THRESHOLD_PX = 100f
 
 @Composable
@@ -31,6 +31,7 @@ fun LibraryScreen(
     onBookLongClick: (Book) -> Unit,
     onSearchClick: () -> Unit,
     onAddCategory: (String) -> Unit,
+    layout: LibraryLayout = LibraryLayout.MEDIUM,
     modifier: Modifier = Modifier,
 ) {
     val visibleBooks = if (selectedCategory == null) books else books.filter { selectedCategory in it.categoryIds }
@@ -41,7 +42,7 @@ fun LibraryScreen(
         SearchBarButton(onClick = onSearchClick, modifier = Modifier.padding(bottom = 8.dp))
         CategoryTabs(categories, selectedCategory, onCategorySelected, onAddCategory)
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = GRID_COLUMN_MIN_WIDTH_DP.dp),
+            columns = GridCells.Adaptive(minSize = layout.gridColumnMinWidthDp.dp),
             contentPadding = PaddingValues(8.dp),
             modifier = Modifier
                 .testTag("library-grid")

@@ -41,6 +41,9 @@ class LibraryRepository(private val database: ReaderDatabase) {
         database.books().clearCategories(bookId.value)
     }
 
+    /** Updates title/author/cover/etc. without touching chapters or category links. */
+    suspend fun updateBookDetails(book: Book) = database.books().upsert(book.toEntity())
+
     suspend fun updateCategories(bookId: BookId, categoryIds: Set<CategoryId>) {
         database.books().clearCategories(bookId.value)
         database.books().insertCategoryRefs(categoryIds.map { BookCategoryCrossRef(bookId.value, it.value) })
