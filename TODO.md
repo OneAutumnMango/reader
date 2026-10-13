@@ -10,9 +10,9 @@ original requirements this plan implements.
 | `:core` | M1 complete. Pure Kotlin, no Android, no I/O. | 13 |
 | `:parser` | M2 complete + CSS subset. | 10 |
 | `:data` | M3, M5 importer, M7 export/import complete. | 13 |
-| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors, nav drawer/settings UI polish. | 51 |
+| `:app` | M4, M5, M6, M7 complete + wired navigation, file pickers, theme editors, nav drawer/settings UI polish, tap-zone picker redesign, root-folder auto-import. | 54 |
 
-88 tests total. Run everything: `./scripts/test.sh --lint`.
+91 tests total. Run everything: `./scripts/test.sh --lint`.
 
 ---
 
@@ -185,14 +185,17 @@ what's left and why.
 
 ## Open questions for review
 
-Resolved since the last pass: navigation now uses a swipeable `ModalNavigationDrawer`
-(hamburger icon on root screens, back arrow on pushed screens) with drawer items for
-Library/Appearance/Stats/Import-Export/Settings; the Library screen has a clickable
-search bar at the top (pushes `Destination.Search`) and a `+` FAB with a dropdown for
-quick-adding files or a light-novel folder; a new Settings screen holds the add-files/
-add-folder buttons; `CategoryTabs` has a trailing "+" tab that opens a dialog to create
-a new category; non-Reader screens get a consistent horizontal content margin, while the
-Reader destination stays edge-to-edge with no drawer/top bar. What's left:
+Resolved since the last pass: fixed a real import bug (file imports were silently failing —
+PDFs never got a `Context` so they always threw, and failures were swallowed with no visible
+error); the library's quick-add FAB now shows a Snackbar with the real result/error message;
+tap zones are no longer a rigid 3x3 grid of cycling cells — `TapZoneEditor` is now a mini
+screen preview with colour-coded zones + legend, tap a zone to select it, then pick its
+action from a list below; `AppearanceRoute` and `SettingsScreen` are now built from a shared
+`MenuSection` card component instead of bare dividers/text for a more consistent look; the
+Library FAB now reads "Add book"/"Add light novel"; Settings has a new "Root folders"
+section — add a folder once and every file/subfolder in it is auto-imported, both
+immediately and again on every app launch (`RootFolderScanner`, tracked via a persisted
+`importedRootEntries` set so the same file is never re-imported). What's left:
 
 - **PDF / CBZ / CBR aren't wired into the reader screen**: `ChapterLoader` only handles
   txt/md/html/epub; opening a PDF or comic book from the library will fail to load. The
@@ -208,6 +211,9 @@ Reader destination stays edge-to-edge with no drawer/top bar. What's left:
 - **requirement 21** ("progress tracker... page 14/100, 14%, chapter X"): `Progress` is
   now persisted per page change, but there's no on-screen indicator widget in the reader
   UI showing it live.
+- **Root folder scanning is one level deep only**: `RootFolderScanner` looks at direct
+  children of a root folder (files = books, subfolders = light novels); it doesn't recurse
+  into nested category subfolders. Say the word if you want recursive scanning instead.
 - **cbr (RAR comics)**: implemented via junrar, but has no automated test — no tool in this
   environment can author a `.rar` fixture. Confirm you're fine with junrar's license, or say the
   word to drop cbr support and keep cbz only.

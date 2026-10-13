@@ -25,19 +25,37 @@ fun rememberImportActions(graph: ReaderGraph): ImportActions {
     val addFilesLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         scope.launch {
             var imported = 0
+            var lastError: String? = null
             uris.forEach { uri ->
-                val file = ContentFileCopier.copyToCache(context, uri) ?: return@forEach
-                if (runCatching { graph.importer.importFile(file) }.isSuccess) imported++
+                val file = ContentFileCopier.copyToCache(context, uri)
+                if (file == null) {
+                    lastError = "Could not read the selected file"
+                    return@forEach
+                }
+                runCatching { graph.importer.importFile(file, pdfContext = context) }
+                    .onSuccess { imported++ }
+                    .onFailure { lastError = it.message ?: it.toString() }
             }
-            status = "Imported $imported of ${uris.size} file(s)"
+            status = when {
+                imported == uris.size -> "Imported $imported of ${uris.size} file(s)"
+                lastError != null -> "Imported $imported of ${uris.size} file(s) — $lastError"
+                else -> "Imported $imported of ${uris.size} file(s)"
+            }
         }
     }
     val addFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { treeUri ->
         if (treeUri == null) return@rememberLauncherForActivityResult
         scope.launch {
             val folder = ContentFileCopier.copyTreeToCache(context, treeUri)
-            val imported = folder?.let { runCatching { graph.importer.importLightNovelFolder(it) }.isSuccess } == true
-            status = if (imported) "Imported light novel" else "Could not import that folder"
+            status = if (folder == null) {
+                "Could not read that folder"
+            } else {
+                runCatching { graph.importer.importLightNovelFolder(folder) }
+                    .fold(
+                        onSuccess = { "Imported light novel" },
+                        onFailure = { "Could not import that folder — ${it.message ?: it}" },
+                    )
+            }
         }
     }
 

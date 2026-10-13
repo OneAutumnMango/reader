@@ -18,29 +18,42 @@ class TapZoneEditorTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `tapping a cell cycles to the next action`() {
+    fun `selecting a zone then an action updates that zone`() {
         var config = TapZoneConfig()
         composeRule.setContent {
             TapZoneEditor(config, onChange = { config = it })
         }
 
-        val before = config.actionAt(0, 0)
         composeRule.onNodeWithTag("tap-zone-editor-0-0").performClick()
+        composeRule.onNodeWithTag("tap-zone-action-${TapAction.TOGGLE_BOOKMARK.name}").performClick()
 
-        val expectedNext = TapAction.entries[(TapAction.entries.indexOf(before) + 1) % TapAction.entries.size]
-        assertEquals(expectedNext, config.actionAt(0, 0))
+        assertEquals(TapAction.TOGGLE_BOOKMARK, config.actionAt(0, 0))
     }
 
     @Test
-    fun `cycling only changes the tapped cell`() {
+    fun `picking an action only changes the selected zone`() {
         var config = TapZoneConfig()
         composeRule.setContent {
             TapZoneEditor(config, onChange = { config = it })
         }
 
         composeRule.onNodeWithTag("tap-zone-editor-0-0").performClick()
+        composeRule.onNodeWithTag("tap-zone-action-${TapAction.TOGGLE_BOOKMARK.name}").performClick()
 
         assertEquals(TapAction.OPEN_MENU, config.actionAt(0, 1))
         assertEquals(TapAction.NEXT, config.actionAt(0, 2))
+    }
+
+    @Test
+    fun `selecting a different zone does not change any action`() {
+        var config = TapZoneConfig()
+        composeRule.setContent {
+            TapZoneEditor(config, onChange = { config = it })
+        }
+
+        composeRule.onNodeWithTag("tap-zone-editor-0-0").performClick()
+        composeRule.onNodeWithTag("tap-zone-editor-1-1").performClick()
+
+        assertEquals(TapZoneConfig().zones, config.zones)
     }
 }

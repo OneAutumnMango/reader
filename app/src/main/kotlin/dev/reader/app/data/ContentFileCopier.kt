@@ -21,16 +21,31 @@ object ContentFileCopier {
     /** Copies every file directly inside a picked folder (non-recursive) into a local temp folder. */
     fun copyTreeToCache(context: Context, treeUri: Uri): File? {
         val tree = DocumentFile.fromTreeUri(context, treeUri) ?: return null
-        val folder = File(context.cacheDir, "imports/${System.currentTimeMillis()}_${tree.name ?: "book"}")
-        folder.mkdirs()
-        tree.listFiles().filter { it.isFile }.forEach { doc ->
+        return copyFolderToCache(context, tree)
+    }
+
+    /** Copies every file directly inside a [DocumentFile] folder (non-recursive) into a local temp folder. */
+    fun copyFolderToCache(context: Context, folder: DocumentFile): File {
+        val target = File(context.cacheDir, "imports/${System.currentTimeMillis()}_${folder.name ?: "book"}")
+        target.mkdirs()
+        folder.listFiles().filter { it.isFile }.forEach { doc ->
             val name = doc.name ?: return@forEach
-            val target = File(folder, name)
+            val destination = File(target, name)
             context.contentResolver.openInputStream(doc.uri)?.use { source ->
-                target.outputStream().use { source.copyTo(it) }
+                destination.outputStream().use { source.copyTo(it) }
             }
         }
-        return folder
+        return target
+    }
+
+    /** Copies a single [DocumentFile] (not a tree/folder) into a local temp file. */
+    fun copyDocumentToCache(context: Context, document: DocumentFile): File? {
+        val name = document.name ?: "import"
+        val target = File(File(context.cacheDir, "imports"), "${System.currentTimeMillis()}_$name")
+        target.parentFile?.mkdirs()
+        val input = context.contentResolver.openInputStream(document.uri) ?: return null
+        input.use { source -> target.outputStream().use { source.copyTo(it) } }
+        return target
     }
 
     private fun displayName(context: Context, uri: Uri): String? {

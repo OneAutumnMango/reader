@@ -9,8 +9,11 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +44,11 @@ fun LibraryRoute(
     var selectedCategory by remember { mutableStateOf<CategoryId?>(null) }
     val importActions = rememberImportActions(graph)
     var showQuickAddMenu by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(importActions.status) {
+        if (importActions.status.isNotBlank()) snackbarHostState.showSnackbar(importActions.status)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         LibraryScreen(
@@ -60,20 +68,22 @@ fun LibraryRoute(
             },
         )
 
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+
         Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
             FloatingActionButton(onClick = { showQuickAddMenu = true }) {
                 Icon(Icons.Filled.Add, contentDescription = "Add book")
             }
             DropdownMenu(expanded = showQuickAddMenu, onDismissRequest = { showQuickAddMenu = false }) {
                 DropdownMenuItem(
-                    text = { Text("Add files") },
+                    text = { Text("Add book") },
                     onClick = {
                         showQuickAddMenu = false
                         importActions.addFiles()
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Add light novel folder") },
+                    text = { Text("Add light novel") },
                     onClick = {
                         showQuickAddMenu = false
                         importActions.addFolder()

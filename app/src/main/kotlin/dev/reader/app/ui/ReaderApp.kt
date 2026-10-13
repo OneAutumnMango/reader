@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -63,6 +64,8 @@ private fun titleFor(destination: Destination): String = when (destination) {
 @Composable
 fun ReaderApp(graph: ReaderGraph) {
     val navigator = remember { Navigator() }
+
+    LaunchedEffect(Unit) { graph.rootFolderScanner.scanAll() }
 
     BackHandler(enabled = navigator.canGoBack) { navigator.pop() }
 

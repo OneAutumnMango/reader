@@ -15,4 +15,6 @@ data class PreferencesFile(
     val readerSettings: ReaderSettings = ReaderSettings(),
     val themePresets: List<ReaderTheme> = ReaderTheme.builtIns,
     val activeThemePresetName: String = ReaderTheme.Default.name,
+    val rootFolders: List<String> = emptyList(),
+    val importedRootEntries: Set<String> = emptySet(),
 )

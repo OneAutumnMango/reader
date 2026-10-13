@@ -43,4 +43,5 @@ class ReaderGraph(context: Context) {
     val settings = SettingsRepository(stores)
     val exporter = ExportRepository(database, settings)
     val importer = BookImporter(library)
+    val rootFolderScanner = RootFolderScanner(context.applicationContext, settings, importer)
 }
