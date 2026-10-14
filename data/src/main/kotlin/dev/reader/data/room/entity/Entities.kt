@@ -16,6 +16,7 @@ data class BookEntity(
     val pdfRenderMode: String?,
     val addedAt: Long,
     val contentHash: String? = null,
+    val chapterPattern: String? = null,
 )
 
 @Entity(tableName = "chapters")

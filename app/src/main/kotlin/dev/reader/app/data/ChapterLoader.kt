@@ -29,7 +29,7 @@ object ChapterLoader {
                 when (book.format) {
                     BookFormat.CBZ, BookFormat.CBR -> loadComic(sourceFile, book.format)
                     BookFormat.PDF -> loadPdf(context, sourceFile, book.pdfRenderMode)
-                    else -> loadText(sourceFile, book.format, book.isLightNovel, chapter.orderIndex)
+                    else -> loadText(sourceFile, book, chapter.orderIndex)
                 }
             }
             result.onFailure { Log.e(LOG_TAG, "Failed to load chapter '${chapter.title}'", it) }
@@ -56,19 +56,17 @@ object ChapterLoader {
             (parsed.chapters.firstOrNull() as? ParsedChapter.TextChapter)?.let { ChapterContent.Text(it.document) }
         }
 
-    private fun loadText(
-        file: File,
-        format: BookFormat,
-        isLightNovel: Boolean,
-        orderIndex: Int,
-    ): ChapterContent.Text? {
+    private fun loadText(file: File, book: Book, orderIndex: Int): ChapterContent.Text? {
+        val format = book.format
+        val isLightNovel = book.isLightNovel
         if (format == BookFormat.EPUB) {
             return EpubParser.parseChapter(file, if (isLightNovel) 0 else orderIndex)
                 ?.let { ChapterContent.Text(it.document) }
         }
+        val pattern = book.chapterPattern.takeUnless { isLightNovel }
         val parsed = when (format) {
-            BookFormat.TXT -> TxtParser.parse(file)
-            BookFormat.MARKDOWN -> MarkdownParser.parse(file)
+            BookFormat.TXT -> TxtParser.parse(file, pattern)
+            BookFormat.MARKDOWN -> MarkdownParser.parse(file, pattern)
             BookFormat.HTML -> HtmlParser.parse(file)
             else -> error("$format has no text loader")
         }

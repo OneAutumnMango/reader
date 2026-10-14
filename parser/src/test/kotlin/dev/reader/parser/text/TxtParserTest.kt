@@ -23,4 +23,17 @@ class TxtParserTest {
         val second = document.blocks[1] as Block.Paragraph
         assertEquals("Second paragraph,\nstill second.", second.spans.single().text)
     }
+
+    @Test
+    fun `splits into chapters with a short preamble as front matter`() {
+        val file = createTempFile(suffix = ".txt").apply {
+            writeText("Title\n\nChapter 1\n\nOne.\n\nChapter 2\n\nTwo.")
+        }.toFile()
+
+        val chapters = TxtParser.parse(file, ChapterSplitter.prefixPattern("Chapter"))
+            .chapters.map { it as dev.reader.parser.ParsedChapter.TextChapter }
+
+        assertEquals(listOf("Front matter", "Chapter 1", "Chapter 2"), chapters.map { it.title })
+        assertEquals(listOf(true, false, false), chapters.map { it.isExtra })
+    }
 }

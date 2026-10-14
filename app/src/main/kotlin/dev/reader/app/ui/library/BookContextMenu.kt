@@ -36,6 +36,7 @@ fun BookContextMenu(
     onMarkAllRead: () -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
+    onDetectChapters: (() -> Unit)? = null,
 ) {
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -81,6 +82,12 @@ fun BookContextMenu(
                 }
                 MenuRow("Change category", Modifier.testTag("book-menu-change-category")) {
                     showCategoryPicker = true
+                }
+                if (onDetectChapters != null) {
+                    MenuRow("Detect chapters", Modifier.testTag("book-menu-detect-chapters")) {
+                        onDetectChapters()
+                        onDismiss()
+                    }
                 }
                 MenuRow("Mark all chapters as read", Modifier.testTag("book-menu-mark-read")) {
                     onMarkAllRead()

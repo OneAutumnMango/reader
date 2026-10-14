@@ -33,9 +33,9 @@ class BookImporter(
         val format = requireNotNull(BookFormat.fromExtension(file.extension)) {
             "unsupported extension: ${file.extension}"
         }
-        val parsed = parse(file, format, pdfContext)
         val hash = ContentHash.ofFile(file)
         val existing = library.findByContentHash(hash) ?: library.findBySourcePath(file.path)
+        val parsed = parse(file, format, pdfContext, existing?.chapterPattern)
         val bookId = existing?.id ?: BookId(newId())
         val book = Book(
             id = bookId,
@@ -48,6 +48,7 @@ class BookImporter(
             pdfRenderMode = existing?.pdfRenderMode,
             addedAt = existing?.addedAt ?: now(),
             contentHash = hash,
+            chapterPattern = existing?.chapterPattern,
         )
         val chapterIds = existingChapterIds(existing)
         val chapters = parsed.chapters.mapIndexed { index, chapter ->
@@ -55,6 +56,12 @@ class BookImporter(
         }
         library.upsertBook(book, chapters)
         return book
+    }
+
+    /** Re-splits a txt/markdown [book] on [pattern] (null = back to a single chapter). */
+    suspend fun applyChapterPattern(book: Book, pattern: String?): Book {
+        library.updateBookDetails(book.copy(chapterPattern = pattern))
+        return importFile(File(book.sourcePath))
     }
 
     suspend fun importLightNovelFolder(folder: File, categoryIds: Set<CategoryId> = emptySet()): Book {
@@ -114,9 +121,14 @@ class BookImporter(
     private suspend fun existingChapterIds(existing: Book?): Map<Int, ChapterId> =
         existing?.let { book -> library.chapters(book.id).associate { it.orderIndex to it.id } }.orEmpty()
 
-    private fun parse(file: File, format: BookFormat, pdfContext: Context?): ParsedBook = when (format) {
-        BookFormat.TXT -> TxtParser.parse(file)
-        BookFormat.MARKDOWN -> MarkdownParser.parse(file)
+    private fun parse(
+        file: File,
+        format: BookFormat,
+        pdfContext: Context?,
+        chapterPattern: String? = null,
+    ): ParsedBook = when (format) {
+        BookFormat.TXT -> TxtParser.parse(file, chapterPattern)
+        BookFormat.MARKDOWN -> MarkdownParser.parse(file, chapterPattern)
         BookFormat.HTML -> HtmlParser.parse(file)
         BookFormat.EPUB -> EpubParser.parse(file)
         BookFormat.CBZ, BookFormat.CBR -> ComicArchiveParser.parse(file, format)

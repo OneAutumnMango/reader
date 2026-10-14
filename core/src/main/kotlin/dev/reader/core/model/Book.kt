@@ -22,6 +22,8 @@ data class Book(
     val addedAt: Instant,
     /** SHA-256 of the imported content, so the same book is recognised even after a rename. */
     val contentHash: String? = null,
+    /** Heading regex that splits a txt/markdown book into chapters; null keeps it as one chapter. */
+    val chapterPattern: String? = null,
 )
 
 @Serializable

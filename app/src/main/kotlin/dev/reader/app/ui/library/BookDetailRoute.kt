@@ -42,6 +42,7 @@ fun BookDetailRoute(
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
     val currentChapter = chapters.find { it.id == progress?.chapterId }
     var showMenu by remember { mutableStateOf(false) }
+    var showChapterDetect by remember { mutableStateOf(false) }
 
     val coverPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -97,6 +98,11 @@ fun BookDetailRoute(
             },
             onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
             onDismiss = { showMenu = false },
+            onDetectChapters = if (book.supportsChapterDetection()) ({ showChapterDetect = true }) else null,
         )
+    }
+
+    if (showChapterDetect) {
+        ChapterDetectHost(graph, book, onDismiss = { showChapterDetect = false })
     }
 }

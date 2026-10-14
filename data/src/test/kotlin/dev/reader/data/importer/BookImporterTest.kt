@@ -157,6 +157,20 @@ class BookImporterTest {
     }
 
     @Test
+    fun `applying a chapter pattern re-splits the book and null restores a single chapter`() = runBlocking {
+        val library = LibraryRepository(database)
+        val file = File(tempDir, "Saga.txt").apply { writeText("Chapter 1\n\nOne.\n\nChapter 2\n\nTwo.") }
+        val book = importer.importFile(file)
+
+        val split = importer.applyChapterPattern(book, "^Chapter")
+        assertEquals(listOf("Chapter 1", "Chapter 2"), library.chapters(split.id).map { it.title })
+        assertEquals("^Chapter", split.chapterPattern)
+
+        val single = importer.applyChapterPattern(split, null)
+        assertEquals(1, library.chapters(single.id).size)
+    }
+
+    @Test
     fun `new books land in the default category`() = runBlocking {
         val library = LibraryRepository(database)
         val manga = dev.reader.core.model.Category(dev.reader.core.model.CategoryId("manga"), "Manga")

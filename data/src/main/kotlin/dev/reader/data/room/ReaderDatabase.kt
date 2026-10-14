@@ -34,7 +34,7 @@ import dev.reader.data.room.entity.ReadingSessionEntity
         ReadingSessionEntity::class,
         ChapterFtsEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class ReaderDatabase : RoomDatabase() {
@@ -58,6 +58,12 @@ abstract class ReaderDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE books ADD COLUMN contentHash TEXT")
                 db.execSQL("ALTER TABLE chapters ADD COLUMN isExtra INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN chapterPattern TEXT")
             }
         }
     }

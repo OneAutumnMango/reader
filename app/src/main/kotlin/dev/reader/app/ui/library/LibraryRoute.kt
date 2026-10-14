@@ -60,6 +60,7 @@ fun LibraryRoute(
     val importActions = rememberImportActions(graph)
     var showQuickAddMenu by remember { mutableStateOf(false) }
     var longPressedBook by remember { mutableStateOf<Book?>(null) }
+    var chapterDetectBook by remember { mutableStateOf<Book?>(null) }
     var coverTargetBook by remember { mutableStateOf<Book?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -148,7 +149,12 @@ fun LibraryRoute(
                 },
                 onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
                 onDismiss = { longPressedBook = null },
+                onDetectChapters = if (book.supportsChapterDetection()) ({ chapterDetectBook = book }) else null,
             )
+        }
+
+        chapterDetectBook?.let { book ->
+            ChapterDetectHost(graph, book, onDismiss = { chapterDetectBook = null })
         }
 
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))

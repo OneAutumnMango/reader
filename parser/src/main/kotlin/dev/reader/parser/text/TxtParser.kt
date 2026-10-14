@@ -5,24 +5,26 @@ import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.RichDocument
 import dev.reader.core.richtext.Span
 import dev.reader.parser.ParsedBook
-import dev.reader.parser.ParsedChapter
 import java.io.File
 
 object TxtParser {
 
-    fun parse(file: File): ParsedBook {
-        val paragraphs = file.readText()
-            .split(Regex("\n\\s*\n"))
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .map { Block.Paragraph(listOf(Span(it))) }
-
+    /** One chapter for the whole file, or one per heading matched by [chapterPattern] (see [ChapterSplitter]). */
+    fun parse(file: File, chapterPattern: String? = null): ParsedBook {
+        val text = file.readText()
+        val chunks = chapterPattern?.let { ChapterSplitter.split(text, it) } ?: listOf(TextChunk(null, text))
         return ParsedBook(
             title = file.nameWithoutExtension,
             author = "",
             coverPath = null,
             format = BookFormat.TXT,
-            chapters = listOf(ParsedChapter.TextChapter(file.nameWithoutExtension, RichDocument(paragraphs))),
+            chapters = chunks.toChapters(file.nameWithoutExtension) { RichDocument(paragraphs(it)) },
         )
     }
+
+    private fun paragraphs(text: String): List<Block> = text
+        .split(Regex("\n\\s*\n"))
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .map { Block.Paragraph(listOf(Span(it))) }
 }
