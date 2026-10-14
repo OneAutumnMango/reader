@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
 import dev.reader.app.data.AppLog
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.TapAction
@@ -38,6 +39,7 @@ fun PdfReaderScreen(
     file: File,
     settings: ReaderSettings,
     modifier: Modifier = Modifier,
+    pages: IntRange? = null,
     showTapZoneLabels: Boolean = false,
     initialPositionFraction: Float = 0f,
     onTapAction: (TapAction) -> Unit = {},
@@ -65,15 +67,21 @@ fun PdfReaderScreen(
         val pageRenderer = renderer
         TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
             when {
-                pageRenderer != null -> ImagePager(
-                    pageCount = pageRenderer.pageCount,
-                    readingMode = settings.readingMode,
-                    initialPage = (initialPositionFraction * pageRenderer.pageCount).roundToInt(),
-                    zoomEnabled = settings.zoomEnabled,
-                    pageGap = settings.pageGap,
-                    onPageChanged = { onPageChanged(it, pageRenderer.pageCount) },
-                ) { index, continuous ->
-                    PdfPageImage(pageRenderer, index, continuous)
+                pageRenderer != null -> {
+                    val all = 0 until pageRenderer.pageCount
+                    val range = pages?.let { maxOf(it.first, 0)..minOf(it.last, all.last) }
+                        ?.takeIf { !it.isEmpty() } ?: all
+                    val count = range.count()
+                    ImagePager(
+                        pageCount = count,
+                        readingMode = settings.readingMode,
+                        initialPage = (initialPositionFraction * count).roundToInt(),
+                        zoomEnabled = settings.zoomEnabled,
+                        pageGap = settings.pageGap,
+                        onPageChanged = { onPageChanged(it, count) },
+                    ) { index, continuous ->
+                        PdfPageImage(pageRenderer, range.first + index, continuous)
+                    }
                 }
                 openFailed -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Couldn't open this PDF. It may be encrypted or corrupted.")
@@ -126,6 +134,7 @@ private fun PdfPageImage(renderer: PdfPageRenderer, index: Int, continuous: Bool
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize(),
                     )
+                    SharpZoomTile(renderer, index, IntSize(it.width, it.height), Modifier.matchParentSize())
                 },
                 onFailure = { Text("Couldn't render this page.") },
             )

@@ -7,7 +7,9 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -20,9 +22,22 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.testTag
 
 private const val MAX_ZOOM = 5f
+
+/** Current pinch zoom of the enclosing [Zoomable], so content can re-render sharper while zoomed. */
+class ZoomState {
+    var scale by mutableFloatStateOf(1f)
+    var offset by mutableStateOf(Offset.Zero)
+
+    /** The unzoomed viewport, for mapping content positions to what's on screen. */
+    var viewport: LayoutCoordinates? = null
+}
+
+val LocalZoomState = compositionLocalOf<ZoomState?> { null }
 
 /**
  * Pinch-to-zoom and pan for any reader content. Gestures are inspected in the Initial pass so a
@@ -31,8 +46,9 @@ private const val MAX_ZOOM = 5f
  */
 @Composable
 fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
+    val zoom = remember { ZoomState() }
+    var scale by zoom::scale
+    var offset by zoom::offset
     LaunchedEffect(enabled) {
         if (!enabled) {
             scale = 1f
@@ -70,6 +86,7 @@ fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composab
             .clipToBounds()
             .testTag("zoomable")
             .then(gesture)
+            .onPlaced { zoom.viewport = it }
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -77,6 +94,6 @@ fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composab
                 translationY = offset.y
             },
     ) {
-        content()
+        CompositionLocalProvider(LocalZoomState provides zoom) { content() }
     }
 }

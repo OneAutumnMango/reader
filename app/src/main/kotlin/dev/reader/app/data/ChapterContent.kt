@@ -8,5 +8,7 @@ import java.io.File
 sealed interface ChapterContent {
     data class Text(val document: RichDocument) : ChapterContent
     data class Comic(val file: File, val format: BookFormat, val pages: List<String>) : ChapterContent
-    data class Pdf(val file: File) : ChapterContent
+
+    /** [pages] limits the viewer to one chapter's 0-based page range; null shows the whole document. */
+    data class Pdf(val file: File, val pages: IntRange? = null) : ChapterContent
 }

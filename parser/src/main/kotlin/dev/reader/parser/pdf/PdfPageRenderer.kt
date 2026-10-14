@@ -45,6 +45,24 @@ class PdfPageRenderer(file: File) : Closeable {
         bitmap
     }
 
+    /**
+     * Renders a [width] x [height] window of [index] scaled to [pageWidthPx] wide, starting
+     * [left]/[top] px into that scaled page; used for sharp tiles while zoomed in.
+     */
+    @Synchronized
+    fun renderRegion(index: Int, pageWidthPx: Float, left: Float, top: Float, width: Int, height: Int): Bitmap =
+        renderer.openPage(index).use { page ->
+            val scale = pageWidthPx / page.width
+            val bitmap = Bitmap.createBitmap(width.coerceAtLeast(1), height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+            bitmap.eraseColor(Color.WHITE)
+            val transform = Matrix().apply {
+                setScale(scale, scale)
+                postTranslate(-left, -top)
+            }
+            page.render(bitmap, null, transform, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            bitmap
+        }
+
     @Synchronized
     override fun close() {
         renderer.close()

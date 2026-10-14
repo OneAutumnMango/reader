@@ -69,11 +69,16 @@ class BookImporter(
         return book
     }
 
-    /** Re-splits a txt/markdown [book] on [pattern] (null = back to a single chapter), skipping [excludedLines]. */
-    suspend fun applyChapterPattern(book: Book, pattern: String?, excludedLines: Set<Int> = emptySet()): Book {
+    /** Re-splits a txt/markdown/pdf [book] on [pattern] (null = its default chapters), skipping [excludedLines]. */
+    suspend fun applyChapterPattern(
+        book: Book,
+        pattern: String?,
+        excludedLines: Set<Int> = emptySet(),
+        pdfContext: Context? = null,
+    ): Book {
         val updated = book.copy(chapterPattern = pattern, chapterExcludedLines = excludedLines)
         library.updateBookDetails(updated)
-        return importFile(File(book.sourcePath), target = updated)
+        return importFile(File(book.sourcePath), pdfContext = pdfContext, target = updated)
     }
 
     suspend fun importLightNovelFolder(folder: File, categoryIds: Set<CategoryId> = emptySet()): Book {
@@ -145,7 +150,8 @@ class BookImporter(
         BookFormat.HTML -> HtmlParser.parse(file)
         BookFormat.EPUB -> EpubParser.parse(file)
         BookFormat.CBZ, BookFormat.CBR -> ComicArchiveParser.parse(file, format)
-        BookFormat.PDF -> PdfTextParser(requireNotNull(pdfContext) { "PDF import needs a Context" }).parse(file)
+        BookFormat.PDF -> PdfTextParser(requireNotNull(pdfContext) { "PDF import needs a Context" })
+            .parse(file, chapterPattern, chapterExcludedLines)
         BookFormat.FB2 -> Fb2Parser.parse(file)
         BookFormat.MOBI -> MobiParser.parse(file)
         BookFormat.RTF -> RtfParser.parse(file)

@@ -5,6 +5,8 @@ import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.core.model.Chapter
 import dev.reader.core.reader.PdfRenderMode
+import dev.reader.core.richtext.RichDocument
+import dev.reader.parser.ParsedBook
 import dev.reader.parser.ParsedChapter
 import dev.reader.parser.comic.ComicArchiveParser
 import dev.reader.parser.docx.DocxParser
@@ -32,7 +34,7 @@ object ChapterLoader {
                 val sourceFile = File(if (book.isLightNovel) chapter.sourcePath else book.sourcePath)
                 when (book.format) {
                     BookFormat.CBZ, BookFormat.CBR -> loadComic(sourceFile, book.format)
-                    BookFormat.PDF -> loadPdf(context, sourceFile, book.pdfRenderMode)
+                    BookFormat.PDF -> loadPdf(context, sourceFile, book, chapter.orderIndex)
                     else -> loadText(sourceFile, book, chapter.orderIndex)?.let {
                         ChapterContent.Text(BookImages.resolve(context, sourceFile, book.format, it.document))
                     }
@@ -55,13 +57,35 @@ object ChapterLoader {
         return ChapterContent.Comic(file, format, pages)
     }
 
-    private fun loadPdf(context: Context, file: File, renderMode: PdfRenderMode?): ChapterContent? =
-        if (renderMode != PdfRenderMode.REFLOW_TEXT) {
-            ChapterContent.Pdf(file)
-        } else {
-            val parsed = PdfTextParser(context).parse(file)
-            (parsed.chapters.firstOrNull() as? ParsedChapter.TextChapter)?.let { ChapterContent.Text(it.document) }
+    private fun loadPdf(context: Context, file: File, book: Book, orderIndex: Int): ChapterContent? {
+        if (book.pdfRenderMode != PdfRenderMode.REFLOW_TEXT) {
+            if (book.isLightNovel) return ChapterContent.Pdf(file)
+            val pages = runCatching { parsePdf(context, file, book).chapters.getOrNull(orderIndex) }
+                .onFailure { AppLog.warn("Couldn't split PDF into chapters; showing every page", LOG_TAG, it) }
+                .getOrNull()
+                .let { (it as? ParsedChapter.TextChapter)?.pages }
+            return ChapterContent.Pdf(file, pages)
         }
+        val chapters = parsePdf(context, file, book).chapters.filterIsInstance<ParsedChapter.TextChapter>()
+        val document = if (book.isLightNovel) {
+            RichDocument(chapters.flatMap { it.document.blocks })
+        } else {
+            chapters.getOrNull(orderIndex)?.document ?: return null
+        }
+        return ChapterContent.Text(document)
+    }
+
+    private data class PdfKey(val path: String, val modified: Long, val pattern: String?, val excluded: Set<Int>)
+
+    private var pdfCache: Pair<PdfKey, ParsedBook>? = null
+
+    /** Splitting needs the whole PDF's text, so keep the last parse for swiping between its chapters. */
+    @Synchronized
+    private fun parsePdf(context: Context, file: File, book: Book): ParsedBook {
+        val key = PdfKey(file.path, file.lastModified(), book.patternFor(), book.excludedLinesFor())
+        pdfCache?.takeIf { it.first == key }?.let { return it.second }
+        return PdfTextParser(context).parse(file, key.pattern, key.excluded).also { pdfCache = key to it }
+    }
 
     private fun loadText(file: File, book: Book, orderIndex: Int): ChapterContent.Text? {
         val isLightNovel = book.isLightNovel

@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -39,6 +40,7 @@ import dev.reader.app.data.AppLog
 import dev.reader.app.data.ReaderGraph
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
+import dev.reader.parser.pdf.PdfTextParser
 import dev.reader.parser.text.ChapterBreak
 import dev.reader.parser.text.ChapterSplitter
 import dev.reader.parser.text.ChapterSuggestion
@@ -53,15 +55,19 @@ enum class ChapterDetectMode { AUTO, STARTS_WITH, REGEX }
 
 /** Whether "Detect chapters" makes sense for [book]. */
 fun Book.supportsChapterDetection(): Boolean =
-    !isLightNovel && (format == BookFormat.TXT || format == BookFormat.MARKDOWN)
+    !isLightNovel && (format == BookFormat.TXT || format == BookFormat.MARKDOWN || format == BookFormat.PDF)
 
 /** Loads [book]'s text and re-splits it with whatever pattern the user confirms. */
 @Composable
 fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val text by produceState<String?>(null, book.sourcePath) {
         value = withContext(Dispatchers.IO) {
-            runCatching { File(book.sourcePath).readText() }
+            runCatching {
+                val file = File(book.sourcePath)
+                if (book.format == BookFormat.PDF) PdfTextParser(context).text(file) else file.readText()
+            }
                 .onFailure { AppLog.error("Couldn't read book for chapter detection", "ChapterDetection", it) }
                 .getOrDefault("")
         }
@@ -74,7 +80,7 @@ fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
         onApply = { pattern, excludedLines ->
             scope.launch {
                 withContext(Dispatchers.IO) {
-                    runCatching { graph.importer.applyChapterPattern(book, pattern, excludedLines) }
+                    runCatching { graph.importer.applyChapterPattern(book, pattern, excludedLines, context) }
                         .onSuccess { AppLog.info("Applied chapter detection settings", "ChapterDetection") }
                         .onFailure { AppLog.error("Couldn't apply chapter detection settings", "ChapterDetection", it) }
                 }

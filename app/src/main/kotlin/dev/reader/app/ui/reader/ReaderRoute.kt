@@ -258,6 +258,7 @@ private fun ChapterPage(
         )
         loaded is ChapterContent.Pdf && startFraction != null -> PdfReaderScreen(
             file = loaded.file,
+            pages = loaded.pages,
             settings = settings,
             initialPositionFraction = startFraction,
             onTapAction = ::onTapAction,
