@@ -34,7 +34,8 @@ class BookImporter(
             "unsupported extension: ${file.extension}"
         }
         val parsed = parse(file, format, pdfContext)
-        val existing = library.findBySourcePath(file.path)
+        val hash = ContentHash.ofFile(file)
+        val existing = library.findByContentHash(hash) ?: library.findBySourcePath(file.path)
         val bookId = existing?.id ?: BookId(newId())
         val book = Book(
             id = bookId,
@@ -44,9 +45,14 @@ class BookImporter(
             format = format,
             sourcePath = file.path,
             categoryIds = existing?.categoryIds ?: categoryIds,
+            pdfRenderMode = existing?.pdfRenderMode,
             addedAt = existing?.addedAt ?: now(),
+            contentHash = hash,
         )
-        val chapters = parsed.chapters.mapIndexed { index, chapter -> chapter.toChapterModel(bookId, index) }
+        val chapterIds = existingChapterIds(existing)
+        val chapters = parsed.chapters.mapIndexed { index, chapter ->
+            chapter.toChapterModel(bookId, index, chapterIds[index])
+        }
         library.upsertBook(book, chapters)
         return book
     }
@@ -55,14 +61,16 @@ class BookImporter(
         val files = (folder.listFiles { f -> f.isFile } ?: emptyArray())
             .sortedWith(compareBy(NaturalSortComparator) { it.name })
 
-        val existing = library.findBySourcePath(folder.path)
+        val hash = ContentHash.ofFolder(folder)
+        val existing = library.findByContentHash(hash) ?: library.findBySourcePath(folder.path)
         val bookId = existing?.id ?: BookId(newId())
+        val chapterIds = existingChapterIds(existing)
         val chapters = files.mapIndexedNotNull { index, file ->
             val format = BookFormat.fromExtension(file.extension) ?: return@mapIndexedNotNull null
             val parsed = parse(file, format, pdfContext = null)
             val textChapters = parsed.chapters.filterIsInstance<ParsedChapter.TextChapter>()
             Chapter(
-                id = ChapterId(newId()),
+                id = chapterIds[index] ?: ChapterId(newId()),
                 bookId = bookId,
                 title = file.nameWithoutExtension,
                 sourcePath = file.path,
@@ -82,10 +90,29 @@ class BookImporter(
             isLightNovel = true,
             categoryIds = existing?.categoryIds ?: categoryIds,
             addedAt = existing?.addedAt ?: now(),
+            contentHash = hash,
         )
         library.upsertBook(book, chapters)
         return book
     }
+
+    /**
+     * Re-imports books added before content hashing (and front-matter detection) existed, in place,
+     * so they get a hash for duplicate checks. Books whose source file is gone are left untouched.
+     */
+    suspend fun refreshLegacyBooks(pdfContext: Context?) {
+        library.booksMissingContentHash().forEach { book ->
+            val source = File(book.sourcePath)
+            if (!source.exists()) return@forEach
+            runCatching {
+                if (book.isLightNovel) importLightNovelFolder(source) else importFile(source, pdfContext = pdfContext)
+            }
+        }
+    }
+
+    /** Reuses chapter ids by position on re-import so reading progress and bookmarks stay attached. */
+    private suspend fun existingChapterIds(existing: Book?): Map<Int, ChapterId> =
+        existing?.let { book -> library.chapters(book.id).associate { it.orderIndex to it.id } }.orEmpty()
 
     private fun parse(file: File, format: BookFormat, pdfContext: Context?): ParsedBook = when (format) {
         BookFormat.TXT -> TxtParser.parse(file)
@@ -111,13 +138,14 @@ class BookImporter(
         return coverFile.path
     }
 
-    private fun ParsedChapter.toChapterModel(bookId: BookId, orderIndex: Int): Chapter = Chapter(
-        id = ChapterId(newId()),
+    private fun ParsedChapter.toChapterModel(bookId: BookId, orderIndex: Int, existingId: ChapterId?) = Chapter(
+        id = existingId ?: ChapterId(newId()),
         bookId = bookId,
         title = title,
         sourcePath = "",
         orderIndex = orderIndex,
         wordCount = (this as? ParsedChapter.TextChapter)?.document?.wordCount() ?: 0,
+        isExtra = (this as? ParsedChapter.TextChapter)?.isExtra ?: false,
     )
 }
 

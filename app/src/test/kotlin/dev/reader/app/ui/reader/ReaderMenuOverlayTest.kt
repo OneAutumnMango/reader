@@ -4,11 +4,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.test.swipeDown
 import dev.reader.core.reader.PdfRenderMode
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode
@@ -18,6 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
@@ -116,6 +121,37 @@ class ReaderMenuOverlayTest {
 
         composeRule.onNodeWithText("Appearance").assertExists()
         composeRule.onNodeWithText("Reading").assertExists()
+    }
+
+    @Test
+    fun `swiping up on the bar expands and pulling the panel down from the top collapses`() {
+        var expanded = false
+        composeRule.setContent {
+            var state by remember { mutableStateOf(false) }
+            ReaderMenuOverlay(
+                progressLabel = "50%",
+                theme = ReaderTheme.Default,
+                onThemeChange = {},
+                settings = ReaderSettings(),
+                onSettingsChange = {},
+                onBack = {},
+                expanded = state,
+                onExpandedChange = {
+                    state = it
+                    expanded = it
+                },
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-menu-bar").performTouchInput {
+            swipe(start = center, end = center - Offset(0f, 300f), durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+        assertTrue(expanded)
+
+        composeRule.onNodeWithTag("reader-menu-panel").performTouchInput { swipeDown() }
+        composeRule.waitForIdle()
+        assertFalse(expanded)
     }
 
     @Test

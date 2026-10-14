@@ -1,7 +1,10 @@
 package dev.reader.app.ui.reader
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,11 +33,20 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.appearance.ReaderSettingsEditor
 import dev.reader.app.ui.appearance.ReaderThemeEditor
@@ -46,7 +58,38 @@ import dev.reader.core.theme.ReaderTheme
 private val EXPANDED_PANEL_MAX_HEIGHT = 420.dp
 private val MENU_SHADOW_ELEVATION = 8.dp
 private const val PERCENT_MAX = 100
-private const val SWIPE_EXPAND_THRESHOLD_PX = 60f
+private const val SWIPE_THRESHOLD_PX = 60f
+private const val FLING_THRESHOLD = 1000f
+
+/**
+ * Collapses the expanded panel when it's dragged down while already scrolled to the top. A gesture
+ * that scrolled the panel's content at any point never collapses it.
+ */
+private class PullDownToCollapse(
+    private val scrollState: ScrollState,
+    private val onCollapse: () -> Unit,
+) : NestedScrollConnection {
+    private var pulled = 0f
+    private var scrolledContent = false
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        if (source == NestedScrollSource.UserInput) {
+            if (consumed.y != 0f) {
+                scrolledContent = true
+            } else if (!scrolledContent && available.y > 0f && scrollState.value == 0) {
+                pulled += available.y
+            }
+        }
+        return Offset.Zero
+    }
+
+    override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+        if (pulled >= SWIPE_THRESHOLD_PX) onCollapse()
+        pulled = 0f
+        scrolledContent = false
+        return Velocity.Zero
+    }
+}
 
 /**
  * Formats chapter position as "Page X of Y" for paged modes and page-image content (PDF pages,
@@ -64,8 +107,8 @@ fun readerProgressLabel(readingMode: ReadingMode, index: Int, total: Int, pageBa
 /**
  * Bottom-anchored reader menu: never shifts the reader content. The collapsed bar shows
  * chapter progress; the "^" expands it upward into font/theme/reading-mode/selectable-text
- * controls (reusing the same editors as the Appearance screen). Can also be expanded/collapsed
- * by swiping up/down on the bar itself when `swipeGestureEnabled` is true.
+ * controls (reusing the same editors as the Appearance screen). Swiping up/down on the bar, or
+ * pulling the panel down from its top, also expands/collapses it when `swipeGestureEnabled`.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,50 +126,58 @@ fun ReaderMenuOverlay(
     pdfRenderMode: PdfRenderMode? = null,
     onPdfRenderModeChange: (PdfRenderMode) -> Unit = {},
 ) {
-    val swipeModifier = if (swipeGestureEnabled) {
-        Modifier.pointerInput(Unit) {
-            var totalDrag = 0f
-            detectVerticalDragGestures(
-                onDragStart = { totalDrag = 0f },
-                onDragEnd = {
-                    when {
-                        totalDrag <= -SWIPE_EXPAND_THRESHOLD_PX -> onExpandedChange(true)
-                        totalDrag >= SWIPE_EXPAND_THRESHOLD_PX -> onExpandedChange(false)
-                    }
-                },
-            ) { change, dragAmount ->
-                change.consume()
-                totalDrag += dragAmount
-            }
-        }
+    val currentOnExpandedChange by rememberUpdatedState(onExpandedChange)
+    var barDrag by remember { mutableFloatStateOf(0f) }
+    val barSwipe = if (swipeGestureEnabled) {
+        Modifier.draggable(
+            state = rememberDraggableState { barDrag += it },
+            orientation = Orientation.Vertical,
+            onDragStarted = { barDrag = 0f },
+            onDragStopped = { velocity ->
+                when {
+                    barDrag <= -SWIPE_THRESHOLD_PX || velocity < -FLING_THRESHOLD -> currentOnExpandedChange(true)
+                    barDrag >= SWIPE_THRESHOLD_PX || velocity > FLING_THRESHOLD -> currentOnExpandedChange(false)
+                }
+            },
+        )
     } else {
         Modifier
     }
 
-    Column(modifier = modifier.fillMaxWidth().shadow(MENU_SHADOW_ELEVATION).then(swipeModifier)) {
+    val panelScroll = rememberScrollState()
+    val pullDownToCollapse = remember(panelScroll) {
+        PullDownToCollapse(panelScroll) { currentOnExpandedChange(false) }
+    }
+
+    Column(modifier = modifier.fillMaxWidth().shadow(MENU_SHADOW_ELEVATION)) {
         AnimatedVisibility(visible = expanded) {
             Surface(tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = EXPANDED_PANEL_MAX_HEIGHT)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                ) {
-                    if (pdfRenderMode != null) {
-                        Text("PDF display", style = MaterialTheme.typography.titleSmall)
-                        PdfModeSelector(pdfRenderMode, onPdfRenderModeChange)
+                Column {
+                    HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = EXPANDED_PANEL_MAX_HEIGHT)
+                            .then(if (swipeGestureEnabled) Modifier.nestedScroll(pullDownToCollapse) else Modifier)
+                            .verticalScroll(panelScroll)
+                            .padding(16.dp)
+                            .testTag("reader-menu-panel"),
+                    ) {
+                        if (pdfRenderMode != null) {
+                            Text("PDF display", style = MaterialTheme.typography.titleSmall)
+                            PdfModeSelector(pdfRenderMode, onPdfRenderModeChange)
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                        }
+                        Text("Appearance", style = MaterialTheme.typography.titleSmall)
+                        ReaderThemeEditor(theme, onThemeChange)
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                        Text("Reading", style = MaterialTheme.typography.titleSmall)
+                        ReaderSettingsEditor(settings, onSettingsChange)
                     }
-                    Text("Appearance", style = MaterialTheme.typography.titleSmall)
-                    ReaderThemeEditor(theme, onThemeChange)
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                    Text("Reading", style = MaterialTheme.typography.titleSmall)
-                    ReaderSettingsEditor(settings, onSettingsChange)
                 }
             }
         }
 
-        Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+        Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth().testTag("reader-menu-bar").then(barSwipe)) {
             Column {
                 HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
                 Row(

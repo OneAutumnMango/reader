@@ -139,4 +139,34 @@ class BookImporterTest {
         val allBooks = LibraryRepository(database).observeBooks().first()
         assertEquals(1, allBooks.size)
     }
+
+    @Test
+    fun `a renamed copy of the same file is recognised as the same book and keeps its chapters`() = runBlocking {
+        val original = File(tempDir, "My Story.txt").apply { writeText("First paragraph.") }
+        val renamed = File(tempDir, "Totally Different Name.txt").apply { writeText("First paragraph.") }
+        val library = LibraryRepository(database)
+
+        val first = importer.importFile(original)
+        val firstChapters = library.chapters(first.id)
+        val second = importer.importFile(renamed)
+
+        assertEquals(first.id, second.id)
+        assertEquals("My Story", second.title)
+        assertEquals(1, library.observeBooks().first().size)
+        assertEquals(firstChapters.map { it.id }, library.chapters(second.id).map { it.id })
+    }
+
+    @Test
+    fun `a renamed light novel folder is recognised as the same book`() = runBlocking {
+        val folder = File(tempDir, "Novel").apply { mkdirs() }
+        File(folder, "1.txt").writeText("one")
+        val renamed = File(tempDir, "Novel Renamed").apply { mkdirs() }
+        File(renamed, "chapter-1.txt").writeText("one")
+
+        val first = importer.importLightNovelFolder(folder)
+        val second = importer.importLightNovelFolder(renamed)
+
+        assertEquals(first.id, second.id)
+        assertEquals(1, LibraryRepository(database).observeBooks().first().size)
+    }
 }

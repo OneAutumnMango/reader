@@ -12,6 +12,7 @@ import dev.reader.data.room.toCategory
 import dev.reader.data.room.toChapter
 import dev.reader.data.room.toEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class LibraryRepository(private val database: ReaderDatabase) {
@@ -29,6 +30,16 @@ class LibraryRepository(private val database: ReaderDatabase) {
 
     suspend fun findBySourcePath(sourcePath: String): Book? =
         database.books().findBySourcePath(sourcePath)?.let { it.toBook(database.books().categoryIdsFor(it.id)) }
+
+    suspend fun findByContentHash(hash: String): Book? =
+        database.books().findByContentHash(hash)?.let { it.toBook(database.books().categoryIdsFor(it.id)) }
+
+    /** Books imported before content hashing existed. */
+    suspend fun booksMissingContentHash(): List<Book> =
+        database.books().observeAll().first().filter { it.contentHash == null }.toBooks()
+
+    suspend fun chapters(bookId: BookId): List<Chapter> =
+        database.chapters().getByBook(bookId.value).map { it.toChapter() }
 
     suspend fun upsertBook(book: Book, chapters: List<Chapter>) {
         database.books().upsert(book.toEntity())

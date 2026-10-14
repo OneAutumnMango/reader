@@ -127,4 +127,61 @@ class EpubParserTest {
         assertEquals("Found it.", paragraph.spans.single().text)
         assertEquals(chapter, EpubParser.parseChapter(file, 0))
     }
+
+    @Test
+    fun `separates front matter from real chapters and uses toc titles`() {
+        val file = createTempFile(suffix = ".epub").toFile()
+        ZipOutputStream(file.outputStream()).use { zip ->
+            fun entry(name: String, content: String) {
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(content.toByteArray())
+                zip.closeEntry()
+            }
+
+            entry(
+                "META-INF/container.xml",
+                """<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>""",
+            )
+            entry(
+                "OEBPS/content.opf",
+                """
+                <package>
+                    <metadata><title>Fronted</title></metadata>
+                    <manifest>
+                        <item id="title" href="Text/part0000.xhtml"/>
+                        <item id="copy" href="Text/copyright.xhtml"/>
+                        <item id="nav" href="nav.xhtml" properties="nav"/>
+                        <item id="ch1" href="Text/one.xhtml"/>
+                        <item id="ch2" href="Text/two.xhtml"/>
+                    </manifest>
+                    <spine>
+                        <itemref idref="title"/><itemref idref="copy"/><itemref idref="nav"/>
+                        <itemref idref="ch1"/><itemref idref="ch2"/>
+                    </spine>
+                </package>
+                """.trimIndent(),
+            )
+            entry(
+                "OEBPS/nav.xhtml",
+                """
+                <html><body><nav epub:type="toc"><ol>
+                    <li><a href="Text/one.xhtml">The Beginning</a></li>
+                    <li><a href="Text/two.xhtml#start">The End</a></li>
+                </ol></nav></body></html>
+                """.trimIndent(),
+            )
+            entry("OEBPS/Text/part0000.xhtml", "<html><body><h1>Fronted</h1><p>by Jane writing as J.</p></body></html>")
+            entry("OEBPS/Text/copyright.xhtml", "<html><body><p>All rights reserved.</p></body></html>")
+            entry("OEBPS/Text/one.xhtml", "<html><body><p>Once upon a time.</p></body></html>")
+            entry("OEBPS/Text/two.xhtml", "<html><body><h2>Two</h2><p>The end.</p></body></html>")
+        }
+
+        val chapters = EpubParser.parse(file).chapters.map { it as ParsedChapter.TextChapter }
+
+        assertEquals(
+            listOf("Title page", "Copyright", "Contents", "The Beginning", "The End"),
+            chapters.map { it.title },
+        )
+        assertEquals(listOf(true, true, true, false, false), chapters.map { it.isExtra })
+    }
 }

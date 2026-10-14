@@ -6,7 +6,12 @@ import dev.reader.core.richtext.RichDocument
 sealed interface ParsedChapter {
     val title: String
 
-    data class TextChapter(override val title: String, val document: RichDocument) : ParsedChapter
+    /** [isExtra] marks front/back matter (title page, copyright, contents…) rather than a real chapter. */
+    data class TextChapter(
+        override val title: String,
+        val document: RichDocument,
+        val isExtra: Boolean = false,
+    ) : ParsedChapter
     data class ImageChapter(override val title: String, val pages: List<String>) : ParsedChapter
 }
 

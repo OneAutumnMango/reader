@@ -28,6 +28,9 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE sourcePath = :sourcePath LIMIT 1")
     suspend fun findBySourcePath(sourcePath: String): BookEntity?
 
+    @Query("SELECT * FROM books WHERE contentHash = :hash LIMIT 1")
+    suspend fun findByContentHash(hash: String): BookEntity?
+
     @Upsert
     suspend fun upsert(book: BookEntity)
 

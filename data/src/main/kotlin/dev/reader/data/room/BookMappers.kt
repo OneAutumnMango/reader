@@ -24,6 +24,7 @@ fun BookEntity.toBook(categoryIds: List<String>) = Book(
     categoryIds = categoryIds.map { CategoryId(it) }.toSet(),
     pdfRenderMode = pdfRenderMode?.let { PdfRenderMode.valueOf(it) },
     addedAt = Instant.fromEpochMilliseconds(addedAt),
+    contentHash = contentHash,
 )
 
 fun Book.toEntity() = BookEntity(
@@ -36,6 +37,7 @@ fun Book.toEntity() = BookEntity(
     isLightNovel = isLightNovel,
     pdfRenderMode = pdfRenderMode?.name,
     addedAt = addedAt.toEpochMilliseconds(),
+    contentHash = contentHash,
 )
 
 fun ChapterEntity.toChapter() = Chapter(
@@ -45,6 +47,7 @@ fun ChapterEntity.toChapter() = Chapter(
     sourcePath = sourcePath,
     orderIndex = orderIndex,
     wordCount = wordCount,
+    isExtra = isExtra,
 )
 
 fun Chapter.toEntity() = ChapterEntity(
@@ -54,6 +57,7 @@ fun Chapter.toEntity() = ChapterEntity(
     sourcePath = sourcePath,
     orderIndex = orderIndex,
     wordCount = wordCount,
+    isExtra = isExtra,
 )
 
 fun CategoryEntity.toCategory() = Category(

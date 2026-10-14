@@ -23,13 +23,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** The app's one dependency graph: a single Room database and DataStore, shared everywhere. */
 class ReaderGraph(context: Context) {
 
+    private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val database: ReaderDatabase = Room.databaseBuilder(
         context.applicationContext,
         ReaderDatabase::class.java,
         "reader.db",
-    ).addMigrations(ReaderDatabase.MIGRATION_2_3).fallbackToDestructiveMigration(true).build()
+    ).addMigrations(ReaderDatabase.MIGRATION_2_3, ReaderDatabase.MIGRATION_3_4)
+        .fallbackToDestructiveMigration(true)
+        .build()
 
     private val stores = ReaderStores(
         fileSystem = FileSystem.SYSTEM,
@@ -51,6 +54,10 @@ class ReaderGraph(context: Context) {
 
     /** Runs once per process in the app scope, so rotation or leaving the screen can't cancel it. */
     fun scanRootFoldersOnLaunch() {
-        if (launchScanStarted.compareAndSet(false, true)) scope.launch { rootFolderScanner.scanAll() }
+        if (!launchScanStarted.compareAndSet(false, true)) return
+        scope.launch(Dispatchers.IO) {
+            importer.refreshLegacyBooks(appContext)
+            rootFolderScanner.scanAll()
+        }
     }
 }

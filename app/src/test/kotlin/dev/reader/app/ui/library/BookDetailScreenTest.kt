@@ -37,6 +37,20 @@ class BookDetailScreenTest {
     )
 
     @Test
+    fun `extras are tucked into an expandable book info section`() {
+        val copyright = Chapter(ChapterId("ex-1"), book.id, "Copyright", "", 2, isExtra = true)
+        var clicked: Chapter? = null
+        composeRule.setContent {
+            BookDetailScreen(book, chapters, emptyList(), onChapterClick = { clicked = it }, extras = listOf(copyright))
+        }
+
+        composeRule.onNodeWithTag("book-info-toggle").performScrollTo().performClick()
+        composeRule.onNodeWithTag("extra-ex-1").performScrollTo().performClick()
+
+        assertEquals(copyright, clicked)
+    }
+
+    @Test
     fun `clicking a chapter reports it`() {
         var clicked: Chapter? = null
         composeRule.setContent {

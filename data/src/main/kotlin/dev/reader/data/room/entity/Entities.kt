@@ -15,6 +15,7 @@ data class BookEntity(
     val isLightNovel: Boolean,
     val pdfRenderMode: String?,
     val addedAt: Long,
+    val contentHash: String? = null,
 )
 
 @Entity(tableName = "chapters")
@@ -25,6 +26,7 @@ data class ChapterEntity(
     val sourcePath: String,
     val orderIndex: Int,
     val wordCount: Int,
+    @ColumnInfo(defaultValue = "0") val isExtra: Boolean = false,
 )
 
 @Entity(tableName = "categories")

@@ -20,6 +20,8 @@ data class Book(
     /** Only meaningful for [BookFormat.PDF]; null means the app default applies. */
     val pdfRenderMode: PdfRenderMode? = null,
     val addedAt: Instant,
+    /** SHA-256 of the imported content, so the same book is recognised even after a rename. */
+    val contentHash: String? = null,
 )
 
 @Serializable
@@ -31,4 +33,6 @@ data class Chapter(
     val sourcePath: String,
     val orderIndex: Int,
     val wordCount: Int = 0,
+    /** Front/back matter (title page, copyright, contents…) shown as book info rather than a chapter. */
+    val isExtra: Boolean = false,
 )

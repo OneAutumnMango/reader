@@ -35,6 +35,8 @@ fun BookDetailRoute(
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val book = books.find { it.id == bookId } ?: return
     val chapters by graph.library.observeChapters(bookId).collectAsState(initial = emptyList())
+    val regularChapters = chapters.filterNot { it.isExtra }.ifEmpty { chapters }
+    val extras = chapters.filter { it.isExtra && it !in regularChapters }
     val bookmarks by graph.bookmarks.observe(bookId).collectAsState(initial = emptyList())
     val progress by graph.progress.observe(bookId).collectAsState(initial = null)
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
@@ -55,12 +57,13 @@ fun BookDetailRoute(
         }
         BookDetailScreen(
             book = book,
-            chapters = chapters,
+            chapters = regularChapters,
+            extras = extras,
             bookmarks = bookmarks,
             onChapterClick = onOpenChapter,
             currentChapterOrderIndex = currentChapter?.orderIndex,
             resumeLabel = if (currentChapter != null) "Resume" else "Start reading",
-            onResume = { (currentChapter ?: chapters.firstOrNull())?.let(onOpenChapter) },
+            onResume = { (currentChapter ?: regularChapters.firstOrNull())?.let(onOpenChapter) },
             onMenuClick = { showMenu = true },
         )
     }
@@ -78,7 +81,7 @@ fun BookDetailRoute(
             onChangeCover = { coverPickerLauncher.launch(arrayOf("image/*")) },
             onMarkAllRead = {
                 scope.launch {
-                    val lastChapter = chapters.lastOrNull()
+                    val lastChapter = regularChapters.lastOrNull()
                     if (lastChapter != null) {
                         graph.progress.update(
                             Progress(

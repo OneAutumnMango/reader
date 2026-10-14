@@ -12,6 +12,9 @@ interface ChapterDao {
     @Query("SELECT * FROM chapters WHERE bookId = :bookId ORDER BY orderIndex")
     fun observeByBook(bookId: String): Flow<List<ChapterEntity>>
 
+    @Query("SELECT * FROM chapters WHERE bookId = :bookId ORDER BY orderIndex")
+    suspend fun getByBook(bookId: String): List<ChapterEntity>
+
     @Upsert
     suspend fun upsertAll(chapters: List<ChapterEntity>)
 

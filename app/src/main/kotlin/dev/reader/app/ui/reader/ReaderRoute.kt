@@ -54,7 +54,12 @@ fun ReaderRoute(
 ) {
     val scope = rememberCoroutineScope()
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
-    val chapters by graph.library.observeChapters(bookId).collectAsState(initial = emptyList())
+    val allChapters by graph.library.observeChapters(bookId).collectAsState(initial = emptyList())
+    // Extras (title page, copyright…) open on their own; otherwise only real chapters are swipeable.
+    val chapters = remember(allChapters, chapterId) {
+        val opened = allChapters.find { it.id == chapterId }
+        if (opened?.isExtra == true) listOf(opened) else allChapters.filterNot { it.isExtra }.ifEmpty { allChapters }
+    }
     val book = books.find { it.id == bookId }
     val preferences by graph.settings.preferences.collectAsState(initial = null)
     val prefs = preferences
@@ -122,7 +127,6 @@ fun ReaderRoute(
                 onPdfRenderModeChange = { mode ->
                     scope.launch { graph.library.updateBookDetails(book.copy(pdfRenderMode = mode)) }
                 },
-                swipeGestureEnabled = readingMode != ReadingMode.PAGED_VERTICAL,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
