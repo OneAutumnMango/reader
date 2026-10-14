@@ -66,7 +66,7 @@ private fun ReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolea
         )
         is Block.Heading -> Text(
             text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
-            style = theme.headingTextStyle(block.textAlign, useBookStyling),
+            style = theme.headingTextStyle(block.level, block.textAlign, useBookStyling),
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         is Block.ListItem -> Text(

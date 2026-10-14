@@ -94,7 +94,7 @@ private fun Block.spansOrEmpty() = when (this) {
 
 private fun Block.styleOf(theme: ReaderTheme, useBookStyling: Boolean) = when (this) {
     is Block.Paragraph -> theme.bodyTextStyle(textAlign, useBookStyling)
-    is Block.Heading -> theme.headingTextStyle(textAlign, useBookStyling)
+    is Block.Heading -> theme.headingTextStyle(level, textAlign, useBookStyling)
     is Block.ListItem -> theme.bodyTextStyle(useBookStyling = useBookStyling)
     is Block.Image -> theme.bodyTextStyle()
 }
@@ -108,7 +108,7 @@ private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: B
         )
         is Block.Heading -> Text(
             text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
-            style = theme.headingTextStyle(block.textAlign, useBookStyling),
+            style = theme.headingTextStyle(block.level, block.textAlign, useBookStyling),
         )
         is Block.ListItem -> Text(
             text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),

@@ -13,6 +13,15 @@ private val CONTAINER_TAGS = setOf(
     "div", "section", "article", "main", "header", "footer", "body", "html", "blockquote",
 )
 private val HEADING_PATTERN = Regex("h[1-6]")
+private val TITLE_CLASS_PATTERN = Regex("(?i)title|chapter|heading|chap-?num|ch-?head")
+private const val MAX_TITLE_LENGTH = 120
+
+/** Many EPUBs mark chapter titles with a class on a `<p>`/`<div>` instead of using `<h1>`-`<h6>`. */
+private fun Element.looksLikeTitle(): Boolean {
+    if (tagName() != "p" && tagName() != "div") return false
+    val text = text().trim()
+    return text.isNotEmpty() && text.length <= MAX_TITLE_LENGTH && TITLE_CLASS_PATTERN.containsMatchIn(className())
+}
 
 fun parseHtmlToRichDocument(html: String): RichDocument {
     val document = Jsoup.parse(html)
@@ -31,6 +40,7 @@ private fun walkBlocks(root: Element, classRules: Map<String, CssStyle>, blocks:
             tag.matches(HEADING_PATTERN) -> {
                 blocks += Block.Heading(tag.drop(1).toInt(), spansOf(element, classRules), textAlign)
             }
+            element.looksLikeTitle() -> blocks += Block.Heading(2, spansOf(element, classRules), textAlign)
             tag == "ul" -> element.children().forEachIndexed { i, li ->
                 blocks += Block.ListItem(spansOf(li, classRules), ordered = false, index = i)
             }

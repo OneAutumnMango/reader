@@ -35,5 +35,7 @@ class TxtParserTest {
 
         assertEquals(listOf("Front matter", "Chapter 1", "Chapter 2"), chapters.map { it.title })
         assertEquals(listOf(true, false, false), chapters.map { it.isExtra })
+        val heading = chapters[1].document.blocks.first() as Block.Heading
+        assertEquals("Chapter 1", heading.spans.single().text)
     }
 }

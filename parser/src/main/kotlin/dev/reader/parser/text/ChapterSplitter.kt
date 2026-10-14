@@ -1,5 +1,6 @@
 package dev.reader.parser.text
 
+import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.RichDocument
 import dev.reader.core.richtext.wordCount
 import dev.reader.parser.ParsedChapter
@@ -14,13 +15,19 @@ internal fun List<TextChunk>.toChapters(bookTitle: String, render: (String) -> R
     map { chunk ->
         val document = render(chunk.text)
         when {
-            chunk.title != null -> ParsedChapter.TextChapter(chunk.title, document)
+            chunk.title != null -> ParsedChapter.TextChapter(chunk.title, document.withHeadingFirst())
             size == 1 -> ParsedChapter.TextChapter(bookTitle, document)
             document.wordCount() <= MAX_FRONT_MATTER_WORDS ->
                 ParsedChapter.TextChapter("Front matter", document, isExtra = true)
             else -> ParsedChapter.TextChapter("Opening", document)
         }
     }
+
+/** A chunk's first block is its heading line; plain-text renders it as a paragraph, so promote it. */
+private fun RichDocument.withHeadingFirst(): RichDocument {
+    val first = blocks.firstOrNull() as? Block.Paragraph ?: return this
+    return RichDocument(listOf(Block.Heading(1, first.spans, first.textAlign)) + blocks.drop(1))
+}
 
 /** A detected chapter heading: the 0-based [line] it starts on, its display [title] and a peek at what follows. */
 data class ChapterBreak(val line: Int, val title: String, val preview: String)

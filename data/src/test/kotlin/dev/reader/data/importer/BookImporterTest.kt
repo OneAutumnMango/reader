@@ -171,6 +171,21 @@ class BookImporterTest {
     }
 
     @Test
+    fun `applying a chapter pattern splits the exact book even when a duplicate shares its content`() = runBlocking {
+        val library = LibraryRepository(database)
+        val file = File(tempDir, "Saga.txt").apply { writeText("Chapter 1\n\nOne.\n\nChapter 2\n\nTwo.") }
+        // A legacy duplicate (imported before hashing) carrying the same content hash, added first.
+        val duplicate = importer.importFile(File(tempDir, "Dup.txt").apply { writeText(file.readText()) })
+        val book = duplicate.copy(id = dev.reader.core.model.BookId("original"), sourcePath = file.path)
+        library.upsertBook(book, emptyList())
+
+        val split = importer.applyChapterPattern(book, "^Chapter")
+
+        assertEquals(book.id, split.id)
+        assertEquals(listOf("Chapter 1", "Chapter 2"), library.chapters(book.id).map { it.title })
+    }
+
+    @Test
     fun `excluded lines are remembered and reapplied when the book is re-imported`() = runBlocking {
         val library = LibraryRepository(database)
         val file = File(tempDir, "Saga.txt").apply {

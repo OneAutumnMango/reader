@@ -19,7 +19,7 @@ import dev.reader.core.theme.Justification
 import dev.reader.core.theme.ReaderTheme
 import java.io.File
 
-private const val HEADING_SCALE = 1.2f
+private val HEADING_SCALES = listOf(1.75f, 1.5f, 1.3f, 1.15f)
 
 /** Prefix used to mark a [ReaderTheme.fontFamily] value as a path to a user-imported font file. */
 const val CUSTOM_FONT_FILE_PREFIX = "file:"
@@ -50,9 +50,18 @@ fun ReaderTheme.bodyTextStyle(
     textAlign = resolveTextAlign(blockAlign, useBookStyling),
 )
 
-fun ReaderTheme.headingTextStyle(blockAlign: Justification? = null, useBookStyling: Boolean = false): TextStyle {
-    val scaledSize = (fontSizeSp * HEADING_SCALE).sp
-    return bodyTextStyle(blockAlign, useBookStyling).copy(fontWeight = FontWeight.Bold, fontSize = scaledSize)
+fun ReaderTheme.headingTextStyle(
+    level: Int = 1,
+    blockAlign: Justification? = null,
+    useBookStyling: Boolean = false,
+): TextStyle {
+    val scale = HEADING_SCALES[(level - 1).coerceIn(0, HEADING_SCALES.lastIndex)]
+    return bodyTextStyle(blockAlign, useBookStyling).copy(
+        fontWeight = FontWeight.Bold,
+        fontSize = (fontSizeSp * scale).sp,
+        lineHeight = (fontSizeSp * scale * lineSpacing).sp,
+        textAlign = if (useBookStyling && blockAlign != null) resolveTextAlign(blockAlign, true) else TextAlign.Center,
+    )
 }
 
 fun ReaderTheme.backgroundColor(): Color = Color(backgroundColor)
@@ -72,12 +81,13 @@ fun List<Span>.toAnnotatedString(
 ): AnnotatedString = buildAnnotatedString {
     forEachIndexed { index, span ->
         val color = span.color.takeIf { useBookStyling }?.let { Color(it) } ?: Color.Unspecified
+        // Only set what the span actually changes, so a heading's bold/size isn't reset to normal.
         withStyle(
             SpanStyle(
                 color = color,
-                fontWeight = if (span.bold) FontWeight.Bold else FontWeight.Normal,
-                fontStyle = if (span.italic) FontStyle.Italic else FontStyle.Normal,
-                textDecoration = if (span.underline) TextDecoration.Underline else TextDecoration.None,
+                fontWeight = if (span.bold) FontWeight.Bold else null,
+                fontStyle = if (span.italic) FontStyle.Italic else null,
+                textDecoration = if (span.underline) TextDecoration.Underline else null,
             ),
         ) {
             append(span.text)

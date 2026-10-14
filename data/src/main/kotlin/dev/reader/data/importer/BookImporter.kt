@@ -33,12 +33,18 @@ class BookImporter(
     private val now: () -> kotlin.time.Instant = { Clock.System.now() },
 ) {
 
-    suspend fun importFile(file: File, categoryIds: Set<CategoryId> = emptySet(), pdfContext: Context? = null): Book {
+    suspend fun importFile(
+        file: File,
+        categoryIds: Set<CategoryId> = emptySet(),
+        pdfContext: Context? = null,
+        target: Book? = null,
+    ): Book {
         val format = requireNotNull(BookFormat.fromExtension(file.extension)) {
             "unsupported extension: ${file.extension}"
         }
         val hash = ContentHash.ofFile(file)
-        val existing = library.findByContentHash(hash) ?: library.findBySourcePath(file.path)
+        // An explicit target wins: duplicates imported before hashing existed can share a hash.
+        val existing = target ?: library.findByContentHash(hash) ?: library.findBySourcePath(file.path)
         val parsed = parse(file, format, pdfContext, existing?.chapterPattern, existing?.chapterExcludedLines.orEmpty())
         val bookId = existing?.id ?: BookId(newId())
         val book = Book(
@@ -65,8 +71,9 @@ class BookImporter(
 
     /** Re-splits a txt/markdown [book] on [pattern] (null = back to a single chapter), skipping [excludedLines]. */
     suspend fun applyChapterPattern(book: Book, pattern: String?, excludedLines: Set<Int> = emptySet()): Book {
-        library.updateBookDetails(book.copy(chapterPattern = pattern, chapterExcludedLines = excludedLines))
-        return importFile(File(book.sourcePath))
+        val updated = book.copy(chapterPattern = pattern, chapterExcludedLines = excludedLines)
+        library.updateBookDetails(updated)
+        return importFile(File(book.sourcePath), target = updated)
     }
 
     suspend fun importLightNovelFolder(folder: File, categoryIds: Set<CategoryId> = emptySet()): Book {

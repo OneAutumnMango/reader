@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
+import dev.reader.app.ui.describeImportError
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.parser.text.ChapterBreak
@@ -64,7 +65,10 @@ fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
         currentExcludedLines = book.chapterExcludedLines,
         onApply = { pattern, excludedLines ->
             scope.launch {
-                withContext(Dispatchers.IO) { graph.importer.applyChapterPattern(book, pattern, excludedLines) }
+                withContext(Dispatchers.IO) {
+                    runCatching { graph.importer.applyChapterPattern(book, pattern, excludedLines) }
+                        .onFailure { describeImportError(it) }
+                }
                 onDismiss()
             }
         },
