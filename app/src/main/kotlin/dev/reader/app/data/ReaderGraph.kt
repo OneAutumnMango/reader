@@ -2,6 +2,7 @@ package dev.reader.app.data
 
 import android.content.Context
 import androidx.room.Room
+import dev.reader.data.export.BackupRepository
 import dev.reader.data.export.ExportRepository
 import dev.reader.data.importer.BookImporter
 import dev.reader.data.repo.BookmarkRepository
@@ -52,6 +53,7 @@ class ReaderGraph(context: Context) {
     val search = SearchRepository(database)
     val settings = SettingsRepository(stores)
     val exporter = ExportRepository(database, settings)
+    val backups = BackupRepository(exporter, context.applicationContext.filesDir)
     val importer = BookImporter(library)
     val rootFolderScanner = RootFolderScanner(context.applicationContext, settings, library, importer)
 

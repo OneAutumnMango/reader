@@ -8,7 +8,7 @@ sealed interface Destination {
     data object Search : Destination
     data object Stats : Destination
     data object Appearance : Destination
-    data object ImportExport : Destination
+    data object Data : Destination
     data object Settings : Destination
     data object Categories : Destination
     data object LogHistory : Destination

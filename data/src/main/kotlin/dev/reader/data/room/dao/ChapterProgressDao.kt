@@ -14,4 +14,7 @@ interface ChapterProgressDao {
 
     @Upsert
     suspend fun upsert(progress: ChapterProgressEntity)
+
+    @Query("SELECT * FROM chapter_progress")
+    suspend fun all(): List<ChapterProgressEntity>
 }

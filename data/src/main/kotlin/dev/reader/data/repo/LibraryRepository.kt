@@ -1,5 +1,6 @@
 package dev.reader.data.repo
 
+import androidx.room.withTransaction
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Category
@@ -47,6 +48,19 @@ class LibraryRepository(private val database: ReaderDatabase) {
         database.books().insertCategoryRefs(book.categoryIds.map { BookCategoryCrossRef(book.id.value, it.value) })
         database.chapters().deleteForBook(book.id.value)
         database.chapters().upsertAll(chapters.map { it.toEntity() })
+    }
+
+    /** Removes every book along with its chapters, bookmarks and progress; categories, stats and settings stay. */
+    suspend fun removeAllBooks() = database.withTransaction {
+        with(database.maintenance()) {
+            deleteBookCategories()
+            deleteBookmarks()
+            deleteProgress()
+            deleteChapterProgress()
+            deleteSearchIndex()
+            deleteChapters()
+            deleteBooks()
+        }
     }
 
     suspend fun deleteBook(bookId: BookId) {

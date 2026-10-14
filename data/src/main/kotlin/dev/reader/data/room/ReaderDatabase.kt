@@ -9,6 +9,7 @@ import dev.reader.data.room.dao.BookmarkDao
 import dev.reader.data.room.dao.CategoryDao
 import dev.reader.data.room.dao.ChapterDao
 import dev.reader.data.room.dao.ChapterProgressDao
+import dev.reader.data.room.dao.MaintenanceDao
 import dev.reader.data.room.dao.ProgressDao
 import dev.reader.data.room.dao.ReadingSessionDao
 import dev.reader.data.room.dao.SearchDao
@@ -46,6 +47,7 @@ abstract class ReaderDatabase : RoomDatabase() {
     abstract fun chapterProgress(): ChapterProgressDao
     abstract fun sessions(): ReadingSessionDao
     abstract fun search(): SearchDao
+    abstract fun maintenance(): MaintenanceDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {

@@ -8,11 +8,11 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,7 +37,7 @@ import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.appearance.AppearanceRoute
 import dev.reader.app.ui.bookmarks.BookmarksRoute
 import dev.reader.app.ui.categories.CategoriesRoute
-import dev.reader.app.ui.export.ImportExportRoute
+import dev.reader.app.ui.data.DataRoute
 import dev.reader.app.ui.library.BookDetailRoute
 import dev.reader.app.ui.library.LibraryRoute
 import dev.reader.app.ui.reader.ReaderRoute
@@ -53,7 +53,7 @@ private val DRAWER_DESTINATIONS = listOf(
     Destination.Appearance to ("Appearance" to Icons.Filled.Palette),
     Destination.Categories to ("Categories" to Icons.Filled.Category),
     Destination.Stats to ("Stats" to Icons.Filled.QueryStats),
-    Destination.ImportExport to ("Import / export" to Icons.Filled.ImportExport),
+    Destination.Data to ("Data" to Icons.Filled.Storage),
     Destination.Settings to ("Settings" to Icons.Filled.Settings),
 )
 
@@ -64,7 +64,7 @@ private fun titleFor(destination: Destination): String = when (destination) {
     Destination.Search -> "Search"
     Destination.Stats -> "Stats"
     Destination.Appearance -> "Appearance"
-    Destination.ImportExport -> "Import / export"
+    Destination.Data -> "Data"
     Destination.Settings -> "Settings"
     Destination.Categories -> "Categories"
     Destination.LogHistory -> "Log history"
@@ -159,7 +159,7 @@ fun ReaderApp(graph: ReaderGraph) {
                 Destination.Stats -> StatsRoute(graph, content)
                 Destination.Appearance -> AppearanceRoute(graph, content)
                 Destination.Categories -> CategoriesRoute(graph, content)
-                Destination.ImportExport -> ImportExportRoute(graph, content)
+                Destination.Data -> DataRoute(graph, content)
                 Destination.Settings -> SettingsRoute(
                     graph,
                     onViewLogHistory = { navigator.push(Destination.LogHistory) },

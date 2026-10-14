@@ -18,4 +18,8 @@ object AppLog {
     }
 
     fun clear() = entries.clear()
+
+    /** Oldest-first plain text, one `timestamp  message` line per entry, for export/clipboard. */
+    fun format(entries: List<LogEntry>): String =
+        entries.asReversed().joinToString("\n") { "${it.timestamp}  ${it.message}" }
 }

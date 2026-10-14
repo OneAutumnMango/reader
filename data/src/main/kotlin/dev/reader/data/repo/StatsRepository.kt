@@ -25,4 +25,6 @@ class StatsRepository(private val database: ReaderDatabase) {
     }
 
     suspend fun recordSession(session: ReadingSessionEvent) = database.sessions().insert(session.toEntity())
+
+    suspend fun resetAll() = database.maintenance().deleteSessions()
 }
