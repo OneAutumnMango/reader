@@ -3,10 +3,8 @@ package dev.reader.app.ui.appearance
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import dev.reader.app.ui.RadioOptions
 import dev.reader.core.reader.KeepScreenAwake
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode
@@ -36,19 +35,13 @@ private fun keepScreenAwakeLabel(option: KeepScreenAwake): String = when (option
 fun ReaderSettingsEditor(settings: ReaderSettings, onChange: (ReaderSettings) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Reading mode")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ReadingMode.entries.forEach { mode ->
-                Row(
-                    modifier = Modifier
-                        .testTag("reading-mode-${mode.name}")
-                        .clickable { onChange(settings.copy(readingMode = mode)) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(selected = settings.readingMode == mode, onClick = null)
-                    Text(readingModeLabel(mode))
-                }
-            }
-        }
+        RadioOptions(
+            options = ReadingMode.entries,
+            selected = settings.readingMode,
+            label = ::readingModeLabel,
+            tag = { "reading-mode-${it.name}" },
+            onSelect = { onChange(settings.copy(readingMode = it)) },
+        )
 
         Row(
             modifier = Modifier
@@ -87,19 +80,13 @@ fun ReaderSettingsEditor(settings: ReaderSettings, onChange: (ReaderSettings) ->
         }
 
         Text("Keep screen awake")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            KeepScreenAwake.entries.forEach { option ->
-                Row(
-                    modifier = Modifier
-                        .testTag("keep-screen-awake-${option.name}")
-                        .clickable { onChange(settings.copy(keepScreenAwake = option)) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(selected = settings.keepScreenAwake == option, onClick = null)
-                    Text(keepScreenAwakeLabel(option))
-                }
-            }
-        }
+        RadioOptions(
+            options = KeepScreenAwake.entries,
+            selected = settings.keepScreenAwake,
+            label = ::keepScreenAwakeLabel,
+            tag = { "keep-screen-awake-${it.name}" },
+            onSelect = { onChange(settings.copy(keepScreenAwake = it)) },
+        )
 
         Row(
             modifier = Modifier

@@ -1,7 +1,6 @@
 package dev.reader.app.ui.appearance
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import dev.reader.app.ui.RadioOptions
 import dev.reader.app.ui.reader.bodyTextStyle
 import dev.reader.core.theme.Justification
 import dev.reader.core.theme.ReaderTheme
@@ -50,19 +49,13 @@ fun ReaderThemeEditor(
 
         FontDropdown(theme.fontFamily, onSelect = { onChange(theme.copy(fontFamily = it)) })
 
-        Row {
-            Justification.entries.forEach { option ->
-                Row(
-                    modifier = Modifier
-                        .testTag("justification-${option.name}")
-                        .clickable { onChange(theme.copy(justification = option)) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(selected = theme.justification == option, onClick = null)
-                    Text(justificationLabel(option))
-                }
-            }
-        }
+        RadioOptions(
+            options = Justification.entries,
+            selected = theme.justification,
+            label = ::justificationLabel,
+            tag = { "justification-${it.name}" },
+            onSelect = { onChange(theme.copy(justification = it)) },
+        )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Text colour", modifier = Modifier.weight(1f))

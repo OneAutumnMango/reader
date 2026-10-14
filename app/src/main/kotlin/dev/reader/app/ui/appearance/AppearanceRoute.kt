@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -15,7 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.MenuSection
+import dev.reader.app.ui.RadioOptions
 import dev.reader.core.theme.AppTheme
+import dev.reader.core.theme.LibraryLayout
 import dev.reader.core.theme.ReaderTheme
 import dev.reader.data.store.PreferencesFile
 import kotlinx.coroutines.launch
@@ -41,6 +44,17 @@ fun AppearanceRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
     ) {
         MenuSection("App theme") {
             AppThemeEditor(preferences.appTheme, onChange = { theme: AppTheme -> update { it.copy(appTheme = theme) } })
+        }
+
+        MenuSection("Library") {
+            Text("Cover size")
+            RadioOptions(
+                options = LibraryLayout.entries,
+                selected = preferences.libraryLayout,
+                label = { layout -> layout.name.lowercase().replaceFirstChar { it.uppercase() } },
+                tag = { "library-layout-${it.name}" },
+                onSelect = { layout -> update { it.copy(libraryLayout = layout) } },
+            )
         }
 
         MenuSection("Reader theme") {

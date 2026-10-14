@@ -165,14 +165,14 @@ fun LibraryRoute(
             }
             DropdownMenu(expanded = showQuickAddMenu, onDismissRequest = { showQuickAddMenu = false }) {
                 DropdownMenuItem(
-                    text = { Text("Add book") },
+                    text = { Text("Add book (file)") },
                     onClick = {
                         showQuickAddMenu = false
                         importActions.addFiles()
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Add light novel") },
+                    text = { Text("Add book (folder)") },
                     onClick = {
                         showQuickAddMenu = false
                         importActions.addFolder()

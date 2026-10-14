@@ -1,16 +1,15 @@
 package dev.reader.app.ui.appearance
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import dev.reader.app.ui.RadioOptions
 import dev.reader.core.theme.AppPaletteOverrides
 import dev.reader.core.theme.AppTheme
 import dev.reader.core.theme.AppThemeMode
@@ -71,19 +70,13 @@ fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modi
         )
 
         Text("Theme mode")
-        Row {
-            AppThemeMode.entries.forEach { mode ->
-                Row(
-                    modifier = Modifier
-                        .testTag("app-theme-mode-${mode.name}")
-                        .clickable { onChange(theme.copy(mode = mode)) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(selected = theme.mode == mode, onClick = null)
-                    Text(mode.name)
-                }
-            }
-        }
+        RadioOptions(
+            options = AppThemeMode.entries,
+            selected = theme.mode,
+            label = { mode -> mode.name.lowercase().replaceFirstChar { it.uppercase() } },
+            tag = { "app-theme-mode-${it.name}" },
+            onSelect = { onChange(theme.copy(mode = it)) },
+        )
 
         Text("Individual colours")
         ColorRole.entries.forEach { role ->

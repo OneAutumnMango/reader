@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.documentfile.provider.DocumentFile
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.rememberImportActions
+import dev.reader.data.store.CollectionKind
 import dev.reader.data.store.PreferencesFile
 import kotlinx.coroutines.launch
 
@@ -30,46 +31,57 @@ fun SettingsRoute(graph: ReaderGraph, onViewLogHistory: () -> Unit, modifier: Mo
 
     fun scan(message: (Int) -> String) {
         scanning = true
-        scanStatus = "Scanning root folders…"
+        scanStatus = "Scanning library folders…"
         scope.launch {
             scanStatus = message(graph.rootFolderScanner.scanAll())
             scanning = false
         }
     }
 
-    val addRootFolderLauncher = rememberLauncherForActivityResult(
+    var pendingKind by remember { mutableStateOf(CollectionKind.FILES) }
+    val addCollectionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { treeUri ->
         if (treeUri == null) return@rememberLauncherForActivityResult
         context.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val kind = pendingKind
         scope.launch {
-            graph.settings.update { it.copy(rootFolders = it.rootFolders + treeUri.toString()) }
-            scan { "Added root folder, imported $it new item(s)" }
+            graph.settings.update {
+                val uri = treeUri.toString()
+                it.copy(
+                    rootFolders = (it.rootFolders + uri).distinct(),
+                    rootFolderKinds = it.rootFolderKinds + (uri to kind),
+                )
+            }
+            scan { "Added collection, imported $it new item(s)" }
         }
     }
 
     val rootFolders = preferences.rootFolders.map { uriString ->
         val uri = Uri.parse(uriString)
         val name = DocumentFile.fromTreeUri(context, uri)?.name ?: uri.lastPathSegment ?: uriString
-        RootFolderDisplay(uri = uriString, displayName = name)
+        RootFolderDisplay(uri = uriString, displayName = name, kind = preferences.rootFolderKinds[uriString])
     }
 
     SettingsScreen(
         status = scanStatus.ifBlank { actions.status },
         rootFolders = rootFolders,
-        onAddBook = actions.addFiles,
-        onAddLightNovel = actions.addFolder,
-        onAddRootFolder = { addRootFolderLauncher.launch(null) },
+        onAddBookFile = actions.addFiles,
+        onAddBookFolder = actions.addFolder,
+        onAddCollection = { kind ->
+            pendingKind = kind
+            addCollectionLauncher.launch(null)
+        },
         onScanRootFolders = { scan { "Scan complete, imported $it new item(s)" } },
         scanning = scanning,
         onRemoveRootFolder = { uri ->
-            scope.launch { graph.settings.update { it.copy(rootFolders = it.rootFolders - uri) } }
+            scope.launch {
+                graph.settings.update {
+                    it.copy(rootFolders = it.rootFolders - uri, rootFolderKinds = it.rootFolderKinds - uri)
+                }
+            }
         },
         onViewLogHistory = onViewLogHistory,
-        libraryLayout = preferences.libraryLayout,
-        onLibraryLayoutChange = { layout ->
-            scope.launch { graph.settings.update { it.copy(libraryLayout = layout) } }
-        },
         modifier = modifier,
     )
 }

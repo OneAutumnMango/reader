@@ -156,7 +156,7 @@ fun CategoriesScreen(
 @Composable
 private fun DefaultOption(label: String, selected: Boolean, tag: String, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().testTag(tag).clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().testTag(tag).clickable(onClick = onClick).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = null)

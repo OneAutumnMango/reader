@@ -9,6 +9,16 @@ import kotlinx.serialization.Serializable
 /** Bumped when a stored shape changes in a way that needs migrating. */
 const val STORE_VERSION: Int = 1
 
+/** How a library folder's contents map to books. */
+@Serializable
+enum class CollectionKind {
+    /** Every file directly inside is its own book. */
+    FILES,
+
+    /** Every subfolder is one book, its files being the chapters. */
+    FOLDERS,
+}
+
 @Serializable
 data class PreferencesFile(
     val version: Int = STORE_VERSION,
@@ -17,6 +27,8 @@ data class PreferencesFile(
     val themePresets: List<ReaderTheme> = ReaderTheme.builtIns,
     val activeThemePresetName: String = ReaderTheme.Default.name,
     val rootFolders: List<String> = emptyList(),
+    /** Library folder URI -> its [CollectionKind]; folders added before kinds existed import both. */
+    val rootFolderKinds: Map<String, CollectionKind> = emptyMap(),
     /** Root-folder entry URI -> sourcePath of the book imported from it. */
     val rootEntryBooks: Map<String, String> = emptyMap(),
     val libraryLayout: LibraryLayout = LibraryLayout.MEDIUM,

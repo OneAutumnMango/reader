@@ -66,7 +66,7 @@ fun rememberImportActions(graph: ReaderGraph): ImportActions {
             } else {
                 runCatching { graph.importer.importLightNovelFolder(folder) }
                     .fold(
-                        onSuccess = { "Imported light novel" },
+                        onSuccess = { "Imported book from folder" },
                         onFailure = { "Could not import that folder — ${describeImportError(it)}" },
                     )
             }

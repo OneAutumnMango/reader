@@ -6,7 +6,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import dev.reader.core.theme.LibraryLayout
+import dev.reader.data.store.CollectionKind
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,177 +20,66 @@ class SettingsScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    @Test
-    fun `clicking add book triggers the callback`() {
-        var clicked = false
-        composeRule.setContent {
-            SettingsScreen(
-                status = "",
-                rootFolders = emptyList(),
-                onAddBook = { clicked = true },
-                onAddLightNovel = {},
-                onAddRootFolder = {},
-                onRemoveRootFolder = {},
-                onViewLogHistory = {},
-                libraryLayout = LibraryLayout.MEDIUM,
-                onLibraryLayoutChange = {},
-            )
-        }
+    private var addedFile = false
+    private var addedFolder = false
+    private var collection: CollectionKind? = null
+    private var removed: String? = null
+    private var scanned = false
+    private var viewedLogs = false
 
-        composeRule.onNodeWithText("Add book").performClick()
-
-        assertTrue(clicked)
+    private fun setContent(folders: List<RootFolderDisplay> = emptyList()) = composeRule.setContent {
+        SettingsScreen(
+            status = "",
+            rootFolders = folders,
+            onAddBookFile = { addedFile = true },
+            onAddBookFolder = { addedFolder = true },
+            onAddCollection = { collection = it },
+            onRemoveRootFolder = { removed = it },
+            onViewLogHistory = { viewedLogs = true },
+            onScanRootFolders = { scanned = true },
+        )
     }
 
     @Test
-    fun `clicking add light novel triggers the callback`() {
-        var clicked = false
-        composeRule.setContent {
-            SettingsScreen(
-                status = "",
-                rootFolders = emptyList(),
-                onAddBook = {},
-                onAddLightNovel = { clicked = true },
-                onAddRootFolder = {},
-                onRemoveRootFolder = {},
-                onViewLogHistory = {},
-                libraryLayout = LibraryLayout.MEDIUM,
-                onLibraryLayoutChange = {},
-            )
-        }
+    fun `add book buttons report file and folder`() {
+        setContent()
 
-        composeRule.onNodeWithText("Add light novel").performClick()
+        composeRule.onNodeWithText("Add book (file)").performClick()
+        composeRule.onNodeWithText("Add book (folder)").performClick()
 
-        assertTrue(clicked)
+        assertTrue(addedFile)
+        assertTrue(addedFolder)
     }
 
     @Test
-    fun `clicking add root folder triggers the callback`() {
-        var clicked = false
-        composeRule.setContent {
-            SettingsScreen(
-                status = "",
-                rootFolders = emptyList(),
-                onAddBook = {},
-                onAddLightNovel = {},
-                onAddRootFolder = { clicked = true },
-                onRemoveRootFolder = {},
-                onViewLogHistory = {},
-                libraryLayout = LibraryLayout.MEDIUM,
-                onLibraryLayoutChange = {},
-            )
-        }
+    fun `collections can be added as files or folders`() {
+        setContent()
 
-        composeRule.onNodeWithText("Add root folder").performClick()
+        composeRule.onNodeWithTag("add-collection-FOLDERS").performScrollTo().performClick()
+        assertEquals(CollectionKind.FOLDERS, collection)
 
-        assertTrue(clicked)
+        composeRule.onNodeWithTag("add-collection-FILES").performScrollTo().performClick()
+        assertEquals(CollectionKind.FILES, collection)
     }
 
     @Test
-    fun `scan now triggers the callback when root folders exist`() {
-        var scanned = false
-        composeRule.setContent {
-            SettingsScreen(
-                status = "",
-                rootFolders = listOf(RootFolderDisplay(uri = "content://tree/1", displayName = "Books")),
-                onAddBook = {},
-                onAddLightNovel = {},
-                onAddRootFolder = {},
-                onRemoveRootFolder = {},
-                onViewLogHistory = {},
-                libraryLayout = LibraryLayout.MEDIUM,
-                onLibraryLayoutChange = {},
-                onScanRootFolders = { scanned = true },
-            )
-        }
+    fun `library folders show their kind and can be removed or scanned`() {
+        setContent(listOf(RootFolderDisplay("content://tree/1", "Books", CollectionKind.FILES)))
 
+        composeRule.onNodeWithText("Each file is a book").assertExists()
+        composeRule.onNodeWithContentDescription("Remove Books").performScrollTo().performClick()
         composeRule.onNodeWithTag("scan-root-folders").performScrollTo().performClick()
 
+        assertEquals("content://tree/1", removed)
         assertTrue(scanned)
     }
 
     @Test
-    fun `clicking remove on a root folder triggers the callback with its uri`() {
-        var removed: String? = null
-        composeRule.setContent {
-            SettingsScreen(
-                status = "",
-                rootFolders = listOf(RootFolderDisplay(uri = "content://tree/1", displayName = "Books")),
-                onAddBook = {},
-                onAddLightNovel = {},
-                onAddRootFolder = {},
-                onRemoveRootFolder = { removed = it },
-                onViewLogHistory = {},
-                libraryLayout = LibraryLayout.MEDIUM,
-                onLibraryLayoutChange = {},
-            )
-        }
-
-        composeRule.onNodeWithContentDescription("Remove Books").performClick()
-
-        assertEquals("content://tree/1", removed)
-    }
-
-    @Test
-    fun `shows the status message`() {
-        composeRule.setContent {
-            SettingsScreen(
-                status = "Imported 3 of 3 file(s)",
-                rootFolders = emptyList(),
-                onAddBook = {},
-                onAddLightNovel = {},
-                onAddRootFolder = {},
-                onRemoveRootFolder = {},
-                onViewLogHistory = {},
-                libraryLayout = LibraryLayout.MEDIUM,
-                onLibraryLayoutChange = {},
-            )
-        }
-
-        composeRule.onNodeWithText("Imported 3 of 3 file(s)").assertExists()
-    }
-
-    @Test
-    fun `clicking view log history triggers the callback`() {
-        var clicked = false
-        composeRule.setContent {
-            SettingsScreen(
-                status = "",
-                rootFolders = emptyList(),
-                onAddBook = {},
-                onAddLightNovel = {},
-                onAddRootFolder = {},
-                onRemoveRootFolder = {},
-                onViewLogHistory = { clicked = true },
-                libraryLayout = LibraryLayout.MEDIUM,
-                onLibraryLayoutChange = {},
-            )
-        }
+    fun `log history button reports the click`() {
+        setContent()
 
         composeRule.onNodeWithText("View error/log history").performScrollTo().performClick()
 
-        assertTrue(clicked)
-    }
-
-    @Test
-    fun `selecting a layout size reports it`() {
-        var selected: LibraryLayout? = null
-        composeRule.setContent {
-            SettingsScreen(
-                status = "",
-                rootFolders = emptyList(),
-                onAddBook = {},
-                onAddLightNovel = {},
-                onAddRootFolder = {},
-                onRemoveRootFolder = {},
-                onViewLogHistory = {},
-                libraryLayout = LibraryLayout.MEDIUM,
-                onLibraryLayoutChange = { selected = it },
-            )
-        }
-
-        composeRule.onNodeWithTag("library-layout-${LibraryLayout.LARGE.name}").performClick()
-
-        assertEquals(LibraryLayout.LARGE, selected)
+        assertTrue(viewedLogs)
     }
 }

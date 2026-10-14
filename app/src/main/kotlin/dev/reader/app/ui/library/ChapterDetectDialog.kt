@@ -266,7 +266,11 @@ private fun ModeRow(
     onSelect: (ChapterDetectMode) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().testTag("chapter-mode-${value.name}").clickable { onSelect(value) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("chapter-mode-${value.name}")
+            .clickable { onSelect(value) }
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = value == selected, onClick = null)

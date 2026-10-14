@@ -9,6 +9,7 @@ import dev.reader.core.model.BookFormat
 import dev.reader.data.importer.BookImporter
 import dev.reader.data.repo.LibraryRepository
 import dev.reader.data.repo.SettingsRepository
+import dev.reader.data.store.CollectionKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -17,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Scans the user's saved root folders and imports any entry that isn't already in the library —
- * each top-level file becomes a book, each top-level subfolder becomes a light novel.
+ * each top-level file and/or subfolder (per its [CollectionKind]) becomes a book.
  */
 class RootFolderScanner(
     private val context: Context,
@@ -31,19 +32,27 @@ class RootFolderScanner(
     suspend fun scanAll(): Int = mutex.withLock {
         withContext(Dispatchers.IO) {
             var imported = 0
-            for (rootUri in settings.preferences.first().rootFolders) {
-                runCatching { imported += scanRoot(Uri.parse(rootUri)) }
-                    .onFailure { AppLog.record("Couldn't scan root folder: ${describeImportError(it)}") }
+            val prefs = settings.preferences.first()
+            for (rootUri in prefs.rootFolders) {
+                runCatching { imported += scanRoot(Uri.parse(rootUri), prefs.rootFolderKinds[rootUri]) }
+                    .onFailure { AppLog.record("Couldn't scan library folder: ${describeImportError(it)}") }
             }
-            AppLog.record("Root folder scan imported $imported new item(s)")
+            AppLog.record("Library folder scan imported $imported new item(s)")
             imported
         }
     }
 
-    private suspend fun scanRoot(rootUri: Uri): Int {
+    private suspend fun scanRoot(rootUri: Uri, kind: CollectionKind?): Int {
         val root = DocumentFile.fromTreeUri(context, rootUri) ?: return 0
         var imported = 0
-        for (child in root.listFiles()) {
+        val entries = root.listFiles().filter { entry ->
+            when (kind) {
+                CollectionKind.FILES -> entry.isFile
+                CollectionKind.FOLDERS -> entry.isDirectory
+                null -> true
+            }
+        }
+        for (child in entries) {
             val key = child.uri.toString()
             val knownSource = settings.preferences.first().rootEntryBooks[key]
             if (knownSource != null && library.findBySourcePath(knownSource) != null) continue
