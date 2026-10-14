@@ -26,6 +26,7 @@ fun BookEntity.toBook(categoryIds: List<String>) = Book(
     addedAt = Instant.fromEpochMilliseconds(addedAt),
     contentHash = contentHash,
     chapterPattern = chapterPattern,
+    chapterExcludedLines = chapterExcludedLines.orEmpty().split(',').mapNotNull { it.toIntOrNull() }.toSet(),
 )
 
 fun Book.toEntity() = BookEntity(
@@ -40,6 +41,7 @@ fun Book.toEntity() = BookEntity(
     addedAt = addedAt.toEpochMilliseconds(),
     contentHash = contentHash,
     chapterPattern = chapterPattern,
+    chapterExcludedLines = chapterExcludedLines.takeIf { it.isNotEmpty() }?.joinToString(","),
 )
 
 fun ChapterEntity.toChapter() = Chapter(

@@ -10,9 +10,10 @@ import java.io.File
 object TxtParser {
 
     /** One chapter for the whole file, or one per heading matched by [chapterPattern] (see [ChapterSplitter]). */
-    fun parse(file: File, chapterPattern: String? = null): ParsedBook {
+    fun parse(file: File, chapterPattern: String? = null, excludedLines: Set<Int> = emptySet()): ParsedBook {
         val text = file.readText()
-        val chunks = chapterPattern?.let { ChapterSplitter.split(text, it) } ?: listOf(TextChunk(null, text))
+        val chunks = chapterPattern?.let { ChapterSplitter.split(text, it, excludedLines) }
+            ?: listOf(TextChunk(null, text))
         return ParsedBook(
             title = file.nameWithoutExtension,
             author = "",

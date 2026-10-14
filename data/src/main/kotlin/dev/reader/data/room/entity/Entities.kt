@@ -17,6 +17,7 @@ data class BookEntity(
     val addedAt: Long,
     val contentHash: String? = null,
     val chapterPattern: String? = null,
+    val chapterExcludedLines: String? = null,
 )
 
 @Entity(tableName = "chapters")

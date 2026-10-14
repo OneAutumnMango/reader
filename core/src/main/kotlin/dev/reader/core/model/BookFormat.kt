@@ -8,6 +8,10 @@ enum class BookFormat {
     PDF,
     CBZ,
     CBR,
+    FB2,
+    MOBI,
+    RTF,
+    DOCX,
     ;
 
     companion object {
@@ -19,6 +23,11 @@ enum class BookFormat {
             "pdf" -> PDF
             "cbz" -> CBZ
             "cbr" -> CBR
+            "fb2" -> FB2
+            // .azw and .azw3 share the classic MOBI/PalmDOC container Kindle devices still read.
+            "mobi", "azw", "azw3" -> MOBI
+            "rtf" -> RTF
+            "docx" -> DOCX
             else -> null
         }
     }

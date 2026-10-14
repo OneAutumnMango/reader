@@ -8,10 +8,14 @@ import dev.reader.core.model.Chapter
 import dev.reader.core.reader.PdfRenderMode
 import dev.reader.parser.ParsedChapter
 import dev.reader.parser.comic.ComicArchiveParser
+import dev.reader.parser.docx.DocxParser
 import dev.reader.parser.epub.EpubParser
+import dev.reader.parser.fb2.Fb2Parser
 import dev.reader.parser.html.HtmlParser
 import dev.reader.parser.markdown.MarkdownParser
+import dev.reader.parser.mobi.MobiParser
 import dev.reader.parser.pdf.PdfTextParser
+import dev.reader.parser.rtf.RtfParser
 import dev.reader.parser.text.TxtParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -57,20 +61,30 @@ object ChapterLoader {
         }
 
     private fun loadText(file: File, book: Book, orderIndex: Int): ChapterContent.Text? {
-        val format = book.format
         val isLightNovel = book.isLightNovel
-        if (format == BookFormat.EPUB) {
-            return EpubParser.parseChapter(file, if (isLightNovel) 0 else orderIndex)
+        val chapterIndex = if (isLightNovel) 0 else orderIndex
+        when (book.format) {
+            BookFormat.EPUB -> return EpubParser.parseChapter(file, chapterIndex)
                 ?.let { ChapterContent.Text(it.document) }
+            BookFormat.FB2 -> return Fb2Parser.parseChapter(file, chapterIndex)
+                ?.let { ChapterContent.Text(it.document) }
+            else -> Unit
         }
-        val pattern = book.chapterPattern.takeUnless { isLightNovel }
-        val parsed = when (format) {
-            BookFormat.TXT -> TxtParser.parse(file, pattern)
-            BookFormat.MARKDOWN -> MarkdownParser.parse(file, pattern)
-            BookFormat.HTML -> HtmlParser.parse(file)
-            else -> error("$format has no text loader")
-        }
-        val chapter = if (isLightNovel) parsed.chapters.firstOrNull() else parsed.chapters.getOrNull(orderIndex)
+        val parsed = parseWholeBook(file, book)
+        val chapter = parsed.chapters.getOrNull(chapterIndex)
         return (chapter as? ParsedChapter.TextChapter)?.let { ChapterContent.Text(it.document) }
     }
+
+    private fun parseWholeBook(file: File, book: Book) = when (book.format) {
+        BookFormat.TXT -> TxtParser.parse(file, book.patternFor(), book.excludedLinesFor())
+        BookFormat.MARKDOWN -> MarkdownParser.parse(file, book.patternFor(), book.excludedLinesFor())
+        BookFormat.HTML -> HtmlParser.parse(file)
+        BookFormat.MOBI -> MobiParser.parse(file)
+        BookFormat.RTF -> RtfParser.parse(file)
+        BookFormat.DOCX -> DocxParser.parse(file)
+        else -> error("${book.format} has no text loader")
+    }
+
+    private fun Book.patternFor(): String? = chapterPattern.takeUnless { isLightNovel }
+    private fun Book.excludedLinesFor(): Set<Int> = chapterExcludedLines.takeUnless { isLightNovel }.orEmpty()
 }

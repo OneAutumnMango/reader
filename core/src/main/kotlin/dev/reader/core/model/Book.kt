@@ -24,6 +24,8 @@ data class Book(
     val contentHash: String? = null,
     /** Heading regex that splits a txt/markdown book into chapters; null keeps it as one chapter. */
     val chapterPattern: String? = null,
+    /** Line numbers matched by [chapterPattern] that the user chose not to treat as a chapter break. */
+    val chapterExcludedLines: Set<Int> = emptySet(),
 )
 
 @Serializable

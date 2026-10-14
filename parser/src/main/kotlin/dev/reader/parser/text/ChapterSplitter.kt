@@ -83,10 +83,11 @@ object ChapterSplitter {
         }
     }
 
-    /** [text] cut at every heading; each chunk keeps its heading line as its first line. */
-    fun split(text: String, pattern: String): List<TextChunk> {
+    /** [text] cut at every heading, except any whose line is in [excludedLines] (merged into the previous chunk). */
+    fun split(text: String, pattern: String, excludedLines: Set<Int> = emptySet()): List<TextChunk> {
         val lines = text.lines()
         val starts = runCatching { headingLines(lines, Regex(pattern)) }.getOrDefault(emptyList())
+            .filterNot { it in excludedLines }
         if (starts.isEmpty()) return listOf(TextChunk(null, text))
         val preamble = lines.subList(0, starts.first()).joinToString("\n")
         val chapters = starts.mapIndexed { i, start ->

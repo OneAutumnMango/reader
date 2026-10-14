@@ -13,10 +13,14 @@ import dev.reader.data.repo.LibraryRepository
 import dev.reader.parser.ParsedBook
 import dev.reader.parser.ParsedChapter
 import dev.reader.parser.comic.ComicArchiveParser
+import dev.reader.parser.docx.DocxParser
 import dev.reader.parser.epub.EpubParser
+import dev.reader.parser.fb2.Fb2Parser
 import dev.reader.parser.html.HtmlParser
 import dev.reader.parser.markdown.MarkdownParser
+import dev.reader.parser.mobi.MobiParser
 import dev.reader.parser.pdf.PdfTextParser
+import dev.reader.parser.rtf.RtfParser
 import dev.reader.parser.text.TxtParser
 import java.io.File
 import java.util.UUID
@@ -35,7 +39,7 @@ class BookImporter(
         }
         val hash = ContentHash.ofFile(file)
         val existing = library.findByContentHash(hash) ?: library.findBySourcePath(file.path)
-        val parsed = parse(file, format, pdfContext, existing?.chapterPattern)
+        val parsed = parse(file, format, pdfContext, existing?.chapterPattern, existing?.chapterExcludedLines.orEmpty())
         val bookId = existing?.id ?: BookId(newId())
         val book = Book(
             id = bookId,
@@ -49,6 +53,7 @@ class BookImporter(
             addedAt = existing?.addedAt ?: now(),
             contentHash = hash,
             chapterPattern = existing?.chapterPattern,
+            chapterExcludedLines = existing?.chapterExcludedLines.orEmpty(),
         )
         val chapterIds = existingChapterIds(existing)
         val chapters = parsed.chapters.mapIndexed { index, chapter ->
@@ -58,9 +63,9 @@ class BookImporter(
         return book
     }
 
-    /** Re-splits a txt/markdown [book] on [pattern] (null = back to a single chapter). */
-    suspend fun applyChapterPattern(book: Book, pattern: String?): Book {
-        library.updateBookDetails(book.copy(chapterPattern = pattern))
+    /** Re-splits a txt/markdown [book] on [pattern] (null = back to a single chapter), skipping [excludedLines]. */
+    suspend fun applyChapterPattern(book: Book, pattern: String?, excludedLines: Set<Int> = emptySet()): Book {
+        library.updateBookDetails(book.copy(chapterPattern = pattern, chapterExcludedLines = excludedLines))
         return importFile(File(book.sourcePath))
     }
 
@@ -126,13 +131,18 @@ class BookImporter(
         format: BookFormat,
         pdfContext: Context?,
         chapterPattern: String? = null,
+        chapterExcludedLines: Set<Int> = emptySet(),
     ): ParsedBook = when (format) {
-        BookFormat.TXT -> TxtParser.parse(file, chapterPattern)
-        BookFormat.MARKDOWN -> MarkdownParser.parse(file, chapterPattern)
+        BookFormat.TXT -> TxtParser.parse(file, chapterPattern, chapterExcludedLines)
+        BookFormat.MARKDOWN -> MarkdownParser.parse(file, chapterPattern, chapterExcludedLines)
         BookFormat.HTML -> HtmlParser.parse(file)
         BookFormat.EPUB -> EpubParser.parse(file)
         BookFormat.CBZ, BookFormat.CBR -> ComicArchiveParser.parse(file, format)
         BookFormat.PDF -> PdfTextParser(requireNotNull(pdfContext) { "PDF import needs a Context" }).parse(file)
+        BookFormat.FB2 -> Fb2Parser.parse(file)
+        BookFormat.MOBI -> MobiParser.parse(file)
+        BookFormat.RTF -> RtfParser.parse(file)
+        BookFormat.DOCX -> DocxParser.parse(file)
     }
 
     /** Extracts an archive-internal cover image (epub/cbz/cbr) to a real file next to the source. */
@@ -142,6 +152,7 @@ class BookImporter(
             BookFormat.EPUB -> EpubParser.extractCover(file, entryName)
             BookFormat.CBZ, BookFormat.CBR -> runCatching { ComicArchiveParser.readPage(file, format, entryName) }
                 .getOrNull()
+            BookFormat.FB2 -> Fb2Parser.extractCover(file, entryName)
             else -> null
         } ?: return null
         val extension = entryName.substringAfterLast('.', "jpg")

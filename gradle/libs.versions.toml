@@ -51,6 +51,7 @@ coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" 
 # Format parsing.
 commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+jspecify = { module = "org.jspecify:jspecify", version = "1.0.0" }
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfboxAndroid" }
 junrar = { module = "com.github.junrar:junrar", version.ref = "junrar" }
 

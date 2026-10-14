@@ -171,6 +171,25 @@ class BookImporterTest {
     }
 
     @Test
+    fun `excluded lines are remembered and reapplied when the book is re-imported`() = runBlocking {
+        val library = LibraryRepository(database)
+        val file = File(tempDir, "Saga.txt").apply {
+            writeText("Chapter 1\n\nOne.\n\nChapter 2\n\nTwo.\n\nChapter 3\n\nThree.")
+        }
+        val book = importer.importFile(file)
+        val secondBreakLine = file.readText().lines().indexOf("Chapter 2")
+
+        val split = importer.applyChapterPattern(book, "^Chapter", setOf(secondBreakLine))
+
+        assertEquals(setOf(secondBreakLine), split.chapterExcludedLines)
+        val titles = library.chapters(split.id).map { it.title }
+        assertEquals(listOf("Chapter 1", "Chapter 3"), titles)
+
+        val reimported = importer.importFile(file)
+        assertEquals(listOf("Chapter 1", "Chapter 3"), library.chapters(reimported.id).map { it.title })
+    }
+
+    @Test
     fun `new books land in the default category`() = runBlocking {
         val library = LibraryRepository(database)
         val manga = dev.reader.core.model.Category(dev.reader.core.model.CategoryId("manga"), "Manga")

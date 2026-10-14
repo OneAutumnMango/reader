@@ -15,9 +15,10 @@ object MarkdownParser {
     private val parser = Parser.builder().build()
     private val renderer = HtmlRenderer.builder().build()
 
-    fun parse(file: File, chapterPattern: String? = null): ParsedBook {
+    fun parse(file: File, chapterPattern: String? = null, excludedLines: Set<Int> = emptySet()): ParsedBook {
         val text = file.readText()
-        val chunks = chapterPattern?.let { ChapterSplitter.split(text, it) } ?: listOf(TextChunk(null, text))
+        val chunks = chapterPattern?.let { ChapterSplitter.split(text, it, excludedLines) }
+            ?: listOf(TextChunk(null, text))
         return ParsedBook(
             title = file.nameWithoutExtension,
             author = "",

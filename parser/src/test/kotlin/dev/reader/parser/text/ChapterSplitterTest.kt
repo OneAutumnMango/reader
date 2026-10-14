@@ -3,6 +3,7 @@ package dev.reader.parser.text
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ChapterSplitterTest {
 
@@ -76,5 +77,16 @@ class ChapterSplitterTest {
 
         assertEquals(listOf(null, "Chapter 1: The Start", "CHAPTER II", "Epilogue"), chunks.map { it.title })
         assertEquals("My Novel\nby Someone\n", chunks.first().text)
+    }
+
+    @Test
+    fun `excluded lines are merged into the previous chunk instead of starting a new one`() {
+        val pattern = requireNotNull(ChapterSplitter.detectPattern(novel, markdown = false))
+        val middleBreak = ChapterSplitter.breaks(novel, pattern)[1].line
+
+        val chunks = ChapterSplitter.split(novel, pattern, excludedLines = setOf(middleBreak))
+
+        assertEquals(listOf(null, "Chapter 1: The Start", "Epilogue"), chunks.map { it.title })
+        assertTrue(chunks[1].text.contains("CHAPTER II"))
     }
 }

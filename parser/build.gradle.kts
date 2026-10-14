@@ -11,6 +11,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.commonmark)
     implementation(libs.jsoup)
+    compileOnly(libs.jspecify)
     implementation(libs.pdfbox.android)
     implementation(libs.junrar)
 

@@ -30,7 +30,12 @@ class ReaderGraph(context: Context) {
         context.applicationContext,
         ReaderDatabase::class.java,
         "reader.db",
-    ).addMigrations(ReaderDatabase.MIGRATION_2_3, ReaderDatabase.MIGRATION_3_4, ReaderDatabase.MIGRATION_4_5)
+    ).addMigrations(
+        ReaderDatabase.MIGRATION_2_3,
+        ReaderDatabase.MIGRATION_3_4,
+        ReaderDatabase.MIGRATION_4_5,
+        ReaderDatabase.MIGRATION_5_6,
+    )
         .fallbackToDestructiveMigration(true)
         .build()
 

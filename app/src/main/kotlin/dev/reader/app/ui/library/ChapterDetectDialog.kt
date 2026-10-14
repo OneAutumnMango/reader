@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -25,8 +26,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
@@ -58,9 +61,10 @@ fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
         text = text,
         markdown = book.format == BookFormat.MARKDOWN,
         currentPattern = book.chapterPattern,
-        onApply = { pattern ->
+        currentExcludedLines = book.chapterExcludedLines,
+        onApply = { pattern, excludedLines ->
             scope.launch {
-                withContext(Dispatchers.IO) { graph.importer.applyChapterPattern(book, pattern) }
+                withContext(Dispatchers.IO) { graph.importer.applyChapterPattern(book, pattern, excludedLines) }
                 onDismiss()
             }
         },
@@ -70,16 +74,18 @@ fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
 
 /**
  * Lets the user pick how a txt/markdown book is split: auto-detected headings, lines starting with
- * some text (e.g. `# ` or `Chapter`), or a regex — previewing every break before applying.
- * [onApply] with null means "no chapters, keep it as one".
+ * some text (e.g. `# ` or `Chapter`), or a regex — previewing every break before applying, and
+ * letting them manually drop any detected break they don't actually want to be a chapter.
+ * [onApply]'s pattern is null for "no chapters, keep it as one".
  */
 @Composable
 fun ChapterDetectDialog(
     text: String?,
     markdown: Boolean,
     currentPattern: String?,
-    onApply: (String?) -> Unit,
+    onApply: (String?, Set<Int>) -> Unit,
     onDismiss: () -> Unit,
+    currentExcludedLines: Set<Int> = emptySet(),
 ) {
     var mode by remember {
         mutableStateOf(if (currentPattern == null) ChapterDetectMode.AUTO else ChapterDetectMode.REGEX)
@@ -97,6 +103,11 @@ fun ChapterDetectDialog(
         } else {
             runCatching { ChapterSplitter.breaks(text, pattern) }
         }
+    }
+    // Manual removals only make sense for the breaks they were chosen against; a different
+    // pattern/mode starts from a clean slate.
+    var excludedLines by remember(pattern == currentPattern) {
+        mutableStateOf(if (pattern == currentPattern) currentExcludedLines else emptySet())
     }
 
     AlertDialog(
@@ -119,19 +130,31 @@ fun ChapterDetectDialog(
                     )
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                ChapterPreview(text, mode, breaks)
+                ChapterPreview(
+                    text = text,
+                    mode = mode,
+                    breaks = breaks,
+                    excludedLines = excludedLines,
+                    onToggle = { line ->
+                        excludedLines = if (line in excludedLines) excludedLines - line else excludedLines + line
+                    },
+                )
             }
         },
         confirmButton = {
+            val keptCount = breaks.getOrNull().orEmpty().count { it.line !in excludedLines }
             TextButton(
-                onClick = { onApply(pattern) },
-                enabled = breaks.getOrNull().orEmpty().isNotEmpty(),
+                onClick = { onApply(pattern, excludedLines) },
+                enabled = keptCount > 0,
                 modifier = Modifier.testTag("chapter-detect-apply"),
             ) { Text("Apply") }
         },
         dismissButton = {
             Row {
-                TextButton(onClick = { onApply(null) }, modifier = Modifier.testTag("chapter-detect-none")) {
+                TextButton(
+                    onClick = { onApply(null, emptySet()) },
+                    modifier = Modifier.testTag("chapter-detect-none"),
+                ) {
                     Text("No chapters")
                 }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -141,7 +164,13 @@ fun ChapterDetectDialog(
 }
 
 @Composable
-private fun ChapterPreview(text: String?, mode: ChapterDetectMode, breaks: Result<List<ChapterBreak>>) {
+private fun ChapterPreview(
+    text: String?,
+    mode: ChapterDetectMode,
+    breaks: Result<List<ChapterBreak>>,
+    excludedLines: Set<Int>,
+    onToggle: (Int) -> Unit,
+) {
     val found = breaks.getOrNull()
     when {
         text == null -> CircularProgressIndicator()
@@ -154,29 +183,47 @@ private fun ChapterPreview(text: String?, mode: ChapterDetectMode, breaks: Resul
             },
         )
         else -> {
+            val keptCount = found.count { it.line !in excludedLines }
             Text(
-                "${found.size} ${if (found.size == 1) "chapter" else "chapters"} found",
+                "$keptCount of ${found.size} ${if (found.size == 1) "chapter" else "chapters"} kept",
                 style = MaterialTheme.typography.labelLarge,
             )
             LazyColumn(modifier = Modifier.heightIn(max = PREVIEW_MAX_HEIGHT).testTag("chapter-preview")) {
-                items(found) { chapterBreak ->
-                    Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                        Text(
-                            chapterBreak.title,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            "Line ${chapterBreak.line + 1} \u00b7 ${chapterBreak.preview}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                items(found, key = { it.line }) { chapterBreak ->
+                    ChapterBreakRow(chapterBreak, chapterBreak.line !in excludedLines) { onToggle(chapterBreak.line) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ChapterBreakRow(chapterBreak: ChapterBreak, kept: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("chapter-break-${chapterBreak.line}")
+            .clickable(onClick = onToggle)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = kept, onCheckedChange = null)
+        Column(modifier = Modifier.padding(start = 4.dp)) {
+            Text(
+                chapterBreak.title,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textDecoration = if (kept) null else TextDecoration.LineThrough,
+                color = if (kept) Color.Unspecified else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Line ${chapterBreak.line + 1} \u00b7 ${chapterBreak.preview}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
