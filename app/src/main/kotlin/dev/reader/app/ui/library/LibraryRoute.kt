@@ -5,6 +5,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.DropdownMenu
@@ -45,8 +46,9 @@ fun LibraryRoute(
     graph: ReaderGraph,
     onOpenBook: (Book) -> Unit,
     onSearchClick: () -> Unit,
-    gridState: androidx.compose.foundation.lazy.grid.LazyGridState =
-        androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
+    gridStateFor: (CategoryId?) -> LazyGridState? = { null },
+    selectedCategory: CategoryId? = null,
+    onCategorySelected: (CategoryId?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -55,7 +57,6 @@ fun LibraryRoute(
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
     val preferences by graph.settings.preferences.collectAsState(initial = null)
     val progressByBook by graph.progress.observeAll().collectAsState(initial = emptyMap())
-    var selectedCategory by remember { mutableStateOf<CategoryId?>(null) }
     val importActions = rememberImportActions(graph)
     var showQuickAddMenu by remember { mutableStateOf(false) }
     var longPressedBook by remember { mutableStateOf<Book?>(null) }
@@ -94,19 +95,24 @@ fun LibraryRoute(
                 selectedCategory = selectedCategory,
                 progressFor = { id -> progressByBook[id]?.takeUnless { it.finished }?.position },
                 finishedFor = { id -> progressByBook[id]?.finished ?: false },
-                onCategorySelected = { selectedCategory = it },
+                onCategorySelected = onCategorySelected,
                 onBookClick = onOpenBook,
                 onBookLongClick = { longPressedBook = it },
                 onSearchClick = onSearchClick,
                 onAddCategory = { name ->
                     scope.launch {
                         graph.library.upsertCategory(
-                            Category(id = CategoryId(UUID.randomUUID().toString()), name = name),
+                            Category(
+                                id = CategoryId(UUID.randomUUID().toString()),
+                                name = name.trim(),
+                                orderIndex = (categories.maxOfOrNull { it.orderIndex } ?: -1) + 1,
+                            ),
                         )
                     }
                 },
                 layout = preferences?.libraryLayout ?: LibraryLayout.MEDIUM,
-                gridState = gridState,
+                showAllCategory = preferences?.showAllCategory ?: true,
+                gridStateFor = gridStateFor,
             )
         }
 

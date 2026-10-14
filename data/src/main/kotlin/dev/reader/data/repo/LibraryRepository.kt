@@ -65,6 +65,25 @@ class LibraryRepository(private val database: ReaderDatabase) {
 
     suspend fun upsertCategory(category: Category) = database.categories().upsert(category.toEntity())
 
+    /** Removes the category and its book links; the books themselves stay in the library. */
+    suspend fun deleteCategory(category: Category) {
+        database.categories().deleteBookRefs(category.id.value)
+        database.categories().delete(category.toEntity())
+    }
+
+    /** Persists [ordered] as the new tab order. */
+    suspend fun reorderCategories(ordered: List<Category>) =
+        ordered.forEachIndexed { index, category -> upsertCategory(category.copy(orderIndex = index)) }
+
+    /** Makes [categoryId] the category new books land in, or clears it when null. */
+    suspend fun setDefaultCategory(categoryId: CategoryId?) =
+        database.categories().observeAll().first().forEach { entity ->
+            upsertCategory(entity.toCategory().copy(isDefault = entity.id == categoryId?.value))
+        }
+
+    suspend fun defaultCategoryIds(): Set<CategoryId> =
+        database.categories().observeAll().first().filter { it.isDefault }.map { CategoryId(it.id) }.toSet()
+
     private suspend fun List<dev.reader.data.room.entity.BookEntity>.toBooks(): List<Book> =
         map { it.toBook(database.books().categoryIdsFor(it.id)) }
 }

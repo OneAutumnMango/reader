@@ -4,8 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Palette
@@ -24,13 +26,17 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.appearance.AppearanceRoute
 import dev.reader.app.ui.bookmarks.BookmarksRoute
+import dev.reader.app.ui.categories.CategoriesRoute
 import dev.reader.app.ui.export.ImportExportRoute
 import dev.reader.app.ui.library.BookDetailRoute
 import dev.reader.app.ui.library.LibraryRoute
@@ -39,11 +45,13 @@ import dev.reader.app.ui.search.SearchRoute
 import dev.reader.app.ui.settings.LogHistoryRoute
 import dev.reader.app.ui.settings.SettingsRoute
 import dev.reader.app.ui.stats.StatsRoute
+import dev.reader.core.model.CategoryId
 import kotlinx.coroutines.launch
 
 private val DRAWER_DESTINATIONS = listOf(
     Destination.Library to ("Library" to Icons.Filled.Menu),
     Destination.Appearance to ("Appearance" to Icons.Filled.Palette),
+    Destination.Categories to ("Categories" to Icons.Filled.Category),
     Destination.Stats to ("Stats" to Icons.Filled.QueryStats),
     Destination.ImportExport to ("Import / export" to Icons.Filled.ImportExport),
     Destination.Settings to ("Settings" to Icons.Filled.Settings),
@@ -58,6 +66,7 @@ private fun titleFor(destination: Destination): String = when (destination) {
     Destination.Appearance -> "Appearance"
     Destination.ImportExport -> "Import / export"
     Destination.Settings -> "Settings"
+    Destination.Categories -> "Categories"
     Destination.LogHistory -> "Log history"
     is Destination.BookDetail -> "Book"
     is Destination.Bookmarks -> "Bookmarks"
@@ -68,7 +77,9 @@ private fun titleFor(destination: Destination): String = when (destination) {
 @Composable
 fun ReaderApp(graph: ReaderGraph) {
     val navigator = remember { Navigator() }
-    val libraryGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    // Kept here so each category tab's scroll position and the chosen tab survive opening a book.
+    val libraryGridStates = remember { mutableMapOf<CategoryId?, LazyGridState>() }
+    var libraryCategory by remember { mutableStateOf<CategoryId?>(null) }
 
     LaunchedEffect(Unit) { graph.scanRootFoldersOnLaunch() }
 
@@ -135,7 +146,9 @@ fun ReaderApp(graph: ReaderGraph) {
                     graph,
                     onOpenBook = { navigator.push(Destination.BookDetail(it.id)) },
                     onSearchClick = { navigator.push(Destination.Search) },
-                    gridState = libraryGridState,
+                    gridStateFor = { libraryGridStates.getOrPut(it) { LazyGridState() } },
+                    selectedCategory = libraryCategory,
+                    onCategorySelected = { libraryCategory = it },
                     modifier = content,
                 )
                 Destination.Search -> SearchRoute(
@@ -145,6 +158,7 @@ fun ReaderApp(graph: ReaderGraph) {
                 )
                 Destination.Stats -> StatsRoute(graph, content)
                 Destination.Appearance -> AppearanceRoute(graph, content)
+                Destination.Categories -> CategoriesRoute(graph, content)
                 Destination.ImportExport -> ImportExportRoute(graph, content)
                 Destination.Settings -> SettingsRoute(
                     graph,

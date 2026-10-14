@@ -1,6 +1,5 @@
 package dev.reader.app.ui.library
 
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,9 +9,11 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.core.model.Book
@@ -21,7 +22,7 @@ import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
 import dev.reader.core.theme.LibraryLayout
 
-private const val SWIPE_CATEGORY_THRESHOLD_PX = 100f
+private const val ALL_PAGE_KEY = "__all__"
 
 @Composable
 fun LibraryScreen(
@@ -36,45 +37,41 @@ fun LibraryScreen(
     onAddCategory: (String) -> Unit,
     layout: LibraryLayout = LibraryLayout.MEDIUM,
     finishedFor: (BookId) -> Boolean = { false },
-    gridState: LazyGridState = rememberLazyGridState(),
+    showAllCategory: Boolean = true,
+    gridStateFor: (CategoryId?) -> LazyGridState? = { null },
     modifier: Modifier = Modifier,
 ) {
-    val visibleBooks = if (selectedCategory == null) books else books.filter { selectedCategory in it.categoryIds }
-    val orderedCategoryIds: List<CategoryId?> = listOf(null) + categories.map { it.id }
-    val currentIndex = orderedCategoryIds.indexOf(selectedCategory).coerceAtLeast(0)
+    // "All" can only be hidden when there's another category to show instead.
+    val showAll = showAllCategory || categories.isEmpty()
+    val pages: List<CategoryId?> = (if (showAll) listOf(null) else emptyList()) + categories.map { it.id }
+    val currentIndex = pages.indexOf(selectedCategory).coerceAtLeast(0)
+    val pagerState = rememberPagerState(initialPage = currentIndex) { pages.size }
+
+    LaunchedEffect(currentIndex) {
+        if (pagerState.currentPage != currentIndex) pagerState.animateScrollToPage(currentIndex)
+    }
+    LaunchedEffect(pagerState.settledPage, pages) {
+        val settled = pages.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
+        if (settled != selectedCategory) onCategorySelected(settled)
+    }
 
     Column(modifier = modifier) {
         SearchBarButton(onClick = onSearchClick, modifier = Modifier.padding(bottom = 8.dp))
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(orderedCategoryIds, currentIndex) {
-                    var totalDrag = 0f
-                    detectHorizontalDragGestures(
-                        onDragStart = { totalDrag = 0f },
-                        onDragEnd = {
-                            when {
-                                totalDrag <= -SWIPE_CATEGORY_THRESHOLD_PX &&
-                                    currentIndex < orderedCategoryIds.lastIndex ->
-                                    onCategorySelected(orderedCategoryIds[currentIndex + 1])
-                                totalDrag >= SWIPE_CATEGORY_THRESHOLD_PX && currentIndex > 0 ->
-                                    onCategorySelected(orderedCategoryIds[currentIndex - 1])
-                            }
-                        },
-                    ) { change, dragAmount ->
-                        change.consume()
-                        totalDrag += dragAmount
-                    }
-                },
-        ) {
-            CategoryTabs(categories, selectedCategory, onCategorySelected, onAddCategory)
+        CategoryTabs(categories, pages.getOrNull(pagerState.currentPage), onCategorySelected, onAddCategory, showAll)
+        HorizontalPager(
+            state = pagerState,
+            key = { pages.getOrNull(it)?.value ?: ALL_PAGE_KEY },
+            modifier = Modifier.fillMaxSize(),
+        ) { page ->
+            val category = pages.getOrNull(page)
+            val pageBooks = if (category == null) books else books.filter { category in it.categoryIds }
             LazyVerticalGrid(
-                state = gridState,
+                state = gridStateFor(category) ?: rememberLazyGridState(),
                 columns = GridCells.Adaptive(minSize = layout.gridColumnMinWidthDp.dp),
                 contentPadding = PaddingValues(8.dp),
-                modifier = Modifier.testTag("library-grid"),
+                modifier = Modifier.fillMaxSize().testTag("library-grid"),
             ) {
-                items(visibleBooks, key = { it.id.value }) { book ->
+                items(pageBooks, key = { it.id.value }) { book ->
                     BookCard(
                         book = book,
                         progress = progressFor(book.id),

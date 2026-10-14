@@ -26,13 +26,15 @@ fun CategoryTabs(
     selected: CategoryId?,
     onSelect: (CategoryId?) -> Unit,
     onAddCategory: (String) -> Unit,
+    showAll: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val selectedIndex = categories.indexOfFirst { it.id == selected }.let { if (it < 0) 0 else it + 1 }
+    val offset = if (showAll) 1 else 0
+    val selectedIndex = categories.indexOfFirst { it.id == selected }.let { if (it < 0) 0 else it + offset }
     var showAddDialog by remember { mutableStateOf(false) }
 
     PrimaryScrollableTabRow(selectedTabIndex = selectedIndex, modifier = modifier) {
-        Tab(selected = selected == null, onClick = { onSelect(null) }, text = { Text("All") })
+        if (showAll) Tab(selected = selected == null, onClick = { onSelect(null) }, text = { Text("All") })
         categories.forEach { category ->
             Tab(
                 selected = selected == category.id,
@@ -59,7 +61,7 @@ fun CategoryTabs(
 }
 
 @Composable
-private fun AddCategoryDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+internal fun AddCategoryDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
 
     AlertDialog(

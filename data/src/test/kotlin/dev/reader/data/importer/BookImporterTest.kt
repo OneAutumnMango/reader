@@ -157,6 +157,18 @@ class BookImporterTest {
     }
 
     @Test
+    fun `new books land in the default category`() = runBlocking {
+        val library = LibraryRepository(database)
+        val manga = dev.reader.core.model.Category(dev.reader.core.model.CategoryId("manga"), "Manga")
+        library.upsertCategory(manga)
+        library.setDefaultCategory(manga.id)
+
+        val book = importer.importFile(File(tempDir, "a.txt").apply { writeText("hi") })
+
+        assertEquals(setOf(manga.id), book.categoryIds)
+    }
+
+    @Test
     fun `a renamed light novel folder is recognised as the same book`() = runBlocking {
         val folder = File(tempDir, "Novel").apply { mkdirs() }
         File(folder, "1.txt").writeText("one")

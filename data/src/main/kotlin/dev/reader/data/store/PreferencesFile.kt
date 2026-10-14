@@ -20,4 +20,5 @@ data class PreferencesFile(
     /** Root-folder entry URI -> sourcePath of the book imported from it. */
     val rootEntryBooks: Map<String, String> = emptyMap(),
     val libraryLayout: LibraryLayout = LibraryLayout.MEDIUM,
+    val showAllCategory: Boolean = true,
 )

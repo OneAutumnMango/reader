@@ -44,7 +44,7 @@ class BookImporter(
             coverPath = existing?.coverPath ?: materializeCover(file, format, bookId, parsed.coverPath),
             format = format,
             sourcePath = file.path,
-            categoryIds = existing?.categoryIds ?: categoryIds,
+            categoryIds = existing?.categoryIds ?: categoryIds.ifEmpty { library.defaultCategoryIds() },
             pdfRenderMode = existing?.pdfRenderMode,
             addedAt = existing?.addedAt ?: now(),
             contentHash = hash,
@@ -88,7 +88,7 @@ class BookImporter(
                 ?: BookFormat.TXT,
             sourcePath = folder.path,
             isLightNovel = true,
-            categoryIds = existing?.categoryIds ?: categoryIds,
+            categoryIds = existing?.categoryIds ?: categoryIds.ifEmpty { library.defaultCategoryIds() },
             addedAt = existing?.addedAt ?: now(),
             contentHash = hash,
         )

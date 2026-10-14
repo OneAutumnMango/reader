@@ -124,6 +124,7 @@ class LibraryScreenTest {
         composeRule.onNodeWithTag("library-grid").performTouchInput {
             swipeLeft()
         }
+        composeRule.waitForIdle()
 
         assertEquals(novels, selected)
     }
@@ -150,5 +151,28 @@ class LibraryScreenTest {
         }
 
         assertEquals(CategoryId("unchanged"), selected)
+    }
+
+    @Test
+    fun `hiding All starts on the first category`() {
+        var selected: CategoryId? = null
+        composeRule.setContent {
+            LibraryScreen(
+                listOf(book("1", "Alpha", setOf(novels)), book("2", "Beta")),
+                categories,
+                null,
+                progressFor = { null },
+                onCategorySelected = { selected = it },
+                onBookClick = {},
+                onBookLongClick = {},
+                onSearchClick = {},
+                onAddCategory = {},
+                showAllCategory = false,
+            )
+        }
+
+        composeRule.onAllNodesWithText("All").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Beta").assertCountEquals(0)
+        assertEquals(novels, selected)
     }
 }
