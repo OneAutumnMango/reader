@@ -74,6 +74,18 @@ fun ReaderSettingsEditor(settings: ReaderSettings, onChange: (ReaderSettings) ->
             Switch(checked = settings.zoomEnabled, onCheckedChange = null)
         }
 
+        Row(
+            modifier = Modifier
+                .testTag("page-gap-toggle")
+                .fillMaxWidth()
+                .clickable { onChange(settings.copy(pageGap = !settings.pageGap)) },
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Gap between PDF/comic pages")
+            Switch(checked = settings.pageGap, onCheckedChange = null)
+        }
+
         Text("Keep screen awake")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             KeepScreenAwake.entries.forEach { option ->

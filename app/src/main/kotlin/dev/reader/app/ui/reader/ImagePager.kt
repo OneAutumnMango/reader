@@ -10,8 +10,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.ReadingMode
+
+private val PAGE_GAP = 8.dp
 
 /**
  * Page viewer for fixed-layout content (comic archives and PDFs rendered as images) that follows
@@ -26,10 +29,12 @@ fun ImagePager(
     modifier: Modifier = Modifier,
     initialPage: Int = 0,
     zoomEnabled: Boolean = true,
+    pageGap: Boolean = true,
     onPageChanged: (index: Int) -> Unit = {},
     pageContent: @Composable (index: Int, continuous: Boolean) -> Unit,
 ) {
     val startPage = initialPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+    val gap = if (pageGap) PAGE_GAP else 0.dp
 
     if (readingMode == ReadingMode.CONTINUOUS_SCROLL) {
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = startPage)
@@ -37,8 +42,8 @@ fun ImagePager(
         Zoomable(zoomEnabled, modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxSize().testTag("image-strip"),
+                verticalArrangement = Arrangement.spacedBy(gap),
             ) {
                 items(pageCount) { index -> pageContent(index, true) }
             }
@@ -53,12 +58,17 @@ fun ImagePager(
     }
 
     when (readingMode) {
-        ReadingMode.PAGED_VERTICAL -> VerticalPager(state = pagerState, modifier = modifier.fillMaxSize()) { page(it) }
+        ReadingMode.PAGED_VERTICAL -> VerticalPager(
+            state = pagerState,
+            pageSpacing = gap,
+            modifier = modifier.fillMaxSize(),
+        ) { page(it) }
         ReadingMode.PAGED_HORIZONTAL_RTL -> HorizontalPager(
             state = pagerState,
             reverseLayout = true,
+            pageSpacing = gap,
             modifier = modifier.fillMaxSize(),
         ) { page(it) }
-        else -> HorizontalPager(state = pagerState, modifier = modifier.fillMaxSize()) { page(it) }
+        else -> HorizontalPager(state = pagerState, pageSpacing = gap, modifier = modifier.fillMaxSize()) { page(it) }
     }
 }

@@ -63,6 +63,7 @@ fun PdfReaderScreen(
                     readingMode = settings.readingMode,
                     initialPage = (initialPositionFraction * pageRenderer.pageCount).roundToInt(),
                     zoomEnabled = settings.zoomEnabled,
+                    pageGap = settings.pageGap,
                     onPageChanged = { onPageChanged(it, pageRenderer.pageCount) },
                 ) { index, continuous ->
                     PdfPageImage(pageRenderer, index, continuous)

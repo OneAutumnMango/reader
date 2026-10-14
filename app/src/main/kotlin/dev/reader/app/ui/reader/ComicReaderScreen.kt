@@ -49,6 +49,7 @@ fun ComicReaderScreen(
                 readingMode = settings.readingMode,
                 initialPage = (initialPositionFraction * pages.size).roundToInt(),
                 zoomEnabled = settings.zoomEnabled,
+                pageGap = settings.pageGap,
                 onPageChanged = { onPageChanged(it, pages.size) },
             ) { index, continuous ->
                 ComicPageImage(file, format, pages[index], continuous)

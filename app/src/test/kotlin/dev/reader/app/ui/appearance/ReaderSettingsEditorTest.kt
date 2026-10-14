@@ -53,4 +53,16 @@ class ReaderSettingsEditorTest {
 
         assertFalse(settings.zoomEnabled)
     }
+
+    @Test
+    fun `toggling the page gap off is reflected`() {
+        var settings = ReaderSettings()
+        composeRule.setContent {
+            ReaderSettingsEditor(settings, onChange = { settings = it })
+        }
+
+        composeRule.onNodeWithTag("page-gap-toggle").performClick()
+
+        assertFalse(settings.pageGap)
+    }
 }

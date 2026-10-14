@@ -18,4 +18,6 @@ data class ReaderSettings(
     val useBookStyling: Boolean = true,
     val customCss: String = "",
     val zoomEnabled: Boolean = true,
+    /** Visible gap between PDF/comic pages; off gives a seamless strip. */
+    val pageGap: Boolean = true,
 )
