@@ -57,9 +57,16 @@ fun ReaderRoute(
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val allChapters by graph.library.observeChapters(bookId).collectAsState(initial = emptyList())
     // Extras (title page, copyright…) open on their own; otherwise only real chapters are swipeable.
-    val chapters = remember(allChapters, chapterId) {
+    val chapters = remember(allChapters, chapterId, books) {
+        val pdfPages = books.find { it.id == bookId }
+            ?.let { it.format == BookFormat.PDF && it.pdfRenderMode != PdfRenderMode.REFLOW_TEXT } == true
         val opened = allChapters.find { it.id == chapterId }
-        if (opened?.isExtra == true) listOf(opened) else allChapters.filterNot { it.isExtra }.ifEmpty { allChapters }
+        when {
+            // Chapters can start mid-page, so page view always shows the whole PDF.
+            pdfPages -> allChapters.take(1)
+            opened?.isExtra == true -> listOf(opened)
+            else -> allChapters.filterNot { it.isExtra }.ifEmpty { allChapters }
+        }
     }
     val book = books.find { it.id == bookId }
     val preferences by graph.settings.preferences.collectAsState(initial = null)
@@ -83,6 +90,7 @@ fun ReaderRoute(
     val pdfRenderMode = if (book.format == BookFormat.PDF) book.pdfRenderMode ?: PdfRenderMode.FIXED_PAGE else null
     val pageBased = book.format == BookFormat.CBZ || book.format == BookFormat.CBR ||
         pdfRenderMode == PdfRenderMode.FIXED_PAGE
+    val search = rememberBookSearch(book, chapters)
 
     Box(modifier = modifier.fillMaxSize()) {
         // In horizontal paged modes the inner page pager scrolls first; once it hits its last/first
@@ -101,6 +109,8 @@ fun ReaderRoute(
                 theme = theme,
                 onToggleMenu = { showMenu = !showMenu },
                 onPositionChanged = { index, total -> positions[page] = index to total },
+                highlight = search.highlight,
+                jump = search.jumpFor(page),
             )
         }
 
@@ -127,6 +137,29 @@ fun ReaderRoute(
                 pdfRenderMode = pdfRenderMode,
                 onPdfRenderModeChange = { mode ->
                     scope.launch { graph.library.updateBookDetails(book.copy(pdfRenderMode = mode)) }
+                },
+                onSearch = if (pageBased) {
+                    null
+                } else {
+                    {
+                        search.open = !search.open
+                        menuExpanded = false
+                    }
+                },
+                searchPanel = if (search.open && !pageBased) {
+                    {
+                        ReaderSearchPanel(
+                            state = search.ui,
+                            onQueryChange = { search.query = it },
+                            onOptionsChange = { search.options = it },
+                            onSelect = { index ->
+                                search.select(index)?.let { scope.launch { pagerState.scrollToPage(it) } }
+                            },
+                            onClose = { search.open = false },
+                        )
+                    }
+                } else {
+                    null
                 },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
@@ -157,6 +190,8 @@ private fun ChapterPage(
     theme: ReaderTheme,
     onToggleMenu: () -> Unit,
     onPositionChanged: (Int, Int) -> Unit,
+    highlight: Regex?,
+    jump: BlockJump?,
 ) {
     val context = LocalContext.current
     var content by remember(chapter.id, book.pdfRenderMode) { mutableStateOf<ChapterContent?>(null) }
@@ -245,6 +280,8 @@ private fun ChapterPage(
             onTapAction = ::onTapAction,
             onPageChanged = ::onPageChanged,
             modifier = Modifier.fillMaxSize(),
+            highlight = highlight,
+            jump = jump,
         )
         loaded is ChapterContent.Comic && startFraction != null -> ComicReaderScreen(
             file = loaded.file,
@@ -258,7 +295,6 @@ private fun ChapterPage(
         )
         loaded is ChapterContent.Pdf && startFraction != null -> PdfReaderScreen(
             file = loaded.file,
-            pages = loaded.pages,
             settings = settings,
             initialPositionFraction = startFraction,
             onTapAction = ::onTapAction,

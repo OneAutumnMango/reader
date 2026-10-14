@@ -57,12 +57,25 @@ object ChapterSplitter {
     /** Marks a pattern whose matches must also be followed by a blank line (see [HeadingRule]). */
     const val STANDALONE_PREFIX = "standalone:"
 
+    /** Marks a "pattern" that is really a hand-picked list of 0-based chapter start lines. */
+    const val LINES_PREFIX = "lines:"
+
     private const val MAX_HEADING_LENGTH = 100
     private const val PREVIEW_LENGTH = 120
     private const val PREVIEW_LINES = 3
 
     /** Literal "line starts with" matching for a user-typed prefix such as `# ` or `Chapter`. */
     fun prefixPattern(prefix: String): String = "^" + Regex.escape(prefix)
+
+    /** Chapters starting exactly at [lines], whatever they contain. */
+    fun linesPattern(lines: Collection<Int>): String = LINES_PREFIX + lines.sorted().joinToString(",")
+
+    /** The hand-picked lines of a [linesPattern], or null for a regular heading pattern. */
+    fun pickedLines(pattern: String): Set<Int>? = pattern.takeIf { it.startsWith(LINES_PREFIX) }
+        ?.removePrefix(LINES_PREFIX)
+        ?.split(',')
+        ?.mapNotNull { it.trim().toIntOrNull() }
+        ?.toSet()
 
     /** The most chapter-like heading pattern in [text], or null if nothing stands out. */
     fun detectPattern(text: String, markdown: Boolean): String? = suggestions(text, markdown).firstOrNull()?.pattern
@@ -74,7 +87,7 @@ object ChapterSplitter {
     /** Where [pattern] would split [text]. Throws on an invalid regex. */
     fun breaks(text: String, pattern: String): List<ChapterBreak> {
         val lines = text.lines()
-        val starts = headingLines(lines, HeadingRule(pattern))
+        val starts = startLines(lines, pattern)
         return starts.mapIndexed { i, index ->
             val end = starts.getOrNull(i + 1) ?: lines.size
             val preview = lines.subList(index + 1, end).asSequence()
@@ -89,7 +102,7 @@ object ChapterSplitter {
     /** [text] cut at every heading, except any whose line is in [excludedLines] (merged into the previous chunk). */
     fun split(text: String, pattern: String, excludedLines: Set<Int> = emptySet()): List<TextChunk> {
         val lines = text.lines()
-        val starts = runCatching { headingLines(lines, HeadingRule(pattern)) }.getOrDefault(emptyList())
+        val starts = runCatching { startLines(lines, pattern) }.getOrDefault(emptyList())
             .filterNot { it in excludedLines }
         if (starts.isEmpty()) return listOf(TextChunk(null, text))
         val preamble = lines.subList(0, starts.first()).joinToString("\n")
@@ -99,6 +112,10 @@ object ChapterSplitter {
         }
         return if (preamble.isBlank()) chapters else listOf(TextChunk(null, preamble)) + chapters
     }
+
+    private fun startLines(lines: List<String>, pattern: String): List<Int> =
+        pickedLines(pattern)?.filter { it in lines.indices && lines[it].isNotBlank() }?.sorted()
+            ?: headingLines(lines, HeadingRule(pattern))
 
     internal fun headingLines(lines: List<String>, rule: HeadingRule): List<Int> = lines.indices.filter { i ->
         val line = lines[i].trim()

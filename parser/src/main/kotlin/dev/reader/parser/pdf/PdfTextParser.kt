@@ -14,7 +14,7 @@ import java.io.File
 
 /**
  * Reflow mode: extracts the text so it can be themed like any other format. Chapters come from a
- * user [chapterPattern] when set, otherwise the PDF's own bookmarks; each knows its page range.
+ * user [chapterPattern] when set, otherwise the PDF's own bookmarks.
  */
 class PdfTextParser(context: Context) {
 
@@ -31,13 +31,7 @@ class PdfTextParser(context: Context) {
             val title = file.nameWithoutExtension
             chapterPattern?.let { patternChapters(lines, it, excludedLines, title) }
                 ?: outlineChapters(doc, lines, title)
-                ?: listOf(
-                    ParsedChapter.TextChapter(
-                        title,
-                        RichDocument(paragraphs(lines)),
-                        pages = 0 until doc.numberOfPages,
-                    ),
-                )
+                ?: listOf(ParsedChapter.TextChapter(title, RichDocument(paragraphs(lines))))
         }
         return ParsedBook(
             title = file.nameWithoutExtension,
@@ -67,9 +61,6 @@ class PdfTextParser(context: Context) {
             TextChunk(titles[range.first()], (range.first()..range.last()).joinToString("\n") { lines[it].text })
         }
         return chunks.toChapters(title) { RichDocument(paragraphs(it.lines().map { line -> PdfLine(line, 0) })) }
-            .zip(ranges) { chapter, range ->
-                (chapter as ParsedChapter.TextChapter).copy(pages = lines[range.first()].page..lines[range.last()].page)
-            }
     }
 
     private fun outlineChapters(doc: PDDocument, lines: List<PdfLine>, title: String): List<ParsedChapter>? {
@@ -86,7 +77,7 @@ class PdfTextParser(context: Context) {
         return sections.mapIndexed { i, (name, start) ->
             val end = (sections.getOrNull(i + 1)?.second ?: doc.numberOfPages) - 1
             val pages = start..end.coerceAtLeast(start)
-            ParsedChapter.TextChapter(name, RichDocument(paragraphs(lines.filter { it.page in pages })), pages = pages)
+            ParsedChapter.TextChapter(name, RichDocument(paragraphs(lines.filter { it.page in pages })))
         }
     }
 }

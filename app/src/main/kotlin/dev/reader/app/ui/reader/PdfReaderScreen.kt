@@ -39,7 +39,6 @@ fun PdfReaderScreen(
     file: File,
     settings: ReaderSettings,
     modifier: Modifier = Modifier,
-    pages: IntRange? = null,
     showTapZoneLabels: Boolean = false,
     initialPositionFraction: Float = 0f,
     onTapAction: (TapAction) -> Unit = {},
@@ -67,21 +66,15 @@ fun PdfReaderScreen(
         val pageRenderer = renderer
         TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
             when {
-                pageRenderer != null -> {
-                    val all = 0 until pageRenderer.pageCount
-                    val range = pages?.let { maxOf(it.first, 0)..minOf(it.last, all.last) }
-                        ?.takeIf { !it.isEmpty() } ?: all
-                    val count = range.count()
-                    ImagePager(
-                        pageCount = count,
-                        readingMode = settings.readingMode,
-                        initialPage = (initialPositionFraction * count).roundToInt(),
-                        zoomEnabled = settings.zoomEnabled,
-                        pageGap = settings.pageGap,
-                        onPageChanged = { onPageChanged(it, count) },
-                    ) { index, continuous ->
-                        PdfPageImage(pageRenderer, range.first + index, continuous)
-                    }
+                pageRenderer != null -> ImagePager(
+                    pageCount = pageRenderer.pageCount,
+                    readingMode = settings.readingMode,
+                    initialPage = (initialPositionFraction * pageRenderer.pageCount).roundToInt(),
+                    zoomEnabled = settings.zoomEnabled,
+                    pageGap = settings.pageGap,
+                    onPageChanged = { onPageChanged(it, pageRenderer.pageCount) },
+                ) { index, continuous ->
+                    PdfPageImage(pageRenderer, index, continuous)
                 }
                 openFailed -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Couldn't open this PDF. It may be encrypted or corrupted.")

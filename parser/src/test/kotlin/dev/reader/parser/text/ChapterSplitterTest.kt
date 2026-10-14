@@ -27,6 +27,22 @@ class ChapterSplitterTest {
     """.trimIndent()
 
     @Test
+    fun `picked lines start chapters anywhere, ignoring blank or out-of-range lines`() {
+        val lines = novel.lines()
+        val partLine = lines.indexOf("Part of the problem was nobody listened.")
+        val pattern = ChapterSplitter.linesPattern(listOf(partLine, 3, 2, 999))
+
+        assertEquals(setOf(partLine, 3, 2, 999), ChapterSplitter.pickedLines(pattern))
+        assertNull(ChapterSplitter.pickedLines("^Chapter"))
+        assertEquals(listOf(3, partLine), ChapterSplitter.breaks(novel, pattern).map { it.line })
+        val chunks = ChapterSplitter.split(novel, pattern)
+        assertEquals(
+            listOf(null, "Chapter 1: The Start", "Part of the problem was nobody listened."),
+            chunks.map { it.title },
+        )
+    }
+
+    @Test
     fun `auto-detects keyword headings without matching prose that starts with a keyword`() {
         val pattern = requireNotNull(ChapterSplitter.detectPattern(novel, markdown = false))
 

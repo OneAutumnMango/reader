@@ -58,14 +58,7 @@ object ChapterLoader {
     }
 
     private fun loadPdf(context: Context, file: File, book: Book, orderIndex: Int): ChapterContent? {
-        if (book.pdfRenderMode != PdfRenderMode.REFLOW_TEXT) {
-            if (book.isLightNovel) return ChapterContent.Pdf(file)
-            val pages = runCatching { parsePdf(context, file, book).chapters.getOrNull(orderIndex) }
-                .onFailure { AppLog.warn("Couldn't split PDF into chapters; showing every page", LOG_TAG, it) }
-                .getOrNull()
-                .let { (it as? ParsedChapter.TextChapter)?.pages }
-            return ChapterContent.Pdf(file, pages)
-        }
+        if (book.pdfRenderMode != PdfRenderMode.REFLOW_TEXT) return ChapterContent.Pdf(file)
         val chapters = parsePdf(context, file, book).chapters.filterIsInstance<ParsedChapter.TextChapter>()
         val document = if (book.isLightNovel) {
             RichDocument(chapters.flatMap { it.document.blocks })

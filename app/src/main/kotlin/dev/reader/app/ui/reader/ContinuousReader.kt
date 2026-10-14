@@ -32,6 +32,8 @@ fun ContinuousReader(
     modifier: Modifier = Modifier,
     initialPositionFraction: Float = 0f,
     onPositionChanged: (index: Int, total: Int) -> Unit = { _, _ -> },
+    highlight: Regex? = null,
+    jump: BlockJump? = null,
 ) {
     val initialIndex = (initialPositionFraction * document.blocks.size)
         .toInt()
@@ -39,6 +41,9 @@ fun ContinuousReader(
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     LaunchedEffect(listState.firstVisibleItemIndex, document.blocks.size) {
         onPositionChanged(listState.firstVisibleItemIndex, document.blocks.size)
+    }
+    LaunchedEffect(jump) {
+        jump?.let { listState.scrollToItem(it.block.coerceIn(0, (document.blocks.size - 1).coerceAtLeast(0))) }
     }
 
     val content: @Composable () -> Unit = {
@@ -48,7 +53,7 @@ fun ContinuousReader(
             contentPadding = PaddingValues(top = READER_TOP_SPACING, bottom = READER_BOTTOM_SPACING),
             verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
         ) {
-            items(document.blocks) { block -> ReaderBlock(block, theme, settings.useBookStyling) }
+            items(document.blocks) { block -> ReaderBlock(block, theme, settings.useBookStyling, highlight) }
         }
     }
 
@@ -60,20 +65,20 @@ fun ContinuousReader(
 }
 
 @Composable
-private fun ReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean) {
+private fun ReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean, highlight: Regex?) {
     when (block) {
         is Block.Paragraph -> Text(
-            text = block.spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling),
+            text = block.spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling).highlighted(highlight),
             style = theme.bodyTextStyle(block.textAlign, useBookStyling),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
         is Block.Heading -> Text(
-            text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
+            text = block.spans.toAnnotatedString(useBookStyling = useBookStyling).highlighted(highlight),
             style = theme.headingTextStyle(block.level, block.textAlign, useBookStyling),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
         is Block.ListItem -> Text(
-            text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
+            text = block.spans.toAnnotatedString(useBookStyling = useBookStyling).highlighted(highlight),
             style = theme.bodyTextStyle(useBookStyling = useBookStyling),
             modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp),
         )

@@ -17,7 +17,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.AppLog
 import dev.reader.app.data.ReaderGraph
+import dev.reader.app.ui.RadioOptions
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.parser.pdf.PdfTextParser
@@ -51,7 +51,7 @@ import java.io.File
 
 private val PREVIEW_MAX_HEIGHT = 280.dp
 
-enum class ChapterDetectMode { AUTO, STARTS_WITH, REGEX }
+enum class ChapterDetectMode { AUTO, STARTS_WITH, REGEX, PICK_LINES }
 
 /** Whether "Detect chapters" makes sense for [book]. */
 fun Book.supportsChapterDetection(): Boolean =
@@ -107,15 +107,25 @@ fun ChapterDetectDialog(
     currentExcludedLines: Set<Int> = emptySet(),
 ) {
     var mode by remember {
-        mutableStateOf(if (currentPattern == null) ChapterDetectMode.AUTO else ChapterDetectMode.REGEX)
+        mutableStateOf(
+            when {
+                currentPattern == null -> ChapterDetectMode.AUTO
+                ChapterSplitter.pickedLines(currentPattern) != null -> ChapterDetectMode.PICK_LINES
+                else -> ChapterDetectMode.REGEX
+            },
+        )
     }
-    var input by remember { mutableStateOf(currentPattern.orEmpty()) }
+    var input by remember {
+        mutableStateOf(currentPattern?.takeIf { ChapterSplitter.pickedLines(it) == null }.orEmpty())
+    }
+    var picked by remember { mutableStateOf(currentPattern?.let(ChapterSplitter::pickedLines).orEmpty()) }
     val suggestions = remember(text, markdown) { text?.let { ChapterSplitter.suggestions(it, markdown) }.orEmpty() }
     var suggestionIndex by remember { mutableStateOf(0) }
     val pattern = when (mode) {
         ChapterDetectMode.AUTO -> suggestions.getOrNull(suggestionIndex)?.pattern
         ChapterDetectMode.STARTS_WITH -> input.takeIf { it.isNotEmpty() }?.let(ChapterSplitter::prefixPattern)
         ChapterDetectMode.REGEX -> input.takeIf { it.isNotBlank() }
+        ChapterDetectMode.PICK_LINES -> picked.takeIf { it.isNotEmpty() }?.let(ChapterSplitter::linesPattern)
     }
     val breaks: Result<List<ChapterBreak>> = remember(text, pattern) {
         if (text == null || pattern == null) {
@@ -134,13 +144,24 @@ fun ChapterDetectDialog(
         title = { Text("Detect chapters") },
         text = {
             Column {
-                ModeRow("Auto-detect", ChapterDetectMode.AUTO, mode) { mode = it }
-                ModeRow("Lines starting with", ChapterDetectMode.STARTS_WITH, mode) { mode = it }
-                ModeRow("Regular expression", ChapterDetectMode.REGEX, mode) { mode = it }
+                RadioOptions(
+                    options = ChapterDetectMode.entries,
+                    selected = mode,
+                    label = {
+                        when (it) {
+                            ChapterDetectMode.AUTO -> "Auto-detect"
+                            ChapterDetectMode.STARTS_WITH -> "Starts with"
+                            ChapterDetectMode.REGEX -> "Regex"
+                            ChapterDetectMode.PICK_LINES -> "Pick lines"
+                        }
+                    },
+                    tag = { "chapter-mode-${it.name}" },
+                    onSelect = { mode = it },
+                )
                 if (mode == ChapterDetectMode.AUTO && suggestions.size > 1) {
                     SuggestionChips(suggestions, suggestionIndex) { suggestionIndex = it }
                 }
-                if (mode != ChapterDetectMode.AUTO) {
+                if (mode == ChapterDetectMode.STARTS_WITH || mode == ChapterDetectMode.REGEX) {
                     OutlinedTextField(
                         value = input,
                         onValueChange = { input = it },
@@ -152,21 +173,27 @@ fun ChapterDetectDialog(
                     )
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                ChapterPreview(
-                    text = text,
-                    mode = mode,
-                    breaks = breaks,
-                    excludedLines = excludedLines,
-                    onToggle = { line ->
-                        excludedLines = if (line in excludedLines) excludedLines - line else excludedLines + line
-                    },
-                )
+                if (mode == ChapterDetectMode.PICK_LINES) {
+                    LinePicker(text, picked) { line -> picked = if (line in picked) picked - line else picked + line }
+                } else {
+                    ChapterPreview(
+                        text = text,
+                        mode = mode,
+                        breaks = breaks,
+                        excludedLines = excludedLines,
+                        onToggle = { line ->
+                            excludedLines = if (line in excludedLines) excludedLines - line else excludedLines + line
+                        },
+                    )
+                }
             }
         },
         confirmButton = {
             val keptCount = breaks.getOrNull().orEmpty().count { it.line !in excludedLines }
             TextButton(
-                onClick = { onApply(pattern, excludedLines) },
+                onClick = {
+                    onApply(pattern, if (mode == ChapterDetectMode.PICK_LINES) emptySet() else excludedLines)
+                },
                 enabled = keptCount > 0,
                 modifier = Modifier.testTag("chapter-detect-apply"),
             ) { Text("Apply") }
@@ -220,6 +247,51 @@ private fun ChapterPreview(
 }
 
 @Composable
+private fun LinePicker(text: String?, picked: Set<Int>, onToggle: (Int) -> Unit) {
+    if (text == null) {
+        CircularProgressIndicator()
+        return
+    }
+    var filter by remember { mutableStateOf("") }
+    val lines = remember(text) { text.lines().withIndex().filter { it.value.isNotBlank() } }
+    val shown = remember(lines, filter) { lines.filter { it.value.contains(filter, ignoreCase = true) } }
+    OutlinedTextField(
+        value = filter,
+        onValueChange = { filter = it },
+        singleLine = true,
+        label = { Text("Filter lines") },
+        modifier = Modifier.fillMaxWidth().testTag("chapter-line-filter"),
+    )
+    Text(
+        "Tick each line a chapter starts on \u00b7 ${picked.size} picked",
+        style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+    LazyColumn(modifier = Modifier.heightIn(max = PREVIEW_MAX_HEIGHT).testTag("chapter-line-picker")) {
+        items(shown, key = { it.index }) { (index, line) ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("chapter-line-$index")
+                    .clickable { onToggle(index) }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = index in picked, onCheckedChange = null)
+                Text(
+                    "${index + 1}  ${line.trim()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = if (index in picked) FontWeight.SemiBold else null,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ChapterBreakRow(chapterBreak: ChapterBreak, kept: Boolean, onToggle: () -> Unit) {
     Row(
         modifier = Modifier
@@ -266,25 +338,5 @@ private fun SuggestionChips(suggestions: List<ChapterSuggestion>, selected: Int,
                 modifier = Modifier.testTag("chapter-suggestion-$index"),
             )
         }
-    }
-}
-
-@Composable
-private fun ModeRow(
-    label: String,
-    value: ChapterDetectMode,
-    selected: ChapterDetectMode,
-    onSelect: (ChapterDetectMode) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("chapter-mode-${value.name}")
-            .clickable { onSelect(value) }
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = value == selected, onClick = null)
-        Text(label, modifier = Modifier.padding(start = 8.dp))
     }
 }

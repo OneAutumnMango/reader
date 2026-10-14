@@ -22,6 +22,8 @@ fun ReaderScreen(
     onTapAction: (TapAction) -> Unit = {},
     onPageChanged: (index: Int, pageCount: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
+    highlight: Regex? = null,
+    jump: BlockJump? = null,
 ) {
     KeepScreenAwakeEffect(settings.keepScreenAwake)
 
@@ -36,6 +38,8 @@ fun ReaderScreen(
                         Modifier.fillMaxSize(),
                         initialPositionFraction,
                         onPageChanged,
+                        highlight,
+                        jump,
                     )
                     else -> PagedReader(
                         document,
@@ -44,6 +48,8 @@ fun ReaderScreen(
                         Modifier.fillMaxSize(),
                         initialPositionFraction,
                         onPageChanged,
+                        highlight,
+                        jump,
                     )
                 }
             }

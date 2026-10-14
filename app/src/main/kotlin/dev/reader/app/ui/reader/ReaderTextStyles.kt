@@ -75,6 +75,19 @@ private fun ReaderTheme.resolveTextAlign(blockAlign: Justification?, useBookStyl
     }
 }
 
+private val SEARCH_HIGHLIGHT = Color(0x80FFC107)
+
+/** [this] with every non-empty match of [regex] shaded, for search results. */
+fun AnnotatedString.highlighted(regex: Regex?): AnnotatedString {
+    regex ?: return this
+    val matches = regex.findAll(text).filterNot { it.range.isEmpty() }.toList()
+    if (matches.isEmpty()) return this
+    return buildAnnotatedString {
+        append(this@highlighted)
+        matches.forEach { addStyle(SpanStyle(background = SEARCH_HIGHLIGHT), it.range.first, it.range.last + 1) }
+    }
+}
+
 fun List<Span>.toAnnotatedString(
     wordSpacingSp: Float = 0f,
     useBookStyling: Boolean = false,

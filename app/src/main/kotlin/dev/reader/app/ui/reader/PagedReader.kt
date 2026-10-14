@@ -39,6 +39,8 @@ fun PagedReader(
     modifier: Modifier = Modifier,
     initialPositionFraction: Float = 0f,
     onPageChanged: (index: Int, pageCount: Int) -> Unit = { _, _ -> },
+    highlight: Regex? = null,
+    jump: BlockJump? = null,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val density = LocalDensity.current
@@ -54,13 +56,17 @@ fun PagedReader(
                 style = block.styleOf(theme, useBookStyling),
                 constraints = Constraints(maxWidth = textWidthPx),
             )
+            // Indexed so a split paragraph's halves still point back at their source block.
             paginate(
-                items = document.blocks,
+                items = document.blocks.withIndex().toList(),
                 pageHeight = pageHeightPx,
                 spacing = spacingPx,
-                measure = { if (it is Block.Image) pageHeightPx else layout(it).size.height.toFloat() },
-                split = { block, available -> splitBlock(block, available, theme, ::layout) },
-                keepWithNext = { it is Block.Heading },
+                measure = { if (it.value is Block.Image) pageHeightPx else layout(it.value).size.height.toFloat() },
+                split = { item, available ->
+                    splitBlock(item.value, available, theme, ::layout)
+                        ?.let { (head, tail) -> IndexedValue(item.index, head) to IndexedValue(item.index, tail) }
+                },
+                keepWithNext = { it.value is Block.Heading },
             )
         }
         val initialPage = (initialPositionFraction * pages.size)
@@ -69,6 +75,10 @@ fun PagedReader(
         val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { pages.size })
 
         LaunchedEffect(pagerState.currentPage, pages.size) { onPageChanged(pagerState.currentPage, pages.size) }
+        LaunchedEffect(jump) {
+            val target = jump?.let { j -> pages.indexOfFirst { page -> page.any { it.index == j.block } } } ?: -1
+            if (target >= 0) pagerState.scrollToPage(target)
+        }
 
         val pageContent: @Composable (Int) -> Unit = { index ->
             Column(
@@ -80,7 +90,7 @@ fun PagedReader(
                 ),
                 verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
             ) {
-                pages.getOrNull(index)?.forEach { block -> PagedReaderBlock(block, theme, useBookStyling) }
+                pages.getOrNull(index)?.forEach { PagedReaderBlock(it.value, theme, useBookStyling, highlight) }
             }
         }
 
@@ -163,12 +173,12 @@ private fun Block.styleOf(theme: ReaderTheme, useBookStyling: Boolean) = when (t
 }
 
 @Composable
-private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean) {
+private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean, highlight: Regex?) {
     if (block is Block.Image) {
         ReaderImage(block, Modifier.fillMaxSize())
     } else {
         Text(
-            text = block.annotated(theme, useBookStyling),
+            text = block.annotated(theme, useBookStyling).highlighted(highlight),
             style = block.styleOf(theme, useBookStyling),
             modifier = Modifier.fillMaxWidth(),
         )

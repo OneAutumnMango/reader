@@ -12,6 +12,7 @@ import com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDoc
 import com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem
 import dev.reader.core.richtext.Block
 import dev.reader.parser.ParsedChapter
+import dev.reader.parser.text.ChapterSplitter
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -125,7 +126,7 @@ class PdfTextParserTest {
     }
 
     @Test
-    fun `bookmarks become chapters with their page ranges`() {
+    fun `bookmarks become chapters covering their pages`() {
         val file = pdf(
             pages = listOf(
                 listOf(listOf("Title page")),
@@ -139,12 +140,12 @@ class PdfTextParserTest {
         val chapters = PdfTextParser(context).parse(file).chapters.map { it as ParsedChapter.TextChapter }
 
         assertEquals(listOf(file.nameWithoutExtension, "Chapter One", "Chapter Two"), chapters.map { it.title })
-        assertEquals(listOf(0..0, 1..2, 3..3), chapters.map { it.pages })
         assertTrue(chapters[1].paragraphs().contains("More of chapter one."))
+        assertTrue(chapters[2].paragraphs().none { it == "More of chapter one." })
     }
 
     @Test
-    fun `a chapter pattern splits on the extracted text and maps chapters to pages`() {
+    fun `a chapter pattern or picked lines split the extracted text`() {
         val file = pdf(
             listOf(
                 listOf(listOf("Chapter 1"), listOf("Opening text of the book.")),
@@ -158,7 +159,9 @@ class PdfTextParserTest {
 
         assertEquals(2, breakLines.size)
         assertEquals(listOf("Chapter 1", "Chapter 2"), chapters.map { it.title })
-        assertEquals(listOf(0..0, 1..1), chapters.map { it.pages })
+        assertTrue(chapters[1].paragraphs().contains("Second chapter text."))
         assertEquals(1, parser.parse(file, "^Chapter \\d", setOf(breakLines[1].index)).chapters.size)
+        val picked = parser.parse(file, ChapterSplitter.linesPattern(breakLines.map { it.index })).chapters
+        assertEquals(listOf("Chapter 1", "Chapter 2"), picked.map { it.title })
     }
 }

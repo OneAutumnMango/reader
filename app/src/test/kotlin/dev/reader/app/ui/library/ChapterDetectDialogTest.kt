@@ -5,6 +5,9 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToKey
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import dev.reader.parser.text.ChapterSplitter
 import org.junit.Rule
@@ -59,6 +62,24 @@ class ChapterDetectDialogTest {
         composeRule.onNodeWithText("1 of 2 chapters kept").assertExists()
         composeRule.onNodeWithTag("chapter-detect-apply").performClick()
         assertEquals(setOf(secondBreakLine), appliedExcluded)
+    }
+
+    @Test
+    fun `pick lines applies the ticked lines, filtered by text`() {
+        setContent()
+
+        composeRule.onNodeWithTag("chapter-mode-PICK_LINES").performClick()
+        composeRule.onNodeWithTag("chapter-detect-apply").assertIsNotEnabled()
+        composeRule.onNodeWithTag("chapter-line-filter").performTextInput("interlude")
+        composeRule.onNodeWithTag("chapter-line-8").performScrollTo().performClick()
+        composeRule.onNodeWithTag("chapter-line-filter").performTextClearance()
+        composeRule.onNodeWithTag("chapter-line-picker").performScrollToKey(2)
+        composeRule.onNodeWithTag("chapter-line-2").performClick()
+        composeRule.onNodeWithText("Tick each line a chapter starts on \u00b7 2 picked").assertExists()
+        composeRule.onNodeWithTag("chapter-detect-apply").performClick()
+
+        assertEquals(ChapterSplitter.linesPattern(listOf(2, 8)), applied)
+        assertEquals(emptySet(), appliedExcluded)
     }
 
     @Test

@@ -17,6 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 class PagedReaderTest {
@@ -56,5 +57,26 @@ class PagedReaderTest {
         }
 
         composeRule.onNodeWithText("Paragraph 1").assertExists()
+    }
+
+    @Test
+    fun `a search jump turns to the page holding that block`() {
+        val document = RichDocument((1..40).map { Block.Paragraph(listOf(Span("Paragraph $it"))) })
+        val settings = ReaderSettings(readingMode = ReadingMode.PAGED_HORIZONTAL_LTR)
+        var page = 0
+
+        composeRule.setContent {
+            PagedReader(
+                document,
+                ReaderTheme.Default,
+                settings,
+                modifier = Modifier.size(300.dp, 500.dp),
+                onPageChanged = { index, _ -> page = index },
+                jump = BlockJump(block = 39, id = 1),
+            )
+        }
+
+        composeRule.onNodeWithText("Paragraph 40").assertExists()
+        assertTrue(page > 0)
     }
 }

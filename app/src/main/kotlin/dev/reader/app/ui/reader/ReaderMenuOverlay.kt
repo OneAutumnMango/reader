@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -125,6 +126,8 @@ fun ReaderMenuOverlay(
     modifier: Modifier = Modifier,
     pdfRenderMode: PdfRenderMode? = null,
     onPdfRenderModeChange: (PdfRenderMode) -> Unit = {},
+    onSearch: (() -> Unit)? = null,
+    searchPanel: (@Composable () -> Unit)? = null,
 ) {
     val currentOnExpandedChange by rememberUpdatedState(onExpandedChange)
     var barDrag by remember { mutableFloatStateOf(0f) }
@@ -177,6 +180,15 @@ fun ReaderMenuOverlay(
             }
         }
 
+        if (searchPanel != null) {
+            Surface(tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth().testTag("reader-search-panel")) {
+                Column {
+                    HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
+                    searchPanel()
+                }
+            }
+        }
+
         Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth().testTag("reader-menu-bar").then(barSwipe)) {
             Column {
                 HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
@@ -204,6 +216,11 @@ fun ReaderMenuOverlay(
                             },
                             modifier = Modifier.testTag("reader-menu-pdf-mode"),
                         )
+                    }
+                    if (onSearch != null) {
+                        IconButton(onClick = onSearch, modifier = Modifier.testTag("reader-menu-search")) {
+                            Icon(Icons.Filled.Search, contentDescription = "Search")
+                        }
                     }
                     IconButton(
                         onClick = { onExpandedChange(!expanded) },
