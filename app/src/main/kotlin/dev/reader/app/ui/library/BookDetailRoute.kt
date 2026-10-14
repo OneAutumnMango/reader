@@ -2,9 +2,10 @@ package dev.reader.app.ui.library
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -14,8 +15,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
+import dev.reader.app.ui.ScreenTopBar
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Chapter
 import dev.reader.core.model.Progress
@@ -29,6 +32,7 @@ fun BookDetailRoute(
     onOpenChapter: (Chapter) -> Unit,
     onOpenBookmarks: () -> Unit,
     modifier: Modifier = Modifier,
+    state: BookDetailState = remember { BookDetailState() },
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -52,22 +56,25 @@ fun BookDetailRoute(
         }
     }
 
-    Column(modifier = modifier) {
-        if (bookmarks.isNotEmpty()) {
-            TextButton(onClick = onOpenBookmarks) { Text("Bookmarks (${bookmarks.size})") }
+    ScreenTopBar(book.title) {
+        IconButton(onClick = { showMenu = true }, modifier = Modifier.testTag("book-detail-menu")) {
+            Icon(Icons.Filled.MoreVert, contentDescription = "Book options")
         }
-        BookDetailScreen(
-            book = book,
-            chapters = regularChapters,
-            extras = extras,
-            bookmarks = bookmarks,
-            onChapterClick = onOpenChapter,
-            currentChapterOrderIndex = currentChapter?.orderIndex,
-            resumeLabel = if (currentChapter != null) "Resume" else "Start reading",
-            onResume = { (currentChapter ?: regularChapters.firstOrNull())?.let(onOpenChapter) },
-            onMenuClick = { showMenu = true },
-        )
     }
+
+    BookDetailScreen(
+        book = book,
+        chapters = regularChapters,
+        extras = extras,
+        bookmarks = bookmarks,
+        onChapterClick = onOpenChapter,
+        currentChapterOrderIndex = currentChapter?.orderIndex,
+        resumeLabel = if (currentChapter != null) "Resume" else "Start reading",
+        onResume = { (currentChapter ?: regularChapters.firstOrNull())?.let(onOpenChapter) },
+        onOpenBookmarks = onOpenBookmarks,
+        state = state,
+        modifier = modifier,
+    )
 
     if (showMenu) {
         BookContextMenu(

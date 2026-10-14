@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Slider
@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import dev.reader.app.ui.MenuSubheader
 import dev.reader.app.ui.RadioOptions
 import dev.reader.app.ui.reader.bodyTextStyle
 import dev.reader.core.theme.Justification
@@ -26,6 +27,7 @@ private const val MIN_FONT_SIZE = 10f
 private const val MAX_FONT_SIZE = 36f
 private const val MIN_LINE_SPACING = 1f
 private const val MAX_LINE_SPACING = 3f
+private val PREVIEW_MIN_HEIGHT = 72.dp
 
 private fun justificationLabel(option: Justification): String = when (option) {
     Justification.START -> "Left"
@@ -47,6 +49,7 @@ fun ReaderThemeEditor(
     Column(modifier = modifier) {
         if (showPreview) ThemePreview(theme)
 
+        MenuSubheader("Text")
         FontDropdown(theme.fontFamily, onSelect = { onChange(theme.copy(fontFamily = it)) })
 
         RadioOptions(
@@ -57,6 +60,7 @@ fun ReaderThemeEditor(
             onSelect = { onChange(theme.copy(justification = it)) },
         )
 
+        MenuSubheader("Colours")
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Text colour", modifier = Modifier.weight(1f))
             ColorSwatch(theme.textColor, selected = false, onClick = {})
@@ -68,6 +72,7 @@ fun ReaderThemeEditor(
             PickColorButton(theme.backgroundColor, "Background colour") { onChange(theme.copy(backgroundColor = it)) }
         }
 
+        MenuSubheader("Size and spacing")
         Text("Font size: ${theme.fontSizeSp.toInt()}sp")
         Slider(
             value = theme.fontSizeSp,
@@ -110,8 +115,9 @@ private fun ThemePreview(theme: ReaderTheme) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
+            .heightIn(min = PREVIEW_MIN_HEIGHT)
             .background(Color(theme.backgroundColor), RoundedCornerShape(8.dp))
+            .testTag("reader-theme-preview-box")
             .padding(12.dp),
     ) {
         Text(

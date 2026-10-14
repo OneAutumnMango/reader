@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -49,6 +50,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import dev.reader.app.ui.MenuSubheader
 import dev.reader.app.ui.appearance.ReaderSettingsEditor
 import dev.reader.app.ui.appearance.ReaderThemeEditor
 import dev.reader.core.reader.PdfRenderMode
@@ -166,14 +168,14 @@ fun ReaderMenuOverlay(
                             .testTag("reader-menu-panel"),
                     ) {
                         if (pdfRenderMode != null) {
-                            Text("PDF display", style = MaterialTheme.typography.titleSmall)
+                            MenuSubheader("PDF display", Modifier.padding(top = 0.dp))
                             PdfModeSelector(pdfRenderMode, onPdfRenderModeChange)
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                         }
-                        Text("Appearance", style = MaterialTheme.typography.titleSmall)
+                        MenuSubheader("Appearance", Modifier.padding(top = 0.dp))
                         ReaderThemeEditor(theme, onThemeChange)
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                        Text("Reading", style = MaterialTheme.typography.titleSmall)
+                        MenuSubheader("Reading", Modifier.padding(top = 0.dp))
                         ReaderSettingsEditor(settings, onSettingsChange)
                     }
                 }
@@ -190,7 +192,7 @@ fun ReaderMenuOverlay(
         }
 
         Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth().testTag("reader-menu-bar").then(barSwipe)) {
-            Column {
+            Column(modifier = Modifier.navigationBarsPadding()) {
                 HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),

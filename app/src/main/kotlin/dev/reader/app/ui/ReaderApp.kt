@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.appearance.AppearanceRoute
@@ -39,12 +41,14 @@ import dev.reader.app.ui.bookmarks.BookmarksRoute
 import dev.reader.app.ui.categories.CategoriesRoute
 import dev.reader.app.ui.data.DataRoute
 import dev.reader.app.ui.library.BookDetailRoute
+import dev.reader.app.ui.library.BookDetailState
 import dev.reader.app.ui.library.LibraryRoute
 import dev.reader.app.ui.reader.ReaderRoute
 import dev.reader.app.ui.search.SearchRoute
 import dev.reader.app.ui.settings.LogHistoryRoute
 import dev.reader.app.ui.settings.SettingsRoute
 import dev.reader.app.ui.stats.StatsRoute
+import dev.reader.core.model.BookId
 import dev.reader.core.model.CategoryId
 import kotlinx.coroutines.launch
 
@@ -79,6 +83,8 @@ fun ReaderApp(graph: ReaderGraph) {
     val navigator = remember { Navigator() }
     // Kept here so each category tab's scroll position and the chosen tab survive opening a book.
     val libraryGridStates = remember { mutableMapOf<CategoryId?, LazyGridState>() }
+    val bookDetailStates = remember { mutableMapOf<BookId, BookDetailState>() }
+    val topBar = remember { TopBarState() }
     var libraryCategory by remember { mutableStateOf<CategoryId?>(null) }
 
     LaunchedEffect(Unit) { graph.scanRootFoldersOnLaunch() }
@@ -118,12 +124,15 @@ fun ReaderApp(graph: ReaderGraph) {
                 TopAppBar(
                     title = {
                         Text(
-                            titleFor(navigator.current),
+                            topBar.title ?: titleFor(navigator.current),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { navigator.switchRoot(Destination.Library) },
                         )
                     },
+                    actions = { topBar.actions?.invoke(this) },
                     navigationIcon = {
                         if (navigator.canGoBack) {
                             IconButton(onClick = { navigator.pop() }) {
@@ -138,48 +147,51 @@ fun ReaderApp(graph: ReaderGraph) {
                 )
             },
         ) { padding ->
-            val content = Modifier
-                .padding(padding)
-                .padding(horizontal = CONTENT_MARGIN)
-            when (val destination = navigator.current) {
-                Destination.Library -> LibraryRoute(
-                    graph,
-                    onOpenBook = { navigator.push(Destination.BookDetail(it.id)) },
-                    onSearchClick = { navigator.push(Destination.Search) },
-                    gridStateFor = { libraryGridStates.getOrPut(it) { LazyGridState() } },
-                    selectedCategory = libraryCategory,
-                    onCategorySelected = { libraryCategory = it },
-                    modifier = content,
-                )
-                Destination.Search -> SearchRoute(
-                    graph,
-                    onBookClick = { navigator.push(Destination.BookDetail(it.id)) },
-                    modifier = content,
-                )
-                Destination.Stats -> StatsRoute(graph, content)
-                Destination.Appearance -> AppearanceRoute(graph, content)
-                Destination.Categories -> CategoriesRoute(graph, content)
-                Destination.Data -> DataRoute(graph, content)
-                Destination.Settings -> SettingsRoute(
-                    graph,
-                    onViewLogHistory = { navigator.push(Destination.LogHistory) },
-                    modifier = content,
-                )
-                Destination.LogHistory -> LogHistoryRoute(content)
-                is Destination.BookDetail -> BookDetailRoute(
-                    graph,
-                    destination.bookId,
-                    onOpenChapter = { navigator.push(Destination.Reader(destination.bookId, it.id)) },
-                    onOpenBookmarks = { navigator.push(Destination.Bookmarks(destination.bookId)) },
-                    modifier = content,
-                )
-                is Destination.Bookmarks -> BookmarksRoute(
-                    graph,
-                    destination.bookId,
-                    onJump = { navigator.push(Destination.Reader(destination.bookId, it.chapterId)) },
-                    modifier = content,
-                )
-                is Destination.Reader -> Unit
+            CompositionLocalProvider(LocalTopBar provides topBar) {
+                val content = Modifier
+                    .padding(padding)
+                    .padding(horizontal = CONTENT_MARGIN)
+                when (val destination = navigator.current) {
+                    Destination.Library -> LibraryRoute(
+                        graph,
+                        onOpenBook = { navigator.push(Destination.BookDetail(it.id)) },
+                        onSearchClick = { navigator.push(Destination.Search) },
+                        gridStateFor = { libraryGridStates.getOrPut(it) { LazyGridState() } },
+                        selectedCategory = libraryCategory,
+                        onCategorySelected = { libraryCategory = it },
+                        modifier = content,
+                    )
+                    Destination.Search -> SearchRoute(
+                        graph,
+                        onBookClick = { navigator.push(Destination.BookDetail(it.id)) },
+                        modifier = content,
+                    )
+                    Destination.Stats -> StatsRoute(graph, content)
+                    Destination.Appearance -> AppearanceRoute(graph, content)
+                    Destination.Categories -> CategoriesRoute(graph, content)
+                    Destination.Data -> DataRoute(graph, content)
+                    Destination.Settings -> SettingsRoute(
+                        graph,
+                        onViewLogHistory = { navigator.push(Destination.LogHistory) },
+                        modifier = content,
+                    )
+                    Destination.LogHistory -> LogHistoryRoute(content)
+                    is Destination.BookDetail -> BookDetailRoute(
+                        graph,
+                        destination.bookId,
+                        onOpenChapter = { navigator.push(Destination.Reader(destination.bookId, it.id)) },
+                        onOpenBookmarks = { navigator.push(Destination.Bookmarks(destination.bookId)) },
+                        modifier = content,
+                        state = bookDetailStates.getOrPut(destination.bookId) { BookDetailState() },
+                    )
+                    is Destination.Bookmarks -> BookmarksRoute(
+                        graph,
+                        destination.bookId,
+                        onJump = { navigator.push(Destination.Reader(destination.bookId, it.chapterId)) },
+                        modifier = content,
+                    )
+                    is Destination.Reader -> Unit
+                }
             }
         }
     }
