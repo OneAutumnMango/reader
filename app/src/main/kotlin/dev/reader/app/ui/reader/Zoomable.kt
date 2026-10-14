@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -30,15 +31,18 @@ private const val MAX_ZOOM = 5f
  */
 @Composable
 fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    if (!enabled) {
-        Box(modifier) { content() }
-        return
-    }
-
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(enabled) {
+        if (!enabled) {
+            scale = 1f
+            offset = Offset.Zero
+        }
+    }
 
-    val gesture = Modifier.pointerInput(Unit) {
+    // Disabling only stops gesture handling; [content] keeps its place in the tree (and its scroll state).
+    val gesture = Modifier.pointerInput(enabled) {
+        if (!enabled) return@pointerInput
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             do {

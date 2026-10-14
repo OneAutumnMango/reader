@@ -2,6 +2,7 @@ package dev.reader.app.ui.reader
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -62,17 +63,17 @@ private fun ReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolea
         is Block.Paragraph -> Text(
             text = block.spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling),
             style = theme.bodyTextStyle(block.textAlign, useBookStyling),
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
         is Block.Heading -> Text(
             text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
             style = theme.headingTextStyle(block.level, block.textAlign, useBookStyling),
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
         is Block.ListItem -> Text(
             text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
             style = theme.bodyTextStyle(useBookStyling = useBookStyling),
-            modifier = Modifier.padding(start = 24.dp, end = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp),
         )
         is Block.Image -> Unit // Rendered by the caller once cover/image caching exists (M5).
     }

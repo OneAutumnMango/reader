@@ -11,6 +11,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,7 +67,8 @@ fun ReaderRoute(
 
     var showMenu by remember(bookId) { mutableStateOf(false) }
     var menuExpanded by remember(bookId) { mutableStateOf(false) }
-    var position by remember(bookId) { mutableStateOf(0 to 0) }
+    // Per chapter page, so the label is right the moment a chapter is swiped in.
+    val positions = remember(bookId) { mutableStateMapOf<Int, Pair<Int, Int>>() }
 
     if (book == null || chapters.isEmpty() || prefs == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -74,10 +76,6 @@ fun ReaderRoute(
     }
 
     val readingMode = prefs.readerSettings.readingMode
-    // Horizontal-paged mode already owns horizontal drags for page-turning within a chapter,
-    // so the chapter-swipe pager only accepts user swipes in the other reading modes.
-    val chapterSwipeEnabled = readingMode != ReadingMode.PAGED_HORIZONTAL_LTR &&
-        readingMode != ReadingMode.PAGED_HORIZONTAL_RTL
     val initialPage = remember(bookId) { chapters.indexOfFirst { it.id == chapterId }.coerceAtLeast(0) }
     val pagerState = rememberPagerState(initialPage = initialPage) { chapters.size }
     val currentChapter = chapters.getOrNull(pagerState.currentPage) ?: chapters[initialPage]
@@ -87,9 +85,11 @@ fun ReaderRoute(
         pdfRenderMode == PdfRenderMode.FIXED_PAGE
 
     Box(modifier = modifier.fillMaxSize()) {
+        // In horizontal paged modes the inner page pager scrolls first; once it hits its last/first
+        // page the leftover swipe nests up into this pager and turns the chapter.
         HorizontalPager(
             state = pagerState,
-            userScrollEnabled = chapterSwipeEnabled,
+            reverseLayout = readingMode == ReadingMode.PAGED_HORIZONTAL_RTL,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             ChapterPage(
@@ -100,11 +100,12 @@ fun ReaderRoute(
                 settings = prefs.readerSettings,
                 theme = theme,
                 onToggleMenu = { showMenu = !showMenu },
-                onPositionChanged = { index, total -> if (page == pagerState.currentPage) position = index to total },
+                onPositionChanged = { index, total -> positions[page] = index to total },
             )
         }
 
         if (showMenu) {
+            val position = positions[pagerState.currentPage] ?: (0 to 0)
             ReaderMenuOverlay(
                 progressLabel = readerProgressLabel(readingMode, position.first, position.second, pageBased),
                 theme = theme,

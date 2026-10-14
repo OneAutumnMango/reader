@@ -4,29 +4,32 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode
 import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.RichDocument
+import dev.reader.core.richtext.Span
 import dev.reader.core.theme.ReaderTheme
 
 private val READER_TOP_SPACING = 48.dp
+private val READER_BOTTOM_SPACING = 32.dp
+private val READER_HORIZONTAL_SPACING = 20.dp
 
 @Composable
 fun PagedReader(
@@ -40,49 +43,110 @@ fun PagedReader(
     BoxWithConstraints(modifier = modifier) {
         val density = LocalDensity.current
         val textMeasurer = rememberTextMeasurer()
-        val maxWidthPx = with(density) { maxWidth.roundToPx() }
-        val maxHeightPx = with(density) { maxHeight.roundToPx() }
+        val textWidthPx = with(density) { (maxWidth - READER_HORIZONTAL_SPACING * 2).roundToPx() }.coerceAtLeast(1)
+        val pageHeightPx = with(density) { (maxHeight - READER_TOP_SPACING - READER_BOTTOM_SPACING).toPx() }
+        val spacingPx = with(density) { theme.paragraphSpacingSp.dp.toPx() }
+        val useBookStyling = settings.useBookStyling
 
-        val pages = remember(document, theme, settings.useBookStyling, maxWidthPx, maxHeightPx) {
-            val heights = document.blocks.map { block ->
-                if (block is Block.Image) {
-                    maxHeightPx.toFloat()
-                } else {
-                    textMeasurer.measure(
-                        text = block.spansOrEmpty().toAnnotatedString(useBookStyling = settings.useBookStyling),
-                        style = block.styleOf(theme, settings.useBookStyling),
-                        constraints = Constraints(maxWidth = maxWidthPx),
-                    ).size.height.toFloat()
-                }
-            }
-            buildPages(heights, maxHeightPx.toFloat()).map { range -> document.blocks.slice(range) }
+        val pages = remember(document, theme, useBookStyling, textWidthPx, pageHeightPx) {
+            fun layout(block: Block) = textMeasurer.measure(
+                text = block.annotated(theme, useBookStyling),
+                style = block.styleOf(theme, useBookStyling),
+                constraints = Constraints(maxWidth = textWidthPx),
+            )
+            paginate(
+                // Images aren't rendered in text mode yet, so they'd only produce blank pages.
+                items = document.blocks.filterNot { it is Block.Image },
+                pageHeight = pageHeightPx,
+                spacing = spacingPx,
+                measure = { layout(it).size.height.toFloat() },
+                split = { block, available -> splitBlock(block, available, theme, ::layout) },
+                keepWithNext = { it is Block.Heading },
+            )
         }
         val initialPage = (initialPositionFraction * pages.size)
             .toInt()
             .coerceIn(0, (pages.size - 1).coerceAtLeast(0))
         val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { pages.size })
 
-        LaunchedEffect(pagerState.currentPage) { onPageChanged(pagerState.currentPage, pagerState.pageCount) }
+        LaunchedEffect(pagerState.currentPage, pages.size) { onPageChanged(pagerState.currentPage, pages.size) }
 
         val pageContent: @Composable (Int) -> Unit = { index ->
             Column(
-                modifier = Modifier.fillMaxSize().padding(top = READER_TOP_SPACING),
+                modifier = Modifier.fillMaxSize().padding(
+                    start = READER_HORIZONTAL_SPACING,
+                    end = READER_HORIZONTAL_SPACING,
+                    top = READER_TOP_SPACING,
+                    bottom = READER_BOTTOM_SPACING,
+                ),
                 verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
             ) {
-                pages[index].forEach { block -> PagedReaderBlock(block, theme, settings.useBookStyling) }
+                pages.getOrNull(index)?.forEach { block -> PagedReaderBlock(block, theme, useBookStyling) }
             }
         }
 
         when (settings.readingMode) {
             ReadingMode.PAGED_VERTICAL -> VerticalPager(state = pagerState) { pageContent(it) }
-            ReadingMode.PAGED_HORIZONTAL_RTL -> CompositionLocalProvider(
-                LocalLayoutDirection provides LayoutDirection.Rtl,
-            ) {
-                HorizontalPager(state = pagerState) { pageContent(it) }
+            ReadingMode.PAGED_HORIZONTAL_RTL -> HorizontalPager(state = pagerState, reverseLayout = true) {
+                pageContent(it)
             }
             else -> HorizontalPager(state = pagerState) { pageContent(it) }
         }
     }
+}
+
+/** The exact text that gets drawn for [this] block, so measuring and rendering always agree. */
+private fun Block.annotated(theme: ReaderTheme, useBookStyling: Boolean): AnnotatedString = when (this) {
+    is Block.Paragraph -> spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling)
+    else -> spansOrEmpty().toAnnotatedString(useBookStyling = useBookStyling)
+}
+
+/**
+ * Cuts a paragraph or list item after the last line that fits in [available] px, so the rest
+ * continues on the next page. Headings are never split; null when not even one line fits.
+ */
+private fun splitBlock(
+    block: Block,
+    available: Float,
+    theme: ReaderTheme,
+    layout: (Block) -> TextLayoutResult,
+): Pair<Block, Block>? {
+    if (block !is Block.Paragraph && block !is Block.ListItem) return null
+    val result = layout(block)
+    var line = result.getLineForVerticalPosition(available)
+    if (result.getLineBottom(line) > available) line--
+    if (line < 0) return null
+    val end = result.getLineEnd(line)
+    if (end <= 0 || end >= result.layoutInput.text.length) return null
+    val separator = if (block is Block.Paragraph && theme.wordSpacingSp > 0f) 1 else 0
+    val (head, tail) = splitSpans(block.spansOrEmpty(), end, separator)
+    return if (block is Block.Paragraph) {
+        block.copy(spans = head) to block.copy(spans = tail)
+    } else {
+        (block as Block.ListItem).copy(spans = head) to block.copy(spans = tail)
+    }
+}
+
+/** Splits [spans] at a character [offset] of their joined text ([separator] chars sit between spans). */
+internal fun splitSpans(spans: List<Span>, offset: Int, separator: Int = 0): Pair<List<Span>, List<Span>> {
+    val head = mutableListOf<Span>()
+    val tail = mutableListOf<Span>()
+    var pos = 0
+    spans.forEachIndexed { i, span ->
+        val start = pos
+        val end = pos + span.text.length
+        when {
+            end <= offset -> head += span
+            start >= offset -> tail += span
+            else -> {
+                head += span.copy(text = span.text.substring(0, offset - start))
+                tail += span.copy(text = span.text.substring(offset - start))
+            }
+        }
+        pos = end + if (i < spans.lastIndex) separator else 0
+    }
+    tail.firstOrNull()?.let { tail[0] = it.copy(text = it.text.trimStart()) }
+    return head to tail
 }
 
 private fun Block.spansOrEmpty() = when (this) {
@@ -101,19 +165,10 @@ private fun Block.styleOf(theme: ReaderTheme, useBookStyling: Boolean) = when (t
 
 @Composable
 private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean) {
-    when (block) {
-        is Block.Paragraph -> Text(
-            text = block.spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling),
-            style = theme.bodyTextStyle(block.textAlign, useBookStyling),
-        )
-        is Block.Heading -> Text(
-            text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
-            style = theme.headingTextStyle(block.level, block.textAlign, useBookStyling),
-        )
-        is Block.ListItem -> Text(
-            text = block.spans.toAnnotatedString(useBookStyling = useBookStyling),
-            style = theme.bodyTextStyle(useBookStyling = useBookStyling),
-        )
-        is Block.Image -> Unit
-    }
+    if (block is Block.Image) return
+    Text(
+        text = block.annotated(theme, useBookStyling),
+        style = block.styleOf(theme, useBookStyling),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
