@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import dev.reader.app.data.AppLog
 import dev.reader.core.model.BookFormat
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.TapAction
@@ -52,23 +54,26 @@ fun ComicReaderScreen(
                 pageGap = settings.pageGap,
                 onPageChanged = { onPageChanged(it, pages.size) },
             ) { index, continuous ->
-                ComicPageImage(file, format, pages[index], continuous)
+                ComicPageImage(file, format, pages[index], index, continuous)
             }
         }
     }
 }
 
 @Composable
-private fun ComicPageImage(file: File, format: BookFormat, pageName: String, continuous: Boolean) {
-    val bitmap by produceState<ImageBitmap?>(null, file, pageName) {
+private fun ComicPageImage(file: File, format: BookFormat, pageName: String, index: Int, continuous: Boolean) {
+    val bitmap by produceState<Result<ImageBitmap>?>(null, file, pageName) {
         value = withContext(Dispatchers.IO) {
+            AppLog.debug("Loading $format comic page ${index + 1}", "ComicReader")
             runCatching {
                 val bytes = ComicArchiveParser.readPage(file, format, pageName)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            }.getOrNull()
+                requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size)) {
+                    "Comic page could not be decoded"
+                }.asImageBitmap()
+            }.onFailure { AppLog.error("Couldn't load $format comic page ${index + 1}", "ComicReader", it) }
         }
     }
-    val loaded = bitmap
+    val loaded = bitmap?.getOrNull()
     when {
         loaded != null && continuous -> Image(
             bitmap = loaded,
@@ -79,6 +84,8 @@ private fun ComicPageImage(file: File, format: BookFormat, pageName: String, con
         else -> Box(
             modifier = if (continuous) Modifier.fillMaxWidth().height(PLACEHOLDER_HEIGHT) else Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
-        ) { CircularProgressIndicator() }
+        ) {
+            if (bitmap?.isFailure == true) Text("Couldn't load this page.") else CircularProgressIndicator()
+        }
     }
 }

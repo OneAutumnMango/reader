@@ -1,6 +1,5 @@
 package dev.reader.app.ui
 
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -17,12 +16,9 @@ import kotlinx.coroutines.launch
 
 private const val LOG_TAG = "ReaderImport"
 
-/** Logs the full stack trace, records it to [AppLog], and returns the deepest error message. */
 internal fun describeImportError(error: Throwable): String {
-    Log.e(LOG_TAG, "Import failed", error)
     val root = generateSequence(error) { it.cause }.last()
     val message = root.message?.takeIf { it.isNotBlank() } ?: root.javaClass.simpleName
-    AppLog.record("Import failed: $message")
     return message
 }
 
@@ -36,41 +32,52 @@ fun rememberImportActions(graph: ReaderGraph): ImportActions {
     var status by remember { mutableStateOf("") }
 
     val addFilesLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
         scope.launch {
+            AppLog.debug("Starting import of ${uris.size} file(s)", LOG_TAG)
             var imported = 0
             var lastError: String? = null
             uris.forEach { uri ->
-                val file = ContentFileCopier.copyToCache(context, uri)
-                if (file == null) {
-                    lastError = "Could not read the selected file"
-                    return@forEach
+                runCatching {
+                    val file = requireNotNull(ContentFileCopier.copyToCache(context, uri)) {
+                        "Could not read the selected file"
+                    }
+                    graph.importer.importFile(file, pdfContext = context)
                 }
-                runCatching { graph.importer.importFile(file, pdfContext = context) }
                     .onSuccess { imported++ }
-                    .onFailure { lastError = describeImportError(it) }
+                    .onFailure {
+                        lastError = describeImportError(it)
+                        AppLog.error("File import failed: $lastError", LOG_TAG, it)
+                    }
             }
             status = when {
                 imported == uris.size -> "Imported $imported of ${uris.size} file(s)"
                 lastError != null -> "Imported $imported of ${uris.size} file(s) — $lastError"
                 else -> "Imported $imported of ${uris.size} file(s)"
             }
-            AppLog.record(status)
+            if (imported == uris.size) AppLog.info(status, LOG_TAG) else AppLog.warn(status, LOG_TAG)
         }
     }
     val addFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { treeUri ->
         if (treeUri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val folder = ContentFileCopier.copyTreeToCache(context, treeUri)
-            status = if (folder == null) {
-                "Could not read that folder"
-            } else {
-                runCatching { graph.importer.importLightNovelFolder(folder) }
-                    .fold(
-                        onSuccess = { "Imported book from folder" },
-                        onFailure = { "Could not import that folder — ${describeImportError(it)}" },
-                    )
-            }
-            AppLog.record(status)
+            AppLog.debug("Starting book-folder import", LOG_TAG)
+            status = runCatching {
+                val folder = requireNotNull(ContentFileCopier.copyTreeToCache(context, treeUri)) {
+                    "Could not read that folder"
+                }
+                graph.importer.importLightNovelFolder(folder)
+            }.fold(
+                onSuccess = {
+                    AppLog.info("Imported book from folder", LOG_TAG)
+                    "Imported book from folder"
+                },
+                onFailure = {
+                    val message = "Could not import that folder — ${describeImportError(it)}"
+                    AppLog.error(message, LOG_TAG, it)
+                    message
+                },
+            )
         }
     }
 

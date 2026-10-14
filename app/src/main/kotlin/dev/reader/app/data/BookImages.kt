@@ -19,6 +19,7 @@ internal object BookImages {
                 if (block is Block.Image) {
                     block.copy(
                         path = runCatching { resolvePath(context, source, format, block.path) }
+                            .onFailure { AppLog.warn("Illustration resolution failed for $format", "BookImages", it) }
                             .getOrDefault(block.path),
                     )
                 } else {
@@ -41,7 +42,11 @@ internal object BookImages {
             format == BookFormat.EPUB -> EpubParser.extractCover(source, path)
             format == BookFormat.FB2 -> Fb2Parser.extractCover(source, path.removePrefix("#"))
             else -> null
-        } ?: return path
+        }
+        if (bytes == null) {
+            AppLog.warn("Embedded illustration not found in $format", "BookImages")
+            return path
+        }
         target.parentFile?.mkdirs()
         target.writeBytes(bytes)
         return target.absolutePath

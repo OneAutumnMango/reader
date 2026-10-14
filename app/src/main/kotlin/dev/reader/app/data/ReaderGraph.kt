@@ -63,8 +63,12 @@ class ReaderGraph(context: Context) {
     fun scanRootFoldersOnLaunch() {
         if (!launchScanStarted.compareAndSet(false, true)) return
         scope.launch(Dispatchers.IO) {
-            importer.refreshLegacyBooks(appContext)
-            rootFolderScanner.scanAll()
+            AppLog.debug("Starting launch-time library refresh", "Startup")
+            runCatching { importer.refreshLegacyBooks(appContext) }
+                .onFailure { AppLog.error("Legacy book refresh failed", "Startup", it) }
+            runCatching { rootFolderScanner.scanAll() }
+                .onSuccess { AppLog.info("Launch-time library refresh complete", "Startup") }
+                .onFailure { AppLog.error("Launch-time library scan failed", "Startup", it) }
         }
     }
 }

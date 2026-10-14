@@ -1,7 +1,6 @@
 package dev.reader.app.data
 
 import android.content.Context
-import android.util.Log
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.core.model.Chapter
@@ -28,6 +27,7 @@ object ChapterLoader {
 
     suspend fun load(context: Context, book: Book, chapter: Chapter): ChapterContent? =
         withContext(Dispatchers.IO) {
+            AppLog.debug("Loading ${book.format} chapter ${chapter.orderIndex + 1}", LOG_TAG)
             val result = runCatching {
                 val sourceFile = File(if (book.isLightNovel) chapter.sourcePath else book.sourcePath)
                 when (book.format) {
@@ -38,12 +38,13 @@ object ChapterLoader {
                     }
                 }
             }
-            result.onFailure { Log.e(LOG_TAG, "Failed to load chapter '${chapter.title}'", it) }
+            result.onFailure { AppLog.error("Failed to load ${book.format} chapter", LOG_TAG, it) }
             val content = result.getOrNull()
                 ?.takeUnless { it is ChapterContent.Text && it.document.blocks.isEmpty() }
-            if (content == null) {
-                val reason = result.exceptionOrNull()?.message ?: "no readable content was found"
-                AppLog.record("Couldn't load '${chapter.title}': $reason")
+            if (content == null && result.isSuccess) {
+                AppLog.warn("No readable content in ${book.format} chapter ${chapter.orderIndex + 1}", LOG_TAG)
+            } else if (content != null) {
+                AppLog.debug("Loaded ${book.format} chapter ${chapter.orderIndex + 1}", LOG_TAG)
             }
             content
         }

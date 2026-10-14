@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
+import dev.reader.app.data.AppLog
 import dev.reader.core.richtext.Block
 
 @Composable
@@ -23,7 +24,10 @@ internal fun ReaderImage(image: Block.Image, modifier: Modifier = Modifier) {
             contentDescription = image.alt.ifBlank { "Book illustration" },
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit,
-            onError = { failed = true },
+            onError = {
+                failed = true
+                AppLog.warn("Couldn't display book illustration", "ReaderImage", it.result.throwable)
+            },
             onSuccess = { failed = false },
         )
         if (failed) Text(image.alt.ifBlank { "Image unavailable" })

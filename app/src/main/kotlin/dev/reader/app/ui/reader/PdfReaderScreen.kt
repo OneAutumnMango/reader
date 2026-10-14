@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import dev.reader.app.data.AppLog
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.TapAction
 import dev.reader.parser.pdf.PdfPageRenderer
@@ -46,10 +47,16 @@ fun PdfReaderScreen(
     var openFailed by remember(file) { mutableStateOf(false) }
 
     DisposableEffect(file) {
+        AppLog.debug("Opening PDF renderer", "PdfReader")
         val opened = runCatching { PdfPageRenderer(file) }
+            .onSuccess { AppLog.debug("Opened PDF with ${it.pageCount} page(s)", "PdfReader") }
+            .onFailure { AppLog.error("Couldn't open PDF", "PdfReader", it) }
         renderer = opened.getOrNull()
         openFailed = opened.isFailure
-        onDispose { opened.getOrNull()?.close() }
+        onDispose {
+            runCatching { opened.getOrNull()?.close() }
+                .onFailure { AppLog.warn("Couldn't close PDF renderer", "PdfReader", it) }
+        }
     }
 
     KeepScreenAwakeEffect(settings.keepScreenAwake)
@@ -82,7 +89,11 @@ fun PdfReaderScreen(
 @Composable
 private fun PdfPageImage(renderer: PdfPageRenderer, index: Int, continuous: Boolean) {
     val ratio by produceState<Float?>(null, renderer, index) {
-        value = withContext(Dispatchers.IO) { runCatching { renderer.aspectRatio(index) }.getOrNull() }
+        value = withContext(Dispatchers.IO) {
+            runCatching { renderer.aspectRatio(index) }
+                .onFailure { AppLog.warn("Couldn't measure PDF page ${index + 1}; using fallback", "PdfReader", it) }
+                .getOrNull()
+        }
             ?: A4_ASPECT_RATIO
     }
     val pageModifier = if (continuous) {
@@ -102,6 +113,7 @@ private fun PdfPageImage(renderer: PdfPageRenderer, index: Int, continuous: Bool
         val bitmap by produceState<Result<ImageBitmap>?>(null, renderer, index, maxWidthPx, maxHeightPx) {
             value = withContext(Dispatchers.IO) {
                 runCatching { renderer.renderPage(index, maxWidthPx, maxHeightPx).asImageBitmap() }
+                    .onFailure { AppLog.error("Couldn't render PDF page ${index + 1}", "PdfReader", it) }
             }
         }
         when (val result = bitmap) {

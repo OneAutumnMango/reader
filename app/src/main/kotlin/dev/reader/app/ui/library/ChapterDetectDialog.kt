@@ -35,8 +35,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.reader.app.data.AppLog
 import dev.reader.app.data.ReaderGraph
-import dev.reader.app.ui.describeImportError
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.parser.text.ChapterBreak
@@ -60,7 +60,11 @@ fun Book.supportsChapterDetection(): Boolean =
 fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val text by produceState<String?>(null, book.sourcePath) {
-        value = withContext(Dispatchers.IO) { runCatching { File(book.sourcePath).readText() }.getOrDefault("") }
+        value = withContext(Dispatchers.IO) {
+            runCatching { File(book.sourcePath).readText() }
+                .onFailure { AppLog.error("Couldn't read book for chapter detection", "ChapterDetection", it) }
+                .getOrDefault("")
+        }
     }
     ChapterDetectDialog(
         text = text,
@@ -71,7 +75,8 @@ fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
             scope.launch {
                 withContext(Dispatchers.IO) {
                     runCatching { graph.importer.applyChapterPattern(book, pattern, excludedLines) }
-                        .onFailure { describeImportError(it) }
+                        .onSuccess { AppLog.info("Applied chapter detection settings", "ChapterDetection") }
+                        .onFailure { AppLog.error("Couldn't apply chapter detection settings", "ChapterDetection", it) }
                 }
                 onDismiss()
             }

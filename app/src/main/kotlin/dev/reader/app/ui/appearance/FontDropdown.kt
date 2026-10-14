@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.documentfile.provider.DocumentFile
+import dev.reader.app.data.AppLog
 import dev.reader.app.ui.reader.CUSTOM_FONT_FILE_PREFIX
 import dev.reader.app.ui.reader.resolveFontFamily
 import kotlinx.coroutines.Dispatchers
@@ -89,10 +90,16 @@ fun FontDropdown(fontFamily: String, onSelect: (String) -> Unit) {
     val fontFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
-            val added = withContext(Dispatchers.IO) { importFont(context, uri, fontsDir) }
+            val added = withContext(Dispatchers.IO) {
+                AppLog.debug("Starting font-file import", "FontImport")
+                runCatching { importFont(context, uri, fontsDir) }
+                    .onFailure { AppLog.error("Couldn't copy font file", "FontImport", it) }
+                    .getOrNull()
+            }
             if (added == null) {
                 Toast.makeText(context, "That file isn't a font Android can read", Toast.LENGTH_SHORT).show()
             } else {
+                AppLog.info("Imported font file", "FontImport")
                 fontsVersion++
                 onSelect("$CUSTOM_FONT_FILE_PREFIX${added.path}")
             }
@@ -183,9 +190,15 @@ private fun importFont(context: android.content.Context, uri: Uri, fontsDir: Fil
         ?: "font-${System.currentTimeMillis()}.ttf"
     fontsDir.mkdirs()
     val target = File(fontsDir, name)
-    context.contentResolver.openInputStream(uri)?.use { input -> target.outputStream().use { input.copyTo(it) } }
-        ?: return null
-    val valid = runCatching { Typeface.createFromFile(target) }.isSuccess
+    val input = context.contentResolver.openInputStream(uri)
+    if (input == null) {
+        AppLog.warn("Selected font file is unreadable", "FontImport")
+        return null
+    }
+    input.use { source -> target.outputStream().use { source.copyTo(it) } }
+    val valid = runCatching { Typeface.createFromFile(target) }
+        .onFailure { AppLog.warn("Selected file is not a supported font", "FontImport", it) }
+        .isSuccess
     if (!valid) target.delete()
     return target.takeIf { valid }
 }

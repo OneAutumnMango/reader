@@ -41,9 +41,18 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         busy = true
         status = "Working\u2026"
         scope.launch {
+            AppLog.debug("Starting data operation: $done", "DataOperations")
             status = runCatching { withContext(Dispatchers.IO) { block() } }
-                .fold(onSuccess = { done }, onFailure = { "Failed: ${describeImportError(it)}" })
-            AppLog.record(status)
+                .fold(
+                    onSuccess = {
+                        AppLog.info(done, "DataOperations")
+                        done
+                    },
+                    onFailure = {
+                        AppLog.error("Data operation failed ($done)", "DataOperations", it)
+                        "Failed: ${describeImportError(it)}"
+                    },
+                )
             busy = false
         }
     }
@@ -120,6 +129,7 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
             action = action,
             onConfirm = {
                 danger = null
+                AppLog.warn("Confirmed destructive action: ${action.name}", "DataOperations")
                 when (action) {
                     DangerAction.REMOVE_ALL_BOOKS -> run("Removed all books") { graph.library.removeAllBooks() }
                     DangerAction.RESET_STATS -> run("Reset all stats") { graph.stats.resetAll() }

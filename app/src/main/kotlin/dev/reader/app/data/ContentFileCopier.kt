@@ -29,9 +29,18 @@ object ContentFileCopier {
         val target = File(context.cacheDir, "imports/${System.currentTimeMillis()}_${folder.name ?: "book"}")
         target.mkdirs()
         folder.listFiles().filter { it.isFile }.forEach { doc ->
-            val name = doc.name ?: return@forEach
+            val name = doc.name
+            if (name == null) {
+                AppLog.warn("Skipped a folder entry without a file name", "FileCopy")
+                return@forEach
+            }
             val destination = File(target, name)
-            context.contentResolver.openInputStream(doc.uri)?.use { source ->
+            val input = context.contentResolver.openInputStream(doc.uri)
+            if (input == null) {
+                AppLog.warn("Skipped an unreadable folder entry", "FileCopy")
+                return@forEach
+            }
+            input.use { source ->
                 destination.outputStream().use { source.copyTo(it) }
             }
         }
