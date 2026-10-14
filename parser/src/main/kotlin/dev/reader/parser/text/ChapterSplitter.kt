@@ -35,6 +35,18 @@ data class ChapterBreak(val line: Int, val title: String, val preview: String)
 /** A slice of the source text: [title] is null for any preamble before the first heading. */
 data class TextChunk(val title: String?, val text: String)
 
+/** One way auto-detection could split a book: a human [name], its [pattern] and how many breaks it finds. */
+data class ChapterSuggestion(val name: String, val pattern: String, val count: Int)
+
+/**
+ * A compiled heading pattern. Patterns starting with [ChapterSplitter.STANDALONE_PREFIX] also require
+ * the heading to be followed by a blank line, i.e. to stand alone as its own paragraph.
+ */
+internal class HeadingRule(pattern: String) {
+    val standalone = pattern.startsWith(ChapterSplitter.STANDALONE_PREFIX)
+    val regex = Regex(pattern.removePrefix(ChapterSplitter.STANDALONE_PREFIX))
+}
+
 /**
  * Splits plain text / markdown into chapters on heading lines matched by a regex. A heading must
  * be short and start the file or follow a blank line, which keeps list items and prose that
@@ -42,43 +54,27 @@ data class TextChunk(val title: String?, val text: String)
  */
 object ChapterSplitter {
 
+    /** Marks a pattern whose matches must also be followed by a blank line (see [HeadingRule]). */
+    const val STANDALONE_PREFIX = "standalone:"
+
     private const val MAX_HEADING_LENGTH = 100
     private const val PREVIEW_LENGTH = 120
     private const val PREVIEW_LINES = 3
-    private const val MIN_AUTO_MATCHES = 2
-    private const val MIN_WEAK_AUTO_MATCHES = 3
-
-    private const val NUMBER_WORDS = "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|" +
-        "thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty"
-
-    // "Chapter 12", "CHAPTER IV: The Return", "Part One", "## Book 2", "Prologue"
-    private const val KEYWORD_PATTERN = "(?i)^(?:#{1,3}\\s*)?(?:" +
-        "(?:chapter|ch\\.|part|book|volume|vol\\.|act|episode)\\s*(?:\\d+|[ivxlcdm]+\\b|(?:$NUMBER_WORDS)\\b)" +
-        "|(?:prologue|epilogue|interlude|afterword|foreword|preface)\\b)"
-
-    private val MARKDOWN_CANDIDATES = listOf("^#\\s+\\S", "^##\\s+\\S")
-    private val WEAK_CANDIDATES = listOf(
-        // "12", "12.", "IV", "IV. The Return"
-        "^(?:\\d{1,4}|[IVXLCDM]{1,7})[.:)]?(?:\\s+\\S.*)?$",
-        // "THE RETURN" — an all-caps line with at least three letters
-        "^(?=(?:[^a-z]*[A-Z]){3})[^a-z]+$",
-    )
 
     /** Literal "line starts with" matching for a user-typed prefix such as `# ` or `Chapter`. */
     fun prefixPattern(prefix: String): String = "^" + Regex.escape(prefix)
 
     /** The most chapter-like heading pattern in [text], or null if nothing stands out. */
-    fun detectPattern(text: String, markdown: Boolean): String? {
-        val lines = text.lines()
-        val strong = (if (markdown) MARKDOWN_CANDIDATES else emptyList()) + KEYWORD_PATTERN
-        return strong.firstOrNull { headingLines(lines, Regex(it)).size >= MIN_AUTO_MATCHES }
-            ?: WEAK_CANDIDATES.firstOrNull { headingLines(lines, Regex(it)).size >= MIN_WEAK_AUTO_MATCHES }
-    }
+    fun detectPattern(text: String, markdown: Boolean): String? = suggestions(text, markdown).firstOrNull()?.pattern
+
+    /** Every plausible way to split [text], best first (see [ChapterDetector]). */
+    fun suggestions(text: String, markdown: Boolean): List<ChapterSuggestion> =
+        ChapterDetector.suggest(text.lines(), markdown)
 
     /** Where [pattern] would split [text]. Throws on an invalid regex. */
     fun breaks(text: String, pattern: String): List<ChapterBreak> {
         val lines = text.lines()
-        val starts = headingLines(lines, Regex(pattern))
+        val starts = headingLines(lines, HeadingRule(pattern))
         return starts.mapIndexed { i, index ->
             val end = starts.getOrNull(i + 1) ?: lines.size
             val preview = lines.subList(index + 1, end).asSequence()
@@ -93,7 +89,7 @@ object ChapterSplitter {
     /** [text] cut at every heading, except any whose line is in [excludedLines] (merged into the previous chunk). */
     fun split(text: String, pattern: String, excludedLines: Set<Int> = emptySet()): List<TextChunk> {
         val lines = text.lines()
-        val starts = runCatching { headingLines(lines, Regex(pattern)) }.getOrDefault(emptyList())
+        val starts = runCatching { headingLines(lines, HeadingRule(pattern)) }.getOrDefault(emptyList())
             .filterNot { it in excludedLines }
         if (starts.isEmpty()) return listOf(TextChunk(null, text))
         val preamble = lines.subList(0, starts.first()).joinToString("\n")
@@ -104,14 +100,15 @@ object ChapterSplitter {
         return if (preamble.isBlank()) chapters else listOf(TextChunk(null, preamble)) + chapters
     }
 
-    private fun headingLines(lines: List<String>, regex: Regex): List<Int> = lines.indices.filter { i ->
+    internal fun headingLines(lines: List<String>, rule: HeadingRule): List<Int> = lines.indices.filter { i ->
         val line = lines[i].trim()
         line.isNotEmpty() &&
             line.length <= MAX_HEADING_LENGTH &&
             (i == 0 || lines[i - 1].isBlank()) &&
-            regex.containsMatchIn(line)
+            (!rule.standalone || i == lines.lastIndex || lines[i + 1].isBlank()) &&
+            rule.regex.containsMatchIn(line)
     }
 
-    private fun headingTitle(line: String): String =
+    internal fun headingTitle(line: String): String =
         line.trim().trimStart('#').trim().trim('*', '_').trim().ifEmpty { line.trim() }
 }

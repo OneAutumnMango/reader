@@ -1,7 +1,9 @@
 package dev.reader.app.ui.library
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -11,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +41,7 @@ import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.parser.text.ChapterBreak
 import dev.reader.parser.text.ChapterSplitter
+import dev.reader.parser.text.ChapterSuggestion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -95,9 +99,10 @@ fun ChapterDetectDialog(
         mutableStateOf(if (currentPattern == null) ChapterDetectMode.AUTO else ChapterDetectMode.REGEX)
     }
     var input by remember { mutableStateOf(currentPattern.orEmpty()) }
-    val detected = remember(text, markdown) { text?.let { ChapterSplitter.detectPattern(it, markdown) } }
+    val suggestions = remember(text, markdown) { text?.let { ChapterSplitter.suggestions(it, markdown) }.orEmpty() }
+    var suggestionIndex by remember { mutableStateOf(0) }
     val pattern = when (mode) {
-        ChapterDetectMode.AUTO -> detected
+        ChapterDetectMode.AUTO -> suggestions.getOrNull(suggestionIndex)?.pattern
         ChapterDetectMode.STARTS_WITH -> input.takeIf { it.isNotEmpty() }?.let(ChapterSplitter::prefixPattern)
         ChapterDetectMode.REGEX -> input.takeIf { it.isNotBlank() }
     }
@@ -108,9 +113,8 @@ fun ChapterDetectDialog(
             runCatching { ChapterSplitter.breaks(text, pattern) }
         }
     }
-    // Manual removals only make sense for the breaks they were chosen against; a different
-    // pattern/mode starts from a clean slate.
-    var excludedLines by remember(pattern == currentPattern) {
+    // Manual removals only make sense for the breaks they were chosen against.
+    var excludedLines by remember(pattern) {
         mutableStateOf(if (pattern == currentPattern) currentExcludedLines else emptySet())
     }
 
@@ -122,6 +126,9 @@ fun ChapterDetectDialog(
                 ModeRow("Auto-detect", ChapterDetectMode.AUTO, mode) { mode = it }
                 ModeRow("Lines starting with", ChapterDetectMode.STARTS_WITH, mode) { mode = it }
                 ModeRow("Regular expression", ChapterDetectMode.REGEX, mode) { mode = it }
+                if (mode == ChapterDetectMode.AUTO && suggestions.size > 1) {
+                    SuggestionChips(suggestions, suggestionIndex) { suggestionIndex = it }
+                }
                 if (mode != ChapterDetectMode.AUTO) {
                     OutlinedTextField(
                         value = input,
@@ -227,6 +234,25 @@ private fun ChapterBreakRow(chapterBreak: ChapterBreak, kept: Boolean, onToggle:
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuggestionChips(suggestions: List<ChapterSuggestion>, selected: Int, onSelect: (Int) -> Unit) {
+    Text(
+        "Other ways this book could be split:",
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        suggestions.forEachIndexed { index, suggestion ->
+            FilterChip(
+                selected = index == selected,
+                onClick = { onSelect(index) },
+                label = { Text("${suggestion.name} (${suggestion.count})") },
+                modifier = Modifier.testTag("chapter-suggestion-$index"),
             )
         }
     }

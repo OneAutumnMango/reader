@@ -72,6 +72,19 @@ class ChapterDetectDialogTest {
     }
 
     @Test
+    fun `picking another suggested split changes the preview`() {
+        val markdown = "# One\n\na\n\n## A\n\nb\n\n## B\n\nc\n\n# Two\n\nd\n\n## C\n\ne"
+        composeRule.setContent {
+            ChapterDetectDialog(markdown, markdown = true, currentPattern = null, onApply = { _, _ -> }, onDismiss = {})
+        }
+
+        composeRule.onNodeWithText("2 of 2 chapters kept").assertExists()
+        composeRule.onNodeWithTag("chapter-suggestion-1").performClick()
+
+        composeRule.onNodeWithText("3 of 3 chapters kept").assertExists()
+    }
+
+    @Test
     fun `a custom starts-with string changes the breaks`() {
         setContent()
 
