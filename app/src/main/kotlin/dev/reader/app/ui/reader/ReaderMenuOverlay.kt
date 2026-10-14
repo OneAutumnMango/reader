@@ -1,6 +1,7 @@
 package dev.reader.app.ui.reader
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,13 +21,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.appearance.ReaderSettingsEditor
@@ -38,6 +36,7 @@ import dev.reader.core.theme.ReaderTheme
 private val EXPANDED_PANEL_MAX_HEIGHT = 420.dp
 private val MENU_SHADOW_ELEVATION = 8.dp
 private const val PERCENT_MAX = 100
+private const val SWIPE_EXPAND_THRESHOLD_PX = 60f
 
 /** Formats chapter position as "Page X of Y" for paged modes, or a percentage for continuous scroll. */
 fun readerProgressLabel(readingMode: ReadingMode, index: Int, total: Int): String {
@@ -52,7 +51,8 @@ fun readerProgressLabel(readingMode: ReadingMode, index: Int, total: Int): Strin
 /**
  * Bottom-anchored reader menu: never shifts the reader content. The collapsed bar shows
  * chapter progress; the "^" expands it upward into font/theme/reading-mode/selectable-text
- * controls (reusing the same editors as the Appearance screen).
+ * controls (reusing the same editors as the Appearance screen). Can also be expanded/collapsed
+ * by swiping up/down on the bar itself when `swipeGestureEnabled` is true.
  */
 @Composable
 fun ReaderMenuOverlay(
@@ -62,11 +62,32 @@ fun ReaderMenuOverlay(
     settings: ReaderSettings,
     onSettingsChange: (ReaderSettings) -> Unit,
     onBack: () -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    swipeGestureEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    val swipeModifier = if (swipeGestureEnabled) {
+        Modifier.pointerInput(Unit) {
+            var totalDrag = 0f
+            detectVerticalDragGestures(
+                onDragStart = { totalDrag = 0f },
+                onDragEnd = {
+                    when {
+                        totalDrag <= -SWIPE_EXPAND_THRESHOLD_PX -> onExpandedChange(true)
+                        totalDrag >= SWIPE_EXPAND_THRESHOLD_PX -> onExpandedChange(false)
+                    }
+                },
+            ) { change, dragAmount ->
+                change.consume()
+                totalDrag += dragAmount
+            }
+        }
+    } else {
+        Modifier
+    }
 
-    Column(modifier = modifier.fillMaxWidth().shadow(MENU_SHADOW_ELEVATION)) {
+    Column(modifier = modifier.fillMaxWidth().shadow(MENU_SHADOW_ELEVATION).then(swipeModifier)) {
         AnimatedVisibility(visible = expanded) {
             Surface(tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -97,7 +118,7 @@ fun ReaderMenuOverlay(
                     }
                     Text(progressLabel, style = MaterialTheme.typography.labelLarge)
                     IconButton(
-                        onClick = { expanded = !expanded },
+                        onClick = { onExpandedChange(!expanded) },
                         modifier = Modifier.testTag("reader-menu-expand"),
                     ) {
                         Icon(

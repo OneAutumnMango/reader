@@ -3,6 +3,7 @@ package dev.reader.app.ui.library
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -44,13 +45,9 @@ fun LibraryScreen(
 
     Column(modifier = modifier) {
         SearchBarButton(onClick = onSearchClick, modifier = Modifier.padding(bottom = 8.dp))
-        CategoryTabs(categories, selectedCategory, onCategorySelected, onAddCategory)
-        LazyVerticalGrid(
-            state = gridState,
-            columns = GridCells.Adaptive(minSize = layout.gridColumnMinWidthDp.dp),
-            contentPadding = PaddingValues(8.dp),
+        Column(
             modifier = Modifier
-                .testTag("library-grid")
+                .fillMaxSize()
                 .pointerInput(orderedCategoryIds, currentIndex) {
                     var totalDrag = 0f
                     detectHorizontalDragGestures(
@@ -70,15 +67,23 @@ fun LibraryScreen(
                     }
                 },
         ) {
-            items(visibleBooks, key = { it.id.value }) { book ->
-                BookCard(
-                    book = book,
-                    progress = progressFor(book.id),
-                    finished = finishedFor(book.id),
-                    onClick = { onBookClick(book) },
-                    onLongClick = { onBookLongClick(book) },
-                    modifier = Modifier.padding(4.dp),
-                )
+            CategoryTabs(categories, selectedCategory, onCategorySelected, onAddCategory)
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Adaptive(minSize = layout.gridColumnMinWidthDp.dp),
+                contentPadding = PaddingValues(8.dp),
+                modifier = Modifier.testTag("library-grid"),
+            ) {
+                items(visibleBooks, key = { it.id.value }) { book ->
+                    BookCard(
+                        book = book,
+                        progress = progressFor(book.id),
+                        finished = finishedFor(book.id),
+                        onClick = { onBookClick(book) },
+                        onLongClick = { onBookLongClick(book) },
+                        modifier = Modifier.padding(4.dp),
+                    )
+                }
             }
         }
     }

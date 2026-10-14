@@ -7,6 +7,7 @@ import dev.reader.core.model.ChapterId
 import dev.reader.core.model.Progress
 import dev.reader.core.stats.ReadingSessionEvent
 import dev.reader.data.room.entity.BookmarkEntity
+import dev.reader.data.room.entity.ChapterProgressEntity
 import dev.reader.data.room.entity.ProgressEntity
 import dev.reader.data.room.entity.ReadingSessionEntity
 import kotlin.time.Instant
@@ -38,6 +39,22 @@ fun ProgressEntity.toProgress() = Progress(
 )
 
 fun Progress.toEntity() = ProgressEntity(
+    bookId = bookId.value,
+    chapterId = chapterId.value,
+    position = position,
+    updatedAt = updatedAt.toEpochMilliseconds(),
+    finished = finished,
+)
+
+fun ChapterProgressEntity.toProgress() = Progress(
+    bookId = BookId(bookId),
+    chapterId = ChapterId(chapterId),
+    position = position,
+    updatedAt = Instant.fromEpochMilliseconds(updatedAt),
+    finished = finished,
+)
+
+fun Progress.toChapterEntity() = ChapterProgressEntity(
     bookId = bookId.value,
     chapterId = chapterId.value,
     position = position,

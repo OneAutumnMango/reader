@@ -14,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,6 +60,7 @@ fun LibraryRoute(
     var showQuickAddMenu by remember { mutableStateOf(false) }
     var longPressedBook by remember { mutableStateOf<Book?>(null) }
     var coverTargetBook by remember { mutableStateOf<Book?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val coverPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -76,26 +78,37 @@ fun LibraryRoute(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        LibraryScreen(
-            books = books,
-            categories = categories,
-            selectedCategory = selectedCategory,
-            progressFor = { id -> progressByBook[id]?.takeUnless { it.finished }?.position },
-            finishedFor = { id -> progressByBook[id]?.finished ?: false },
-            onCategorySelected = { selectedCategory = it },
-            onBookClick = onOpenBook,
-            onBookLongClick = { longPressedBook = it },
-            onSearchClick = onSearchClick,
-            onAddCategory = { name ->
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
                 scope.launch {
-                    graph.library.upsertCategory(
-                        Category(id = CategoryId(UUID.randomUUID().toString()), name = name),
-                    )
+                    graph.rootFolderScanner.scanAll()
+                    isRefreshing = false
                 }
             },
-            layout = preferences?.libraryLayout ?: LibraryLayout.MEDIUM,
-            gridState = gridState,
-        )
+        ) {
+            LibraryScreen(
+                books = books,
+                categories = categories,
+                selectedCategory = selectedCategory,
+                progressFor = { id -> progressByBook[id]?.takeUnless { it.finished }?.position },
+                finishedFor = { id -> progressByBook[id]?.finished ?: false },
+                onCategorySelected = { selectedCategory = it },
+                onBookClick = onOpenBook,
+                onBookLongClick = { longPressedBook = it },
+                onSearchClick = onSearchClick,
+                onAddCategory = { name ->
+                    scope.launch {
+                        graph.library.upsertCategory(
+                            Category(id = CategoryId(UUID.randomUUID().toString()), name = name),
+                        )
+                    }
+                },
+                layout = preferences?.libraryLayout ?: LibraryLayout.MEDIUM,
+                gridState = gridState,
+            )
+        }
 
         longPressedBook?.let { book ->
             BookContextMenu(

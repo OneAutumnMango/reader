@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +40,7 @@ fun BookDetailScreen(
     currentChapterOrderIndex: Int? = null,
     resumeLabel: String? = null,
     onResume: () -> Unit = {},
+    onMenuClick: () -> Unit = {},
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -83,6 +86,15 @@ fun BookDetailScreen(
                     .padding(16.dp)
                     .testTag("resume-button"),
             )
+        }
+
+        IconButton(
+            onClick = onMenuClick,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .testTag("book-detail-menu"),
+        ) {
+            Icon(Icons.Filled.MoreVert, contentDescription = "Book options")
         }
     }
 }

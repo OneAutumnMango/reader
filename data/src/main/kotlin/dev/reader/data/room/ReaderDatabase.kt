@@ -6,6 +6,7 @@ import dev.reader.data.room.dao.BookDao
 import dev.reader.data.room.dao.BookmarkDao
 import dev.reader.data.room.dao.CategoryDao
 import dev.reader.data.room.dao.ChapterDao
+import dev.reader.data.room.dao.ChapterProgressDao
 import dev.reader.data.room.dao.ProgressDao
 import dev.reader.data.room.dao.ReadingSessionDao
 import dev.reader.data.room.dao.SearchDao
@@ -15,6 +16,7 @@ import dev.reader.data.room.entity.BookmarkEntity
 import dev.reader.data.room.entity.CategoryEntity
 import dev.reader.data.room.entity.ChapterEntity
 import dev.reader.data.room.entity.ChapterFtsEntity
+import dev.reader.data.room.entity.ChapterProgressEntity
 import dev.reader.data.room.entity.ProgressEntity
 import dev.reader.data.room.entity.ReadingSessionEntity
 
@@ -26,10 +28,11 @@ import dev.reader.data.room.entity.ReadingSessionEntity
         BookCategoryCrossRef::class,
         BookmarkEntity::class,
         ProgressEntity::class,
+        ChapterProgressEntity::class,
         ReadingSessionEntity::class,
         ChapterFtsEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class ReaderDatabase : RoomDatabase() {
@@ -38,6 +41,7 @@ abstract class ReaderDatabase : RoomDatabase() {
     abstract fun categories(): CategoryDao
     abstract fun bookmarks(): BookmarkDao
     abstract fun progress(): ProgressDao
+    abstract fun chapterProgress(): ChapterProgressDao
     abstract fun sessions(): ReadingSessionDao
     abstract fun search(): SearchDao
 }

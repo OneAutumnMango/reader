@@ -1,5 +1,9 @@
 package dev.reader.app.ui.reader
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -30,6 +34,8 @@ class ReaderMenuOverlayTest {
                 settings = ReaderSettings(),
                 onSettingsChange = {},
                 onBack = {},
+                expanded = false,
+                onExpandedChange = {},
             )
         }
 
@@ -40,6 +46,7 @@ class ReaderMenuOverlayTest {
     @Test
     fun `expanding reveals appearance and reading controls`() {
         composeRule.setContent {
+            var expanded by remember { mutableStateOf(false) }
             ReaderMenuOverlay(
                 progressLabel = "50%",
                 theme = ReaderTheme.Default,
@@ -47,6 +54,8 @@ class ReaderMenuOverlayTest {
                 settings = ReaderSettings(),
                 onSettingsChange = {},
                 onBack = {},
+                expanded = expanded,
+                onExpandedChange = { expanded = it },
             )
         }
 
@@ -67,6 +76,8 @@ class ReaderMenuOverlayTest {
                 settings = ReaderSettings(),
                 onSettingsChange = {},
                 onBack = { backed = true },
+                expanded = false,
+                onExpandedChange = {},
             )
         }
 

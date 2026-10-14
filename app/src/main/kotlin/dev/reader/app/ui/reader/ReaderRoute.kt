@@ -2,9 +2,12 @@ package dev.reader.app.ui.reader
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -18,13 +21,19 @@ import androidx.compose.ui.platform.LocalContext
 import dev.reader.app.data.ChapterContent
 import dev.reader.app.data.ChapterLoader
 import dev.reader.app.data.ReaderGraph
+import dev.reader.core.model.Book
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Bookmark
 import dev.reader.core.model.BookmarkId
+import dev.reader.core.model.Chapter
 import dev.reader.core.model.ChapterId
 import dev.reader.core.model.Progress
+import dev.reader.core.reader.ReaderSettings
+import dev.reader.core.reader.ReadingMode
 import dev.reader.core.reader.TapAction
+import dev.reader.core.stats.ReadingSessionEvent
 import dev.reader.core.theme.ReaderTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -38,111 +47,51 @@ fun ReaderRoute(
     onOpenMenu: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val chapters by graph.library.observeChapters(bookId).collectAsState(initial = emptyList())
     val book = books.find { it.id == bookId }
-    val chapter = chapters.find { it.id == chapterId }
     val preferences by graph.settings.preferences.collectAsState(initial = null)
-
-    var content by remember(bookId, chapterId) { mutableStateOf<ChapterContent?>(null) }
-    var loadFailed by remember(bookId, chapterId) { mutableStateOf(false) }
-    var showMenu by remember(bookId, chapterId) { mutableStateOf(false) }
-    var position by remember(bookId, chapterId) { mutableStateOf(0 to 0) }
-    var initialPositionFraction by remember(bookId, chapterId) { mutableStateOf<Float?>(null) }
-
-    LaunchedEffect(book, chapter) {
-        val b = book ?: return@LaunchedEffect
-        val c = chapter ?: return@LaunchedEffect
-        content = ChapterLoader.load(context, b, c)
-        loadFailed = content == null
-    }
-
-    LaunchedEffect(bookId, chapterId) {
-        val saved = graph.progress.observe(bookId).first()
-        initialPositionFraction = saved?.takeIf { it.chapterId == chapterId }?.position ?: 0f
-    }
-
-    fun onTapAction(action: TapAction) {
-        when (action) {
-            TapAction.OPEN_MENU -> showMenu = !showMenu
-            TapAction.TOGGLE_BOOKMARK -> scope.launch {
-                graph.bookmarks.add(
-                    Bookmark(
-                        id = BookmarkId(UUID.randomUUID().toString()),
-                        bookId = bookId,
-                        chapterId = chapterId,
-                        position = 0f,
-                        createdAt = Clock.System.now(),
-                    ),
-                )
-            }
-            else -> Unit
-        }
-    }
-
-    fun onPageChanged(index: Int, pageCount: Int) {
-        position = index to pageCount
-        if (pageCount > 0) {
-            scope.launch {
-                graph.progress.update(
-                    Progress(
-                        bookId = bookId,
-                        chapterId = chapterId,
-                        position = index.toFloat() / pageCount,
-                        updatedAt = Clock.System.now(),
-                    ),
-                )
-            }
-        }
-    }
-
     val prefs = preferences
-    val loaded = content
-    val startFraction = initialPositionFraction
+
+    var showMenu by remember(bookId) { mutableStateOf(false) }
+    var menuExpanded by remember(bookId) { mutableStateOf(false) }
+    var position by remember(bookId) { mutableStateOf(0 to 0) }
+
+    if (book == null || chapters.isEmpty() || prefs == null) {
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
+
+    val readingMode = prefs.readerSettings.readingMode
+    // Horizontal-paged mode already owns horizontal drags for page-turning within a chapter,
+    // so the chapter-swipe pager only accepts user swipes in the other reading modes.
+    val chapterSwipeEnabled = readingMode != ReadingMode.PAGED_HORIZONTAL_LTR &&
+        readingMode != ReadingMode.PAGED_HORIZONTAL_RTL
+    val initialPage = remember(bookId) { chapters.indexOfFirst { it.id == chapterId }.coerceAtLeast(0) }
+    val pagerState = rememberPagerState(initialPage = initialPage) { chapters.size }
+    val currentChapter = chapters.getOrNull(pagerState.currentPage) ?: chapters[initialPage]
+    val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
 
     Box(modifier = modifier.fillMaxSize()) {
-        when {
-            loaded is ChapterContent.Text && prefs != null && startFraction != null -> {
-                val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
-                ReaderScreen(
-                    document = loaded.document,
-                    theme = theme,
-                    settings = prefs.readerSettings,
-                    initialPositionFraction = startFraction,
-                    onTapAction = ::onTapAction,
-                    onPageChanged = ::onPageChanged,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            loaded is ChapterContent.Comic && prefs != null -> ComicReaderScreen(
-                file = loaded.file,
-                format = loaded.format,
-                pages = loaded.pages,
-                tapZones = prefs.readerSettings.tapZones,
-                onTapAction = ::onTapAction,
-                onPageChanged = ::onPageChanged,
-                modifier = Modifier.fillMaxSize(),
+        HorizontalPager(
+            state = pagerState,
+            userScrollEnabled = chapterSwipeEnabled,
+            modifier = Modifier.fillMaxSize(),
+        ) { page ->
+            ChapterPage(
+                graph = graph,
+                scope = scope,
+                book = book,
+                chapter = chapters[page],
+                settings = prefs.readerSettings,
+                theme = theme,
+                onToggleMenu = { showMenu = !showMenu },
+                onPositionChanged = { index, total -> if (page == pagerState.currentPage) position = index to total },
             )
-            loaded is ChapterContent.Pdf && prefs != null -> PdfReaderScreen(
-                file = loaded.file,
-                tapZones = prefs.readerSettings.tapZones,
-                onTapAction = ::onTapAction,
-                onPageChanged = ::onPageChanged,
-                modifier = Modifier.fillMaxSize(),
-            )
-            loadFailed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Couldn't load this chapter.")
-            }
-            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
         }
 
-        if (showMenu && prefs != null) {
-            val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
-            val readingMode = prefs.readerSettings.readingMode
+        if (showMenu) {
             ReaderMenuOverlay(
                 progressLabel = readerProgressLabel(readingMode, position.first, position.second),
                 theme = theme,
@@ -159,8 +108,141 @@ fun ReaderRoute(
                     scope.launch { graph.settings.update { it.copy(readerSettings = updated) } }
                 },
                 onBack = onOpenMenu,
+                expanded = menuExpanded,
+                onExpandedChange = { menuExpanded = it },
+                swipeGestureEnabled = readingMode != ReadingMode.PAGED_VERTICAL,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
+        }
+    }
+
+    LaunchedEffect(currentChapter.id) {
+        // Keep the book-level "last opened" pointer up to date as chapters are swiped through.
+        val existing = graph.progress.observe(bookId).first()
+        graph.progress.update(
+            Progress(
+                bookId = bookId,
+                chapterId = currentChapter.id,
+                position = existing?.takeIf { it.chapterId == currentChapter.id }?.position ?: 0f,
+                updatedAt = Clock.System.now(),
+            ),
+        )
+    }
+}
+
+@Composable
+private fun ChapterPage(
+    graph: ReaderGraph,
+    scope: CoroutineScope,
+    book: Book,
+    chapter: Chapter,
+    settings: ReaderSettings,
+    theme: ReaderTheme,
+    onToggleMenu: () -> Unit,
+    onPositionChanged: (Int, Int) -> Unit,
+) {
+    val context = LocalContext.current
+    var content by remember(chapter.id) { mutableStateOf<ChapterContent?>(null) }
+    var loadFailed by remember(chapter.id) { mutableStateOf(false) }
+    var initialPositionFraction by remember(chapter.id) { mutableStateOf<Float?>(null) }
+    var lastFraction by remember(chapter.id) { mutableStateOf(0f) }
+    val sessionStartedAt = remember(chapter.id) { Clock.System.now() }
+
+    DisposableEffect(chapter.id) {
+        onDispose {
+            scope.launch {
+                graph.stats.recordSession(
+                    ReadingSessionEvent(
+                        bookId = book.id,
+                        chapterId = chapter.id,
+                        startedAt = sessionStartedAt,
+                        endedAt = Clock.System.now(),
+                        wordsRead = (chapter.wordCount * lastFraction).toInt(),
+                    ),
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(chapter.id) {
+        content = ChapterLoader.load(context, book, chapter)
+        loadFailed = content == null
+    }
+
+    LaunchedEffect(chapter.id) {
+        val saved = graph.progress.observeChapterProgress(book.id, chapter.id).first()
+        initialPositionFraction = saved?.position ?: 0f
+    }
+
+    fun onTapAction(action: TapAction) {
+        when (action) {
+            TapAction.OPEN_MENU -> onToggleMenu()
+            TapAction.TOGGLE_BOOKMARK -> scope.launch {
+                graph.bookmarks.add(
+                    Bookmark(
+                        id = BookmarkId(UUID.randomUUID().toString()),
+                        bookId = book.id,
+                        chapterId = chapter.id,
+                        position = 0f,
+                        createdAt = Clock.System.now(),
+                    ),
+                )
+            }
+            else -> Unit
+        }
+    }
+
+    fun onPageChanged(index: Int, pageCount: Int) {
+        onPositionChanged(index, pageCount)
+        if (pageCount > 0) {
+            lastFraction = index.toFloat() / pageCount
+            scope.launch {
+                graph.progress.updateChapterProgress(
+                    Progress(
+                        bookId = book.id,
+                        chapterId = chapter.id,
+                        position = index.toFloat() / pageCount,
+                        updatedAt = Clock.System.now(),
+                    ),
+                )
+            }
+        }
+    }
+
+    val loaded = content
+    val startFraction = initialPositionFraction
+
+    when {
+        loaded is ChapterContent.Text && startFraction != null -> ReaderScreen(
+            document = loaded.document,
+            theme = theme,
+            settings = settings,
+            initialPositionFraction = startFraction,
+            onTapAction = ::onTapAction,
+            onPageChanged = ::onPageChanged,
+            modifier = Modifier.fillMaxSize(),
+        )
+        loaded is ChapterContent.Comic -> ComicReaderScreen(
+            file = loaded.file,
+            format = loaded.format,
+            pages = loaded.pages,
+            tapZones = settings.tapZones,
+            onTapAction = ::onTapAction,
+            onPageChanged = ::onPageChanged,
+            modifier = Modifier.fillMaxSize(),
+        )
+        loaded is ChapterContent.Pdf -> PdfReaderScreen(
+            file = loaded.file,
+            tapZones = settings.tapZones,
+            onTapAction = ::onTapAction,
+            onPageChanged = ::onPageChanged,
+            modifier = Modifier.fillMaxSize(),
+        )
+        loadFailed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Couldn't load this chapter.")
+        }
+        else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
         }
     }
 }

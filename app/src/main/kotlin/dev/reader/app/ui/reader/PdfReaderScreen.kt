@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -34,25 +35,29 @@ fun PdfReaderScreen(
     modifier: Modifier = Modifier,
 ) {
     var renderer by remember(file) { mutableStateOf<PdfPageRenderer?>(null) }
+    var openFailed by remember(file) { mutableStateOf(false) }
 
     DisposableEffect(file) {
-        val opened = runCatching { PdfPageRenderer(file) }.getOrNull()
-        renderer = opened
-        onDispose { opened?.close() }
+        val opened = runCatching { PdfPageRenderer(file) }
+        renderer = opened.getOrNull()
+        openFailed = opened.isFailure
+        onDispose { opened.getOrNull()?.close() }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
         val pageRenderer = renderer
         TapZoneOverlay(tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
-            if (pageRenderer != null) {
-                ImagePager(
+            when {
+                pageRenderer != null -> ImagePager(
                     pageCount = pageRenderer.pageCount,
                     onPageChanged = { onPageChanged(it, pageRenderer.pageCount) },
                 ) { index ->
                     PdfPageImage(pageRenderer, index, Modifier.fillMaxSize())
                 }
-            } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                openFailed -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Couldn't open this PDF. It may be encrypted or corrupted.")
+                }
+                else -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
@@ -66,18 +71,23 @@ private fun PdfPageImage(renderer: PdfPageRenderer, index: Int, modifier: Modifi
         val density = LocalDensity.current
         val widthPx = with(density) { maxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.roundToPx() }
-        val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, index, widthPx, heightPx) {
+        val bitmap by produceState<Result<androidx.compose.ui.graphics.ImageBitmap>?>(null, index, widthPx, heightPx) {
             value = withContext(Dispatchers.IO) {
-                runCatching { renderer.renderPage(index, widthPx, heightPx).asImageBitmap() }.getOrNull()
+                runCatching { renderer.renderPage(index, widthPx, heightPx).asImageBitmap() }
             }
         }
-        val loaded = bitmap
-        if (loaded != null) {
-            Image(bitmap = loaded, contentDescription = null, modifier = Modifier.fillMaxSize())
-        } else {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        when (val result = bitmap) {
+            null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
+            else -> result.fold(
+                onSuccess = { Image(bitmap = it, contentDescription = null, modifier = Modifier.fillMaxSize()) },
+                onFailure = {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Couldn't render this page.")
+                    }
+                },
+            )
         }
     }
 }

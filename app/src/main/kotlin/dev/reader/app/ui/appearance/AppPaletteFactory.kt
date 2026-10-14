@@ -5,6 +5,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.ColorUtils
+import dev.reader.core.theme.AppPaletteOverrides
 import dev.reader.core.theme.AppThemeMode
 
 private const val AMOLED_SURFACE_LIGHTNESS = 0.06f
@@ -24,13 +25,14 @@ private const val HSL_COMPONENT_COUNT = 3
 /** Derives a Material3 [ColorScheme] from one seed colour, without a dynamic-colour dependency. */
 object AppPaletteFactory {
 
-    fun colorScheme(seedColor: Long, mode: AppThemeMode, systemInDarkTheme: Boolean): ColorScheme {
-        val dark = when (mode) {
-            AppThemeMode.SYSTEM -> systemInDarkTheme
-            AppThemeMode.LIGHT -> false
-            AppThemeMode.DARK, AppThemeMode.AMOLED -> true
-        }
-
+    @Suppress("CyclomaticComplexMethod")
+    fun colorScheme(
+        seedColor: Long,
+        mode: AppThemeMode,
+        systemInDarkTheme: Boolean,
+        overrides: AppPaletteOverrides = AppPaletteOverrides(),
+    ): ColorScheme {
+        val dark = isDark(mode, systemInDarkTheme)
         val hsl = FloatArray(HSL_COMPONENT_COUNT)
         ColorUtils.colorToHSL(seedColor.toInt(), hsl)
         val hue = hsl[0]
@@ -39,21 +41,16 @@ object AppPaletteFactory {
         fun tone(lightness: Float, saturation: Float = NEUTRAL_SATURATION) =
             Color(ColorUtils.HSLToColor(floatArrayOf(hue, saturation, lightness)))
 
-        val background = if (mode == AppThemeMode.AMOLED) {
-            Color.Black
-        } else {
-            tone(if (dark) DARK_BACKGROUND_LIGHTNESS else LIGHT_BACKGROUND_LIGHTNESS)
-        }
-        val surface = if (mode == AppThemeMode.AMOLED) {
-            tone(AMOLED_SURFACE_LIGHTNESS)
-        } else {
-            tone(if (dark) DARK_SURFACE_LIGHTNESS else LIGHT_SURFACE_LIGHTNESS)
-        }
-        val primary = tone(if (dark) DARK_PRIMARY_LIGHTNESS else LIGHT_PRIMARY_LIGHTNESS, accentSaturation)
+        val background = overrides.background?.let { Color(it) } ?: defaultBackground(mode, dark, ::tone)
+        val surface = overrides.surface?.let { Color(it) } ?: defaultSurface(mode, dark, ::tone)
+        val primary = overrides.accent?.let { Color(it) }
+            ?: tone(if (dark) DARK_PRIMARY_LIGHTNESS else LIGHT_PRIMARY_LIGHTNESS, accentSaturation)
         val onPrimary = if (dark) Color.Black else Color.White
-        val onBackground = tone(if (dark) DARK_ON_BACKGROUND_LIGHTNESS else LIGHT_ON_BACKGROUND_LIGHTNESS)
+        val onBackground = overrides.onSurface?.let { Color(it) }
+            ?: tone(if (dark) DARK_ON_BACKGROUND_LIGHTNESS else LIGHT_ON_BACKGROUND_LIGHTNESS)
+        val outline = overrides.outline?.let { Color(it) }
 
-        return if (dark) {
+        val base = if (dark) {
             darkColorScheme(
                 primary = primary,
                 onPrimary = onPrimary,
@@ -72,5 +69,26 @@ object AppPaletteFactory {
                 onSurface = onBackground,
             )
         }
+        return if (outline != null) base.copy(outline = outline) else base
     }
+
+    private fun isDark(mode: AppThemeMode, systemInDarkTheme: Boolean): Boolean = when (mode) {
+        AppThemeMode.SYSTEM -> systemInDarkTheme
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK, AppThemeMode.AMOLED -> true
+    }
+
+    private fun defaultBackground(mode: AppThemeMode, dark: Boolean, tone: (Float, Float) -> Color): Color =
+        if (mode == AppThemeMode.AMOLED) {
+            Color.Black
+        } else {
+            tone(if (dark) DARK_BACKGROUND_LIGHTNESS else LIGHT_BACKGROUND_LIGHTNESS, NEUTRAL_SATURATION)
+        }
+
+    private fun defaultSurface(mode: AppThemeMode, dark: Boolean, tone: (Float, Float) -> Color): Color =
+        if (mode == AppThemeMode.AMOLED) {
+            tone(AMOLED_SURFACE_LIGHTNESS, NEUTRAL_SATURATION)
+        } else {
+            tone(if (dark) DARK_SURFACE_LIGHTNESS else LIGHT_SURFACE_LIGHTNESS, NEUTRAL_SATURATION)
+        }
 }

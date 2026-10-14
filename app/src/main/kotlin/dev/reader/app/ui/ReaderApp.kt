@@ -84,7 +84,7 @@ fun ReaderApp(graph: ReaderGraph) {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = false,
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet {
                 DRAWER_DESTINATIONS.forEach { (destination, labelAndIcon) ->

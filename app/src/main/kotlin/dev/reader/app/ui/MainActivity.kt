@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
                 preferences.appTheme.seedColor,
                 preferences.appTheme.mode,
                 isSystemInDarkTheme(),
+                preferences.appTheme.overrides,
             )
 
             MaterialTheme(colorScheme = colorScheme) {

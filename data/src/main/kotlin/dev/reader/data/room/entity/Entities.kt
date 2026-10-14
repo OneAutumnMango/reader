@@ -60,6 +60,16 @@ data class ProgressEntity(
     val finished: Boolean,
 )
 
+/** One row per (book, chapter): preserves position within that chapter even after swiping away. */
+@Entity(tableName = "chapter_progress", primaryKeys = ["bookId", "chapterId"])
+data class ChapterProgressEntity(
+    val bookId: String,
+    val chapterId: String,
+    val position: Float,
+    val updatedAt: Long,
+    val finished: Boolean,
+)
+
 @Entity(tableName = "reading_sessions")
 data class ReadingSessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
