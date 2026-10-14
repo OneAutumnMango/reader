@@ -70,9 +70,9 @@ fun ReaderApp(graph: ReaderGraph) {
     val navigator = remember { Navigator() }
     val libraryGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
 
-    LaunchedEffect(Unit) { graph.rootFolderScanner.scanAll() }
+    LaunchedEffect(Unit) { graph.scanRootFoldersOnLaunch() }
 
-    BackHandler(enabled = navigator.canGoBack) { navigator.pop() }
+    BackHandler(enabled = navigator.handlesSystemBack) { navigator.back() }
 
     if (navigator.current is Destination.Reader) {
         ReaderDestinationContent(graph, navigator)

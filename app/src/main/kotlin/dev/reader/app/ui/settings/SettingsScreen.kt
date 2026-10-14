@@ -8,11 +8,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +44,8 @@ fun SettingsScreen(
     libraryLayout: LibraryLayout,
     onLibraryLayoutChange: (LibraryLayout) -> Unit,
     modifier: Modifier = Modifier,
+    onScanRootFolders: () -> Unit = {},
+    scanning: Boolean = false,
 ) {
     Column(
         modifier = modifier
@@ -94,8 +99,19 @@ fun SettingsScreen(
                 HorizontalDivider()
             }
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(onClick = onAddRootFolder, modifier = Modifier.fillMaxWidth()) {
-                Text("Add root folder")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onAddRootFolder, modifier = Modifier.weight(1f)) {
+                    Text("Add root folder")
+                }
+                OutlinedButton(
+                    onClick = onScanRootFolders,
+                    enabled = rootFolders.isNotEmpty() && !scanning,
+                    modifier = Modifier.weight(1f).testTag("scan-root-folders"),
+                ) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (scanning) "Scanning…" else "Scan now")
+                }
             }
         }
 

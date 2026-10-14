@@ -26,6 +26,16 @@ fun SettingsRoute(graph: ReaderGraph, onViewLogHistory: () -> Unit, modifier: Mo
     val actions = rememberImportActions(graph)
     val preferences by graph.settings.preferences.collectAsState(initial = PreferencesFile())
     var scanStatus by remember { mutableStateOf("") }
+    var scanning by remember { mutableStateOf(false) }
+
+    fun scan(message: (Int) -> String) {
+        scanning = true
+        scanStatus = "Scanning root folders…"
+        scope.launch {
+            scanStatus = message(graph.rootFolderScanner.scanAll())
+            scanning = false
+        }
+    }
 
     val addRootFolderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
@@ -34,8 +44,7 @@ fun SettingsRoute(graph: ReaderGraph, onViewLogHistory: () -> Unit, modifier: Mo
         context.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         scope.launch {
             graph.settings.update { it.copy(rootFolders = it.rootFolders + treeUri.toString()) }
-            val imported = graph.rootFolderScanner.scanAll()
-            scanStatus = "Added root folder, imported $imported new item(s)"
+            scan { "Added root folder, imported $it new item(s)" }
         }
     }
 
@@ -51,6 +60,8 @@ fun SettingsRoute(graph: ReaderGraph, onViewLogHistory: () -> Unit, modifier: Mo
         onAddBook = actions.addFiles,
         onAddLightNovel = actions.addFolder,
         onAddRootFolder = { addRootFolderLauncher.launch(null) },
+        onScanRootFolders = { scan { "Scan complete, imported $it new item(s)" } },
+        scanning = scanning,
         onRemoveRootFolder = { uri ->
             scope.launch { graph.settings.update { it.copy(rootFolders = it.rootFolders - uri) } }
         },

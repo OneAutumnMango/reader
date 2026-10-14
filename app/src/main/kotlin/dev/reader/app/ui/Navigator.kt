@@ -13,6 +13,9 @@ class Navigator(start: Destination = Destination.Library) {
     val current: Destination get() = stack.last()
     val canGoBack: Boolean get() = stack.size > 1
 
+    /** System back: pops the stack, or returns to the library from another drawer root. */
+    val handlesSystemBack: Boolean get() = canGoBack || current != Destination.Library
+
     fun push(destination: Destination) {
         stack = stack + destination
     }
@@ -26,5 +29,9 @@ class Navigator(start: Destination = Destination.Library) {
         if (!canGoBack) return false
         stack = stack.dropLast(1)
         return true
+    }
+
+    fun back() {
+        if (!pop()) switchRoot(Destination.Library)
     }
 }

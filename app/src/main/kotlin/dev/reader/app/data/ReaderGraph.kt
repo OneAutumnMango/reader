@@ -15,8 +15,10 @@ import dev.reader.data.store.ReaderStores
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okio.FileSystem
 import okio.Path.Companion.toPath
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** The app's one dependency graph: a single Room database and DataStore, shared everywhere. */
 class ReaderGraph(context: Context) {
@@ -43,5 +45,12 @@ class ReaderGraph(context: Context) {
     val settings = SettingsRepository(stores)
     val exporter = ExportRepository(database, settings)
     val importer = BookImporter(library)
-    val rootFolderScanner = RootFolderScanner(context.applicationContext, settings, importer)
+    val rootFolderScanner = RootFolderScanner(context.applicationContext, settings, library, importer)
+
+    private val launchScanStarted = AtomicBoolean(false)
+
+    /** Runs once per process in the app scope, so rotation or leaving the screen can't cancel it. */
+    fun scanRootFoldersOnLaunch() {
+        if (launchScanStarted.compareAndSet(false, true)) scope.launch { rootFolderScanner.scanAll() }
+    }
 }

@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.TapAction
@@ -90,26 +91,29 @@ private fun PdfPageImage(renderer: PdfPageRenderer, index: Int, continuous: Bool
     }
 
     BoxWithConstraints(modifier = pageModifier, contentAlignment = Alignment.Center) {
-        val pageRatio = ratio
-        if (pageRatio == null) {
+        if (ratio == null) {
             CircularProgressIndicator()
             return@BoxWithConstraints
         }
         val density = LocalDensity.current
-        val boxWidth = with(density) { maxWidth.toPx() }
-        val boxHeight = with(density) { maxHeight.toPx() }
-        // Fit the page inside the box without stretching it.
-        val widthPx = minOf(boxWidth, boxHeight * pageRatio).roundToInt().coerceAtLeast(1)
-        val heightPx = (widthPx / pageRatio).roundToInt().coerceAtLeast(1)
-        val bitmap by produceState<Result<ImageBitmap>?>(null, renderer, index, widthPx, heightPx) {
+        val maxWidthPx = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
+        val maxHeightPx = with(density) { maxHeight.roundToPx() }.coerceAtLeast(1)
+        val bitmap by produceState<Result<ImageBitmap>?>(null, renderer, index, maxWidthPx, maxHeightPx) {
             value = withContext(Dispatchers.IO) {
-                runCatching { renderer.renderPage(index, widthPx, heightPx).asImageBitmap() }
+                runCatching { renderer.renderPage(index, maxWidthPx, maxHeightPx).asImageBitmap() }
             }
         }
         when (val result = bitmap) {
             null -> CircularProgressIndicator()
             else -> result.fold(
-                onSuccess = { Image(bitmap = it, contentDescription = null, modifier = Modifier.fillMaxSize()) },
+                onSuccess = {
+                    Image(
+                        bitmap = it,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
                 onFailure = { Text("Couldn't render this page.") },
             )
         }

@@ -36,6 +36,20 @@ class NavigatorTest {
     }
 
     @Test
+    fun `back from another drawer root returns to the library`() {
+        val navigator = Navigator()
+        navigator.switchRoot(Destination.Settings)
+        navigator.push(Destination.LogHistory)
+
+        assertTrue(navigator.handlesSystemBack)
+        navigator.back()
+        assertEquals(Destination.Settings, navigator.current)
+        navigator.back()
+        assertEquals(Destination.Library, navigator.current)
+        assertFalse(navigator.handlesSystemBack)
+    }
+
+    @Test
     fun `switchRoot clears everything pushed on top`() {
         val navigator = Navigator()
         navigator.push(Destination.BookDetail(BookId("b1")))

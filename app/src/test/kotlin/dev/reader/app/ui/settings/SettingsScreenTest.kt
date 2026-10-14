@@ -87,6 +87,29 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun `scan now triggers the callback when root folders exist`() {
+        var scanned = false
+        composeRule.setContent {
+            SettingsScreen(
+                status = "",
+                rootFolders = listOf(RootFolderDisplay(uri = "content://tree/1", displayName = "Books")),
+                onAddBook = {},
+                onAddLightNovel = {},
+                onAddRootFolder = {},
+                onRemoveRootFolder = {},
+                onViewLogHistory = {},
+                libraryLayout = LibraryLayout.MEDIUM,
+                onLibraryLayoutChange = {},
+                onScanRootFolders = { scanned = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("scan-root-folders").performScrollTo().performClick()
+
+        assertTrue(scanned)
+    }
+
+    @Test
     fun `clicking remove on a root folder triggers the callback with its uri`() {
         var removed: String? = null
         composeRule.setContent {
