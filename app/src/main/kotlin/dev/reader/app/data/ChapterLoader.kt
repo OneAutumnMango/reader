@@ -49,7 +49,7 @@ object ChapterLoader {
     }
 
     private fun loadPdf(context: Context, file: File, renderMode: PdfRenderMode?): ChapterContent? =
-        if (renderMode == PdfRenderMode.FIXED_PAGE) {
+        if (renderMode != PdfRenderMode.REFLOW_TEXT) {
             ChapterContent.Pdf(file)
         } else {
             val parsed = PdfTextParser(context).parse(file)
@@ -62,11 +62,14 @@ object ChapterLoader {
         isLightNovel: Boolean,
         orderIndex: Int,
     ): ChapterContent.Text? {
+        if (format == BookFormat.EPUB) {
+            return EpubParser.parseChapter(file, if (isLightNovel) 0 else orderIndex)
+                ?.let { ChapterContent.Text(it.document) }
+        }
         val parsed = when (format) {
             BookFormat.TXT -> TxtParser.parse(file)
             BookFormat.MARKDOWN -> MarkdownParser.parse(file)
             BookFormat.HTML -> HtmlParser.parse(file)
-            BookFormat.EPUB -> EpubParser.parse(file)
             else -> error("$format has no text loader")
         }
         val chapter = if (isLightNovel) parsed.chapters.firstOrNull() else parsed.chapters.getOrNull(orderIndex)

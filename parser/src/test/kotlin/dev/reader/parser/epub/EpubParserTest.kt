@@ -8,8 +8,9 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.createTempFile
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
-private fun buildEpub(): File {
+private fun buildEpub(includeMissingChapter: Boolean = false): File {
     val file = createTempFile(suffix = ".epub").toFile()
     ZipOutputStream(file.outputStream()).use { zip ->
         fun entry(name: String, content: String) {
@@ -35,10 +36,12 @@ private fun buildEpub(): File {
                 <metadata><title>My Book</title><creator>Jane Doe</creator></metadata>
                 <manifest>
                     <item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                    ${if (includeMissingChapter) "<item id=\"ch2\" href=\"missing.xhtml\"/>" else ""}
                     <item id="cover" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
                 </manifest>
                 <spine>
                     <itemref idref="ch1"/>
+                    ${if (includeMissingChapter) "<itemref idref=\"ch2\"/>" else ""}
                 </spine>
             </package>
             """.trimIndent(),
@@ -50,6 +53,23 @@ private fun buildEpub(): File {
 }
 
 class EpubParserTest {
+
+    @Test
+    fun `loads only the requested chapter without reading other spine entries`() {
+        val chapter = EpubParser.parseChapter(buildEpub(includeMissingChapter = true), 0)
+        assertEquals("Chapter One", chapter?.title)
+        val paragraph = chapter?.document?.blocks?.filterIsInstance<Block.Paragraph>()?.single()
+        assertEquals("Hello world.", paragraph?.spans?.single()?.text)
+    }
+
+    @Test
+    fun `chapter loader matches full parse and returns null outside the spine`() {
+        val file = buildEpub()
+        val expected = EpubParser.parse(file).chapters.single() as ParsedChapter.TextChapter
+        assertEquals(expected, EpubParser.parseChapter(file, 0))
+        assertNull(EpubParser.parseChapter(file, -1))
+        assertNull(EpubParser.parseChapter(file, 1))
+    }
 
     @Test
     fun `reads metadata, cover and spine order`() {
@@ -105,5 +125,6 @@ class EpubParserTest {
         val chapter = book.chapters.single() as ParsedChapter.TextChapter
         val paragraph = chapter.document.blocks.filterIsInstance<Block.Paragraph>().single()
         assertEquals("Found it.", paragraph.spans.single().text)
+        assertEquals(chapter, EpubParser.parseChapter(file, 0))
     }
 }

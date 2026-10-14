@@ -12,6 +12,20 @@ import java.util.zip.ZipFile
 
 object EpubParser {
 
+    fun parseChapter(file: File, orderIndex: Int): ParsedChapter.TextChapter? = ZipFile(file).use { zip ->
+        val container = Jsoup.parse(zip.readEntryText("META-INF/container.xml"), "", Parser.xmlParser())
+        val opfPath = container.select("rootfile").first()?.attr("full-path")
+            ?: error("EPUB container.xml has no rootfile")
+        val opf = Jsoup.parse(zip.readEntryText(opfPath), "", Parser.xmlParser())
+        val manifest = opf.select("manifest > item").associateBy { it.attr("id") }
+        val entries = opf.select("spine > itemref").mapNotNull { manifest[it.attr("idref")] }
+        val entry = entries.getOrNull(orderIndex) ?: return@use null
+        val document = parseHtmlToRichDocument(zip.readEntryText(entry.resolve(opfPath.substringBeforeLast('/', ""))))
+        val title = (document.blocks.firstOrNull() as? Block.Heading)
+            ?.spans?.joinToString("") { it.text }?.ifBlank { null } ?: "Chapter ${orderIndex + 1}"
+        ParsedChapter.TextChapter(title, document)
+    }
+
     fun parse(file: File): ParsedBook {
         ZipFile(file).use { zip ->
             val containerXml = zip.readEntryText("META-INF/container.xml")

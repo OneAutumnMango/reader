@@ -14,12 +14,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +36,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.appearance.ReaderSettingsEditor
 import dev.reader.app.ui.appearance.ReaderThemeEditor
+import dev.reader.core.reader.PdfRenderMode
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode
 import dev.reader.core.theme.ReaderTheme
@@ -55,6 +63,7 @@ fun readerProgressLabel(readingMode: ReadingMode, index: Int, total: Int): Strin
  * by swiping up/down on the bar itself when `swipeGestureEnabled` is true.
  */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun ReaderMenuOverlay(
     progressLabel: String,
     theme: ReaderTheme,
@@ -66,6 +75,8 @@ fun ReaderMenuOverlay(
     onExpandedChange: (Boolean) -> Unit,
     swipeGestureEnabled: Boolean = true,
     modifier: Modifier = Modifier,
+    pdfRenderMode: PdfRenderMode? = null,
+    onPdfRenderModeChange: (PdfRenderMode) -> Unit = {},
 ) {
     val swipeModifier = if (swipeGestureEnabled) {
         Modifier.pointerInput(Unit) {
@@ -117,6 +128,32 @@ fun ReaderMenuOverlay(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                     Text(progressLabel, style = MaterialTheme.typography.labelLarge)
+                    if (pdfRenderMode != null) {
+                        val nextMode = if (pdfRenderMode == PdfRenderMode.FIXED_PAGE) {
+                            PdfRenderMode.REFLOW_TEXT
+                        } else {
+                            PdfRenderMode.FIXED_PAGE
+                        }
+                        val label = if (nextMode == PdfRenderMode.REFLOW_TEXT) {
+                            "Show extracted text"
+                        } else {
+                            "Show PDF pages"
+                        }
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                TooltipAnchorPosition.Above,
+                            ),
+                            tooltip = { PlainTooltip { Text(label) } },
+                            state = rememberTooltipState(),
+                        ) {
+                            IconButton(
+                                onClick = { onPdfRenderModeChange(nextMode) },
+                                modifier = Modifier.testTag("reader-menu-pdf-mode"),
+                            ) {
+                                Icon(Icons.Filled.Refresh, contentDescription = label)
+                            }
+                        }
+                    }
                     IconButton(
                         onClick = { onExpandedChange(!expanded) },
                         modifier = Modifier.testTag("reader-menu-expand"),

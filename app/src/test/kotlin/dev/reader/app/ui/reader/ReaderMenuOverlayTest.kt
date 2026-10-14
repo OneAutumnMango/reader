@@ -5,9 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import dev.reader.core.reader.PdfRenderMode
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode
 import dev.reader.core.theme.ReaderTheme
@@ -23,6 +25,33 @@ class ReaderMenuOverlayTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun `PDF button toggles between original pages and extracted text`() {
+        var mode = PdfRenderMode.FIXED_PAGE
+        composeRule.setContent {
+            var selected by remember { mutableStateOf(PdfRenderMode.FIXED_PAGE) }
+            ReaderMenuOverlay(
+                progressLabel = "Page 1 of 10",
+                theme = ReaderTheme.Default,
+                onThemeChange = {},
+                settings = ReaderSettings(),
+                onSettingsChange = {},
+                onBack = {},
+                expanded = false,
+                onExpandedChange = {},
+                pdfRenderMode = selected,
+                onPdfRenderModeChange = {
+                    selected = it
+                    mode = it
+                },
+            )
+        }
+        composeRule.onNodeWithContentDescription("Show extracted text").performClick()
+        assertEquals(PdfRenderMode.REFLOW_TEXT, mode)
+        composeRule.onNodeWithContentDescription("Show PDF pages").performClick()
+        assertEquals(PdfRenderMode.FIXED_PAGE, mode)
+    }
 
     @Test
     fun `shows the progress label and nothing expanded by default`() {

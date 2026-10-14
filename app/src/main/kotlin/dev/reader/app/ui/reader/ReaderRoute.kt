@@ -22,12 +22,14 @@ import dev.reader.app.data.ChapterContent
 import dev.reader.app.data.ChapterLoader
 import dev.reader.app.data.ReaderGraph
 import dev.reader.core.model.Book
+import dev.reader.core.model.BookFormat
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Bookmark
 import dev.reader.core.model.BookmarkId
 import dev.reader.core.model.Chapter
 import dev.reader.core.model.ChapterId
 import dev.reader.core.model.Progress
+import dev.reader.core.reader.PdfRenderMode
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode
 import dev.reader.core.reader.TapAction
@@ -110,6 +112,14 @@ fun ReaderRoute(
                 onBack = onOpenMenu,
                 expanded = menuExpanded,
                 onExpandedChange = { menuExpanded = it },
+                pdfRenderMode = if (book.format == BookFormat.PDF) {
+                    book.pdfRenderMode ?: PdfRenderMode.FIXED_PAGE
+                } else {
+                    null
+                },
+                onPdfRenderModeChange = { mode ->
+                    scope.launch { graph.library.updateBookDetails(book.copy(pdfRenderMode = mode)) }
+                },
                 swipeGestureEnabled = readingMode != ReadingMode.PAGED_VERTICAL,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
@@ -142,8 +152,8 @@ private fun ChapterPage(
     onPositionChanged: (Int, Int) -> Unit,
 ) {
     val context = LocalContext.current
-    var content by remember(chapter.id) { mutableStateOf<ChapterContent?>(null) }
-    var loadFailed by remember(chapter.id) { mutableStateOf(false) }
+    var content by remember(chapter.id, book.pdfRenderMode) { mutableStateOf<ChapterContent?>(null) }
+    var loadFailed by remember(chapter.id, book.pdfRenderMode) { mutableStateOf(false) }
     var initialPositionFraction by remember(chapter.id) { mutableStateOf<Float?>(null) }
     var lastFraction by remember(chapter.id) { mutableStateOf(0f) }
     val sessionStartedAt = remember(chapter.id) { Clock.System.now() }
@@ -164,7 +174,7 @@ private fun ChapterPage(
         }
     }
 
-    LaunchedEffect(chapter.id) {
+    LaunchedEffect(chapter.id, book.pdfRenderMode) {
         content = ChapterLoader.load(context, book, chapter)
         loadFailed = content == null
     }
