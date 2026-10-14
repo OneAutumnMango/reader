@@ -29,6 +29,17 @@ class ChapterDetectorTest {
     }
 
     @Test
+    fun `finds standalone bold lines in markdown`() {
+        val titles = listOf("**The Arrival**", "**A Long Night**", "**Homecoming**")
+        val text = book(titles, extra = "Some **bold** words mid-sentence.\n\n")
+
+        val pattern = requireNotNull(ChapterSplitter.detectPattern(text, markdown = true))
+
+        val detected = ChapterSplitter.breaks(text, pattern).map { it.title }
+        assertEquals(listOf("The Arrival", "A Long Night", "Homecoming"), detected)
+    }
+
+    @Test
     fun `learns a recurring prefix from the book itself`() {
         val titles = (1..5).map { "Log Entry #$it" }
 

@@ -83,6 +83,14 @@ internal object ChapterDetector {
             add(Strategy("# headings", "^#\\s+\\S", weight = 3.0, minMatches = 2))
             add(Strategy("## headings", "^##\\s+\\S", weight = 2.8, minMatches = 2))
             add(Strategy("### headings", "^###\\s+\\S", weight = 2.0, minMatches = 3))
+            add(
+                Strategy(
+                    "Standalone **bold** lines",
+                    ChapterSplitter.STANDALONE_PREFIX + BOLD_PATTERN,
+                    weight = 2.4,
+                    minMatches = 2,
+                ),
+            )
         }
         add(Strategy("Chapter / Part / Prologue headings", KEYWORD_PATTERN, weight = 3.0, minMatches = 2))
         add(Strategy("第N章 headings", CJK_PATTERN, weight = 3.0, minMatches = 2))
