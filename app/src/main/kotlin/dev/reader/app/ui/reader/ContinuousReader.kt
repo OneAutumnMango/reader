@@ -39,9 +39,7 @@ fun ContinuousReader(
         .toInt()
         .coerceIn(0, (document.blocks.size - 1).coerceAtLeast(0))
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
-    LaunchedEffect(listState.firstVisibleItemIndex, document.blocks.size) {
-        onPositionChanged(listState.firstVisibleItemIndex, document.blocks.size)
-    }
+    ReportReadingPosition(listState, document.blocks.size, onPositionChanged)
     LaunchedEffect(jump) {
         jump?.let { listState.scrollToItem(it.block.coerceIn(0, (document.blocks.size - 1).coerceAtLeast(0))) }
     }

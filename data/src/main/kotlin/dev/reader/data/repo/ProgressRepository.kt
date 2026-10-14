@@ -9,6 +9,7 @@ import dev.reader.data.room.toEntity
 import dev.reader.data.room.toProgress
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlin.time.Instant
 
 class ProgressRepository(private val database: ReaderDatabase) {
 
@@ -29,4 +30,24 @@ class ProgressRepository(private val database: ReaderDatabase) {
 
     suspend fun updateChapterProgress(progress: Progress) =
         database.chapterProgress().upsert(progress.toChapterEntity())
+
+    fun observeChapterProgress(bookId: BookId): Flow<Map<ChapterId, Progress>> =
+        database.chapterProgress().observeForBook(bookId.value).map { rows ->
+            rows.associate { ChapterId(it.chapterId) to it.toProgress() }
+        }
+
+    /** 0..1 through each book, from its chapters' progress. */
+    fun observeBookFractions(): Flow<Map<BookId, Float>> =
+        database.chapterProgress().observeBookFractions().map { rows ->
+            rows.associate { BookId(it.bookId) to it.fraction }
+        }
+
+    /** Marks [chapterIds] read (finished, at the end) or unread (back to the start). */
+    suspend fun setChaptersRead(bookId: BookId, chapterIds: List<ChapterId>, read: Boolean, now: Instant) =
+        database.chapterProgress().upsertAll(
+            chapterIds.map { id ->
+                Progress(bookId, id, position = if (read) 1f else 0f, updatedAt = now, finished = read)
+                    .toChapterEntity()
+            },
+        )
 }

@@ -54,29 +54,6 @@ fun AppearanceRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         }
 
         MenuSection("Reader theme") {
-            ReaderThemePresetPicker(
-                presets = preferences.themePresets,
-                activeName = preferences.activeThemePresetName,
-                onSelect = { name -> update { it.copy(activeThemePresetName = name) } },
-                onSaveAsNew = { name ->
-                    update {
-                        it.copy(
-                            themePresets = it.themePresets + activeTheme.copy(name = name),
-                            activeThemePresetName = name,
-                        )
-                    }
-                },
-                onDelete = { name ->
-                    update { prefs ->
-                        val remaining = prefs.themePresets.filterNot { preset -> preset.name == name }
-                        val active = prefs.activeThemePresetName.takeIf { it != name }
-                            ?: remaining.firstOrNull()?.name
-                            ?: ReaderTheme.Default.name
-                        prefs.copy(themePresets = remaining, activeThemePresetName = active)
-                    }
-                },
-                modifier = Modifier.padding(bottom = 12.dp),
-            )
             ReaderThemeEditor(
                 activeTheme,
                 onChange = { theme ->
@@ -88,6 +65,30 @@ fun AppearanceRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
                     }
                 },
                 showPreview = true,
+                presetPicker = {
+                    ReaderThemePresetPicker(
+                        presets = preferences.themePresets,
+                        activeName = preferences.activeThemePresetName,
+                        onSelect = { name -> update { it.copy(activeThemePresetName = name) } },
+                        onSaveAsNew = { name ->
+                            update {
+                                it.copy(
+                                    themePresets = it.themePresets + activeTheme.copy(name = name),
+                                    activeThemePresetName = name,
+                                )
+                            }
+                        },
+                        onDelete = { name ->
+                            update { prefs ->
+                                val remaining = prefs.themePresets.filterNot { preset -> preset.name == name }
+                                val active = prefs.activeThemePresetName.takeIf { it != name }
+                                    ?: remaining.firstOrNull()?.name
+                                    ?: ReaderTheme.Default.name
+                                prefs.copy(themePresets = remaining, activeThemePresetName = active)
+                            }
+                        },
+                    )
+                },
             )
         }
 

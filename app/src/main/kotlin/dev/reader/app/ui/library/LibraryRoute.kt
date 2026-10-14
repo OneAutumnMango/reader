@@ -30,16 +30,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
+import dev.reader.app.data.markBookRead
 import dev.reader.app.ui.rememberImportActions
 import dev.reader.core.model.Book
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
-import dev.reader.core.model.Progress
 import dev.reader.core.theme.LibraryLayout
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
-import kotlin.time.Clock
 
 @Composable
 fun LibraryRoute(
@@ -57,6 +55,7 @@ fun LibraryRoute(
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
     val preferences by graph.settings.preferences.collectAsState(initial = null)
     val progressByBook by graph.progress.observeAll().collectAsState(initial = emptyMap())
+    val fractionByBook by graph.progress.observeBookFractions().collectAsState(initial = emptyMap())
     val importActions = rememberImportActions(graph)
     var showQuickAddMenu by remember { mutableStateOf(false) }
     var longPressedBook by remember { mutableStateOf<Book?>(null) }
@@ -94,8 +93,10 @@ fun LibraryRoute(
                 books = books,
                 categories = categories,
                 selectedCategory = selectedCategory,
-                progressFor = { id -> progressByBook[id]?.takeUnless { it.finished }?.position },
-                finishedFor = { id -> progressByBook[id]?.finished ?: false },
+                progressFor = { id ->
+                    fractionByBook[id]?.takeIf { it > 0f && it < 1f && progressByBook[id]?.finished != true }
+                },
+                finishedFor = { id -> progressByBook[id]?.finished == true || (fractionByBook[id] ?: 0f) >= 1f },
                 onCategorySelected = onCategorySelected,
                 onBookClick = onOpenBook,
                 onBookLongClick = { longPressedBook = it },
@@ -131,22 +132,7 @@ fun LibraryRoute(
                     coverTargetBook = book
                     coverPickerLauncher.launch(arrayOf("image/*"))
                 },
-                onMarkAllRead = {
-                    scope.launch {
-                        val lastChapter = graph.library.observeChapters(book.id).first().lastOrNull()
-                        if (lastChapter != null) {
-                            graph.progress.update(
-                                Progress(
-                                    bookId = book.id,
-                                    chapterId = lastChapter.id,
-                                    position = 1f,
-                                    updatedAt = Clock.System.now(),
-                                    finished = true,
-                                ),
-                            )
-                        }
-                    }
-                },
+                onMarkAllRead = { scope.launch { graph.markBookRead(book.id) } },
                 onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
                 onDismiss = { longPressedBook = null },
                 onDetectChapters = if (book.supportsChapterDetection()) ({ chapterDetectBook = book }) else null,

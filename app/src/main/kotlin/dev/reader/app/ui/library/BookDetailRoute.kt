@@ -18,10 +18,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
+import dev.reader.app.data.markBookRead
 import dev.reader.app.ui.ScreenTopBar
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Chapter
-import dev.reader.core.model.Progress
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
@@ -43,6 +43,7 @@ fun BookDetailRoute(
     val extras = chapters.filter { it.isExtra && it !in regularChapters }
     val bookmarks by graph.bookmarks.observe(bookId).collectAsState(initial = emptyList())
     val progress by graph.progress.observe(bookId).collectAsState(initial = null)
+    val chapterProgress by graph.progress.observeChapterProgress(bookId).collectAsState(initial = emptyMap())
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
     val currentChapter = chapters.find { it.id == progress?.chapterId }
     var showMenu by remember { mutableStateOf(false) }
@@ -68,10 +69,18 @@ fun BookDetailRoute(
         extras = extras,
         bookmarks = bookmarks,
         onChapterClick = onOpenChapter,
-        currentChapterOrderIndex = currentChapter?.orderIndex,
+        currentChapterId = currentChapter?.id,
+        chapterProgress = chapterProgress,
         resumeLabel = if (currentChapter != null) "Resume" else "Start reading",
         onResume = { (currentChapter ?: regularChapters.firstOrNull())?.let(onOpenChapter) },
         onOpenBookmarks = onOpenBookmarks,
+        onSetRead = { targets, read ->
+            scope.launch {
+                val now = Clock.System.now()
+                graph.progress.setChaptersRead(book.id, targets.map { it.id }, read, now)
+                progress?.takeIf { !read && it.finished }?.let { graph.progress.update(it.copy(finished = false)) }
+            }
+        },
         state = state,
         modifier = modifier,
     )
@@ -87,22 +96,7 @@ fun BookDetailRoute(
                 scope.launch { graph.library.updateBookDetails(book.copy(title = newTitle)) }
             },
             onChangeCover = { coverPickerLauncher.launch(arrayOf("image/*")) },
-            onMarkAllRead = {
-                scope.launch {
-                    val lastChapter = regularChapters.lastOrNull()
-                    if (lastChapter != null) {
-                        graph.progress.update(
-                            Progress(
-                                bookId = book.id,
-                                chapterId = lastChapter.id,
-                                position = 1f,
-                                updatedAt = Clock.System.now(),
-                                finished = true,
-                            ),
-                        )
-                    }
-                }
-            },
+            onMarkAllRead = { scope.launch { graph.markBookRead(book.id) } },
             onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
             onDismiss = { showMenu = false },
             onDetectChapters = if (book.supportsChapterDetection()) ({ showChapterDetect = true }) else null,

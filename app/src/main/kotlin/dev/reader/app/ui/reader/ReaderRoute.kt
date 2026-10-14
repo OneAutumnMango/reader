@@ -197,6 +197,7 @@ private fun ChapterPage(
     var content by remember(chapter.id, book.pdfRenderMode) { mutableStateOf<ChapterContent?>(null) }
     var loadFailed by remember(chapter.id, book.pdfRenderMode) { mutableStateOf(false) }
     var initialPositionFraction by remember(chapter.id) { mutableStateOf<Float?>(null) }
+    var finished by remember(chapter.id) { mutableStateOf(false) }
     var lastFraction by remember(chapter.id) { mutableStateOf(0f) }
     var lastIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
     var pagesTurned by remember(chapter.id) { mutableStateOf(0) }
@@ -228,7 +229,9 @@ private fun ChapterPage(
 
     LaunchedEffect(chapter.id) {
         val saved = graph.progress.observeChapterProgress(book.id, chapter.id).first()
-        initialPositionFraction = saved?.position ?: 0f
+        finished = saved?.finished == true
+        // A finished chapter is being re-read, so start it from the top.
+        initialPositionFraction = if (finished) 0f else saved?.position ?: 0f
     }
 
     fun onTapAction(action: TapAction) {
@@ -254,14 +257,19 @@ private fun ChapterPage(
         if (lastIndex != null && lastIndex != index) pagesTurned++
         lastIndex = index
         if (pageCount > 0) {
-            lastFraction = index.toFloat() / pageCount
+            val atEnd = index >= pageCount - 1
+            if (atEnd) finished = true
+            lastFraction = if (atEnd) 1f else index.toFloat() / pageCount
+            val position = lastFraction
+            val done = finished
             scope.launch {
                 graph.progress.updateChapterProgress(
                     Progress(
                         bookId = book.id,
                         chapterId = chapter.id,
-                        position = index.toFloat() / pageCount,
+                        position = position,
                         updatedAt = Clock.System.now(),
+                        finished = done,
                     ),
                 )
             }

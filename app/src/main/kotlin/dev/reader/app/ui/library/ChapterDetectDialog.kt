@@ -13,6 +13,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -37,7 +43,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.AppLog
 import dev.reader.app.data.ReaderGraph
-import dev.reader.app.ui.RadioOptions
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.parser.pdf.PdfTextParser
@@ -138,26 +143,39 @@ fun ChapterDetectDialog(
     var excludedLines by remember(pattern) {
         mutableStateOf(if (pattern == currentPattern) currentExcludedLines else emptySet())
     }
+    var showPicker by remember { mutableStateOf(false) }
+
+    // A saved auto-detected split reopens as Auto-detect with that suggestion chosen, not as a raw regex.
+    LaunchedEffect(suggestions) {
+        val index = suggestions.indexOfFirst { it.pattern == currentPattern }
+        if (index >= 0 && mode == ChapterDetectMode.REGEX && input == currentPattern) {
+            mode = ChapterDetectMode.AUTO
+            suggestionIndex = index
+        }
+    }
+
+    fun selectMode(next: ChapterDetectMode) {
+        if (next == ChapterDetectMode.PICK_LINES && picked.isEmpty()) {
+            picked = breaks.getOrNull().orEmpty().map { it.line }.filterNot { it in excludedLines }.toSet()
+        }
+        mode = next
+    }
+
+    if (showPicker && text != null) {
+        ChapterLinePicker(
+            text = text,
+            picked = picked,
+            onToggle = { line -> picked = if (line in picked) picked - line else picked + line },
+            onDone = { showPicker = false },
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Detect chapters") },
         text = {
             Column {
-                RadioOptions(
-                    options = ChapterDetectMode.entries,
-                    selected = mode,
-                    label = {
-                        when (it) {
-                            ChapterDetectMode.AUTO -> "Auto-detect"
-                            ChapterDetectMode.STARTS_WITH -> "Starts with"
-                            ChapterDetectMode.REGEX -> "Regex"
-                            ChapterDetectMode.PICK_LINES -> "Pick lines"
-                        }
-                    },
-                    tag = { "chapter-mode-${it.name}" },
-                    onSelect = { mode = it },
-                )
+                ModeDropdown(mode, ::selectMode)
                 if (mode == ChapterDetectMode.AUTO && suggestions.size > 1) {
                     SuggestionChips(suggestions, suggestionIndex) { suggestionIndex = it }
                 }
@@ -174,7 +192,12 @@ fun ChapterDetectDialog(
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 if (mode == ChapterDetectMode.PICK_LINES) {
-                    LinePicker(text, picked) { line -> picked = if (line in picked) picked - line else picked + line }
+                    PickedChapters(
+                        text = text,
+                        breaks = breaks.getOrNull().orEmpty(),
+                        onUnpick = { line -> picked = picked - line },
+                        onOpenPicker = { showPicker = true },
+                    )
                 } else {
                     ChapterPreview(
                         text = text,
@@ -247,49 +270,71 @@ private fun ChapterPreview(
 }
 
 @Composable
-private fun LinePicker(text: String?, picked: Set<Int>, onToggle: (Int) -> Unit) {
+private fun PickedChapters(
+    text: String?,
+    breaks: List<ChapterBreak>,
+    onUnpick: (Int) -> Unit,
+    onOpenPicker: () -> Unit,
+) {
     if (text == null) {
         CircularProgressIndicator()
         return
     }
-    var filter by remember { mutableStateOf("") }
-    val lines = remember(text) { text.lines().withIndex().filter { it.value.isNotBlank() } }
-    val shown = remember(lines, filter) { lines.filter { it.value.contains(filter, ignoreCase = true) } }
-    OutlinedTextField(
-        value = filter,
-        onValueChange = { filter = it },
-        singleLine = true,
-        label = { Text("Filter lines") },
-        modifier = Modifier.fillMaxWidth().testTag("chapter-line-filter"),
-    )
-    Text(
-        "Tick each line a chapter starts on \u00b7 ${picked.size} picked",
-        style = MaterialTheme.typography.labelLarge,
-        modifier = Modifier.padding(top = 8.dp),
-    )
-    LazyColumn(modifier = Modifier.heightIn(max = PREVIEW_MAX_HEIGHT).testTag("chapter-line-picker")) {
-        items(shown, key = { it.index }) { (index, line) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("chapter-line-$index")
-                    .clickable { onToggle(index) }
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(checked = index in picked, onCheckedChange = null)
-                Text(
-                    "${index + 1}  ${line.trim()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = if (index in picked) FontWeight.SemiBold else null,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 4.dp),
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            if (breaks.isEmpty()) "No lines picked yet." else "${breaks.size} picked",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onOpenPicker, modifier = Modifier.testTag("chapter-open-picker")) {
+            Text("Pick in book")
+        }
+    }
+    LazyColumn(modifier = Modifier.heightIn(max = PREVIEW_MAX_HEIGHT).testTag("chapter-preview")) {
+        items(breaks, key = { it.line }) { chapterBreak ->
+            ChapterBreakRow(chapterBreak, kept = true) { onUnpick(chapterBreak.line) }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModeDropdown(mode: ChapterDetectMode, onSelect: (ChapterDetectMode) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = mode.label,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Method") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+                .testTag("chapter-mode"),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            ChapterDetectMode.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    },
+                    modifier = Modifier.testTag("chapter-mode-${option.name}"),
                 )
             }
         }
     }
 }
+
+private val ChapterDetectMode.label: String
+    get() = when (this) {
+        ChapterDetectMode.AUTO -> "Auto-detect"
+        ChapterDetectMode.STARTS_WITH -> "Lines starting with"
+        ChapterDetectMode.REGEX -> "Regular expression"
+        ChapterDetectMode.PICK_LINES -> "Pick lines"
+    }
 
 @Composable
 private fun ChapterBreakRow(chapterBreak: ChapterBreak, kept: Boolean, onToggle: () -> Unit) {

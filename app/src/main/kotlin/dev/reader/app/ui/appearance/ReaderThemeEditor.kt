@@ -45,6 +45,7 @@ fun ReaderThemeEditor(
     onChange: (ReaderTheme) -> Unit,
     modifier: Modifier = Modifier,
     showPreview: Boolean = false,
+    presetPicker: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier = modifier) {
         if (showPreview) ThemePreview(theme)
@@ -59,6 +60,11 @@ fun ReaderThemeEditor(
             tag = { "justification-${it.name}" },
             onSelect = { onChange(theme.copy(justification = it)) },
         )
+
+        if (presetPicker != null) {
+            MenuSubheader("Preset")
+            presetPicker()
+        }
 
         MenuSubheader("Colours")
         Row(verticalAlignment = Alignment.CenterVertically) {

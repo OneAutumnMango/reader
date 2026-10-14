@@ -1,9 +1,15 @@
 package dev.reader.app.ui.reader
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.RichDocument
@@ -51,7 +57,27 @@ class ContinuousReaderTest {
     }
 
     @Test
-    fun `reports the first visible block index and total block count`() {
+    fun `reports the first visible block until the end is reached`() {
+        val long = RichDocument((1..60).map { Block.Paragraph(listOf(Span("Paragraph $it"))) })
+        var reported: Pair<Int, Int>? = null
+        composeRule.setContent {
+            ContinuousReader(
+                long,
+                ReaderTheme.Default,
+                ReaderSettings(),
+                Modifier.size(300.dp, 400.dp).testTag("reader"),
+                onPositionChanged = { index, total -> reported = index to total },
+            )
+        }
+
+        assertEquals(0 to 60, reported)
+        composeRule.onNodeWithTag("reader").performScrollToIndex(59)
+        composeRule.waitForIdle()
+        assertEquals(59 to 60, reported)
+    }
+
+    @Test
+    fun `a chapter that fits on screen reports its end straight away`() {
         var reported: Pair<Int, Int>? = null
         composeRule.setContent {
             ContinuousReader(
@@ -62,6 +88,6 @@ class ContinuousReaderTest {
             )
         }
 
-        assertEquals(0 to 2, reported)
+        assertEquals(1 to 2, reported)
     }
 }

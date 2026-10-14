@@ -5,9 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performScrollToKey
-import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import dev.reader.parser.text.ChapterSplitter
 import org.junit.Rule
@@ -27,11 +25,14 @@ class ChapterDetectDialogTest {
     private var applied: String? = "unset"
     private var appliedExcluded: Set<Int> = setOf(-1)
 
-    private fun setContent(currentExcludedLines: Set<Int> = emptySet()) = composeRule.setContent {
+    private fun setContent(
+        currentExcludedLines: Set<Int> = emptySet(),
+        currentPattern: String? = null,
+    ) = composeRule.setContent {
         ChapterDetectDialog(
             text,
             markdown = false,
-            currentPattern = null,
+            currentPattern = currentPattern,
             onApply = { pattern, excluded ->
                 applied = pattern
                 appliedExcluded = excluded
@@ -65,21 +66,46 @@ class ChapterDetectDialogTest {
     }
 
     @Test
-    fun `pick lines applies the ticked lines, filtered by text`() {
+    fun `pick lines starts from the current split and adds lines picked in the book`() {
         setContent()
 
+        composeRule.onNodeWithTag("chapter-mode").performClick()
         composeRule.onNodeWithTag("chapter-mode-PICK_LINES").performClick()
-        composeRule.onNodeWithTag("chapter-detect-apply").assertIsNotEnabled()
-        composeRule.onNodeWithTag("chapter-line-filter").performTextInput("interlude")
-        composeRule.onNodeWithTag("chapter-line-8").performScrollTo().performClick()
-        composeRule.onNodeWithTag("chapter-line-filter").performTextClearance()
-        composeRule.onNodeWithTag("chapter-line-picker").performScrollToKey(2)
-        composeRule.onNodeWithTag("chapter-line-2").performClick()
-        composeRule.onNodeWithText("Tick each line a chapter starts on \u00b7 2 picked").assertExists()
+        composeRule.onNodeWithTag("chapter-break-0").assertExists()
+        composeRule.onNodeWithTag("chapter-break-4").assertExists()
+
+        composeRule.onNodeWithTag("chapter-open-picker").performClick()
+        composeRule.onNodeWithTag("chapter-picker-lines").performScrollToIndex(8)
+        composeRule.onNodeWithTag("chapter-line-8").performClick()
+        composeRule.onNodeWithTag("chapter-picker-done").performClick()
+        composeRule.onNodeWithTag("chapter-break-4").performClick()
         composeRule.onNodeWithTag("chapter-detect-apply").performClick()
 
-        assertEquals(ChapterSplitter.linesPattern(listOf(2, 8)), applied)
+        assertEquals(ChapterSplitter.linesPattern(listOf(0, 8)), applied)
         assertEquals(emptySet(), appliedExcluded)
+    }
+
+    @Test
+    fun `reopening keeps picked lines listed and highlighted until toggled off`() {
+        setContent(currentPattern = ChapterSplitter.linesPattern(listOf(0, 8)))
+
+        composeRule.onNodeWithTag("chapter-break-8").assertExists()
+        composeRule.onNodeWithTag("chapter-open-picker").performClick()
+        composeRule.onNodeWithText("Tap a line to start a chapter there \u00b7 2 picked").assertExists()
+        composeRule.onNodeWithTag("chapter-picker-lines").performScrollToIndex(8)
+        composeRule.onNodeWithTag("chapter-line-8").performClick()
+        composeRule.onNodeWithTag("chapter-picker-done").performClick()
+        composeRule.onNodeWithTag("chapter-detect-apply").performClick()
+
+        assertEquals(ChapterSplitter.linesPattern(listOf(0)), applied)
+    }
+
+    @Test
+    fun `a saved auto-detected split reopens as auto-detect`() {
+        setContent(currentPattern = ChapterSplitter.detectPattern(text, markdown = false))
+
+        composeRule.onNodeWithText("Auto-detect").assertExists()
+        composeRule.onNodeWithText("2 of 2 chapters kept").assertExists()
     }
 
     @Test
@@ -109,6 +135,7 @@ class ChapterDetectDialogTest {
     fun `a custom starts-with string changes the breaks`() {
         setContent()
 
+        composeRule.onNodeWithTag("chapter-mode").performClick()
         composeRule.onNodeWithTag("chapter-mode-STARTS_WITH").performClick()
         composeRule.onNodeWithTag("chapter-pattern-field").performTextInput("~ ")
 

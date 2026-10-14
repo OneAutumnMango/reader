@@ -1,7 +1,10 @@
 package dev.reader.app.ui.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -16,17 +19,24 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
@@ -46,17 +57,31 @@ import androidx.compose.ui.unit.dp
 import dev.reader.core.model.Book
 import dev.reader.core.model.Bookmark
 import dev.reader.core.model.Chapter
+import dev.reader.core.model.ChapterId
+import dev.reader.core.model.Progress
 
 private val COVER_WIDTH = 120.dp
 private val COVER_HEIGHT = 180.dp
+private val FAB_CLEARANCE = 88.dp
 private const val READ_CHAPTER_ALPHA = 0.5f
 private const val TITLE_MAX_LINES = 3
+private const val PERCENT = 100
 
-/** Kept per book outside the screen, so the scroll position and book-info toggle survive opening a chapter. */
+enum class ChapterSort(val label: String) {
+    ASCENDING("First to last"),
+    DESCENDING("Last to first"),
+    UNREAD_FIRST("Unread first"),
+}
+
+/** Kept per book outside the screen, so scroll position, book-info toggle and sort survive opening a chapter. */
 class BookDetailState {
     val listState = LazyListState()
     var showExtras by mutableStateOf(false)
+    var sort by mutableStateOf(ChapterSort.ASCENDING)
 }
+
+/** A chapter's place in the book (1-based, extras excluded), whatever order the list is sorted in. */
+private data class NumberedChapter(val number: Int, val chapter: Chapter)
 
 @Composable
 fun BookDetailScreen(
@@ -65,41 +90,65 @@ fun BookDetailScreen(
     bookmarks: List<Bookmark>,
     onChapterClick: (Chapter) -> Unit,
     modifier: Modifier = Modifier,
-    currentChapterOrderIndex: Int? = null,
+    currentChapterId: ChapterId? = null,
+    chapterProgress: Map<ChapterId, Progress> = emptyMap(),
     resumeLabel: String? = null,
     onResume: () -> Unit = {},
     onOpenBookmarks: () -> Unit = {},
+    onSetRead: (chapters: List<Chapter>, read: Boolean) -> Unit = { _, _ -> },
     extras: List<Chapter> = emptyList(),
     state: BookDetailState = remember { BookDetailState() },
 ) {
-    LazyColumn(state = state.listState, modifier = modifier.fillMaxSize()) {
-        item {
-            BookHeader(
-                book = book,
-                chapterCount = chapters.size,
-                currentChapterOrderIndex = currentChapterOrderIndex,
-                resumeLabel = resumeLabel,
-                onResume = onResume,
-                bookmarkCount = bookmarks.size,
-                onOpenBookmarks = onOpenBookmarks,
+    val numbered = chapters.mapIndexed { index, chapter -> NumberedChapter(index + 1, chapter) }
+    val isFinished = { chapter: Chapter -> chapterProgress[chapter.id]?.finished == true }
+    val sorted = when (state.sort) {
+        ChapterSort.ASCENDING -> numbered
+        ChapterSort.DESCENDING -> numbered.asReversed()
+        ChapterSort.UNREAD_FIRST -> numbered.sortedBy { isFinished(it.chapter) }
+    }
+    val current = numbered.find { it.chapter.id == currentChapterId }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(state = state.listState, modifier = Modifier.fillMaxSize()) {
+            item {
+                BookHeader(book, chapters.size, current?.number, bookmarks.size, onOpenBookmarks)
+            }
+            if (extras.isNotEmpty()) {
+                item { BookInfoCard(extras, state.showExtras, { state.showExtras = it }, onChapterClick) }
+            }
+            item {
+                ChaptersHeader(
+                    count = chapters.size,
+                    readCount = chapters.count(isFinished),
+                    sort = state.sort,
+                    onSortChange = { state.sort = it },
+                )
+            }
+            items(sorted, key = { it.chapter.id.value }) { (number, chapter) ->
+                ChapterRow(
+                    number = number,
+                    chapter = chapter,
+                    isCurrent = chapter.id == currentChapterId,
+                    progress = chapterProgress[chapter.id],
+                    onClick = { onChapterClick(chapter) },
+                    onSetRead = { read -> onSetRead(listOf(chapter), read) },
+                    onMarkPreviousRead = { onSetRead(chapters.take(number - 1), true) },
+                )
+            }
+            item { Spacer(Modifier.height(FAB_CLEARANCE)) }
+        }
+
+        if (resumeLabel != null) {
+            ExtendedFloatingActionButton(
+                onClick = onResume,
+                icon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
+                text = { Text(resumeLabel) },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .testTag("resume-button"),
             )
         }
-        if (extras.isNotEmpty()) {
-            item { BookInfoCard(extras, state.showExtras, { state.showExtras = it }, onChapterClick) }
-        }
-        item {
-            Text(
-                "Chapters",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
-            )
-            HorizontalDivider()
-        }
-        items(chapters, key = { it.id.value }) { chapter ->
-            ChapterRow(chapter, currentChapterOrderIndex) { onChapterClick(chapter) }
-        }
-        item { Spacer(Modifier.height(24.dp)) }
     }
 }
 
@@ -107,9 +156,7 @@ fun BookDetailScreen(
 private fun BookHeader(
     book: Book,
     chapterCount: Int,
-    currentChapterOrderIndex: Int?,
-    resumeLabel: String?,
-    onResume: () -> Unit,
+    currentNumber: Int?,
     bookmarkCount: Int,
     onOpenBookmarks: () -> Unit,
 ) {
@@ -137,24 +184,15 @@ private fun BookHeader(
                 )
             }
             val chapterLabel = if (chapterCount == 1) "1 chapter" else "$chapterCount chapters"
-            val progressLabel = currentChapterOrderIndex?.let { " \u00b7 on ${it + 1}" }.orEmpty()
+            val progressLabel = currentNumber?.let { " \u00b7 on $it" }.orEmpty()
             Text(
                 "${book.format.name} \u00b7 $chapterLabel$progressLabel",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp),
             )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 12.dp),
-            ) {
-                if (resumeLabel != null) {
-                    Button(onClick = onResume, modifier = Modifier.testTag("resume-button")) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
-                        Text(resumeLabel, modifier = Modifier.padding(start = 6.dp))
-                    }
-                }
-                if (bookmarkCount > 0) {
+            if (bookmarkCount > 0) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 12.dp)) {
                     OutlinedButton(onClick = onOpenBookmarks, modifier = Modifier.testTag("bookmarks-button")) {
                         Icon(Icons.Filled.Bookmark, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
                         Text("$bookmarkCount", modifier = Modifier.padding(start = 6.dp))
@@ -163,6 +201,46 @@ private fun BookHeader(
             }
         }
     }
+}
+
+@Composable
+private fun ChaptersHeader(count: Int, readCount: Int, sort: ChapterSort, onSortChange: (ChapterSort) -> Unit) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+    ) {
+        Text(
+            "Chapters",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            "  $readCount / $count read",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Box {
+            IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("chapter-sort")) {
+                Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort chapters")
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                ChapterSort.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.label) },
+                        leadingIcon = { if (option == sort) Icon(Icons.Filled.Check, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            onSortChange(option)
+                        },
+                        modifier = Modifier.testTag("chapter-sort-${option.name}"),
+                    )
+                }
+            }
+        }
+    }
+    HorizontalDivider()
 }
 
 @Composable
@@ -206,40 +284,96 @@ private fun BookInfoCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChapterRow(chapter: Chapter, currentChapterOrderIndex: Int?, onClick: () -> Unit) {
-    val isCurrent = chapter.orderIndex == currentChapterOrderIndex
-    val isRead = currentChapterOrderIndex != null && chapter.orderIndex < currentChapterOrderIndex
-    ListItem(
-        headlineContent = {
-            Text(
-                chapter.title,
-                fontWeight = if (isCurrent) FontWeight.SemiBold else null,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+private fun ChapterRow(
+    number: Int,
+    chapter: Chapter,
+    isCurrent: Boolean,
+    progress: Progress?,
+    onClick: () -> Unit,
+    onSetRead: (Boolean) -> Unit,
+    onMarkPreviousRead: () -> Unit,
+) {
+    val isRead = progress?.finished == true
+    val partial = progress?.position?.takeIf { !isRead && it > 0f }
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        ListItem(
+            headlineContent = {
+                Text(
+                    chapter.title,
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else null,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            supportingContent = if (isCurrent || partial != null) {
+                { ChapterProgressLine(isCurrent, partial) }
+            } else {
+                null
+            },
+            leadingContent = {
+                Text("$number", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 4.dp))
+            },
+            trailingContent = if (isRead) {
+                { Icon(Icons.Filled.CheckCircle, contentDescription = "Read", Modifier.size(18.dp)) }
+            } else {
+                null
+            },
+            colors = when {
+                isCurrent -> ListItemDefaults.colors(
+                    headlineColor = MaterialTheme.colorScheme.primary,
+                    supportingColor = MaterialTheme.colorScheme.primary,
+                    leadingIconColor = MaterialTheme.colorScheme.primary,
+                )
+                isRead -> ListItemDefaults.colors(
+                    headlineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = READ_CHAPTER_ALPHA),
+                    leadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = READ_CHAPTER_ALPHA),
+                    trailingIconColor = MaterialTheme.colorScheme.primary.copy(alpha = READ_CHAPTER_ALPHA),
+                )
+                else -> ListItemDefaults.colors()
+            },
+            modifier = Modifier
+                .testTag("chapter-${chapter.id.value}")
+                .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true }),
+        )
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text(if (isRead) "Mark as unread" else "Mark as read") },
+                onClick = {
+                    menuOpen = false
+                    onSetRead(!isRead)
+                },
+                modifier = Modifier.testTag("chapter-toggle-read"),
             )
-        },
-        supportingContent = if (isCurrent) ({ Text("Reading now") }) else null,
-        leadingContent = {
-            Text(
-                "${chapter.orderIndex + 1}",
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(end = 4.dp),
+            if (number > 1) {
+                DropdownMenuItem(
+                    text = { Text("Mark all before as read") },
+                    onClick = {
+                        menuOpen = false
+                        onMarkPreviousRead()
+                    },
+                    modifier = Modifier.testTag("chapter-mark-previous"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChapterProgressLine(isCurrent: Boolean, partial: Float?) {
+    Column {
+        val label = listOfNotNull(
+            "Reading now".takeIf { isCurrent },
+            partial?.let { "${(it * PERCENT).toInt()}% read" },
+        ).joinToString(" \u00b7 ")
+        Text(label)
+        if (partial != null) {
+            LinearProgressIndicator(
+                progress = { partial },
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag("chapter-progress"),
             )
-        },
-        colors = when {
-            isCurrent -> ListItemDefaults.colors(
-                headlineColor = MaterialTheme.colorScheme.primary,
-                supportingColor = MaterialTheme.colorScheme.primary,
-                leadingIconColor = MaterialTheme.colorScheme.primary,
-            )
-            isRead -> ListItemDefaults.colors(
-                headlineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = READ_CHAPTER_ALPHA),
-            )
-            else -> ListItemDefaults.colors()
-        },
-        modifier = Modifier
-            .testTag("chapter-${chapter.id.value}")
-            .clickable(onClick = onClick),
-    )
+        }
+    }
 }

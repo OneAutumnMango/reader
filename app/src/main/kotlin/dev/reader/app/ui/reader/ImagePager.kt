@@ -38,7 +38,7 @@ fun ImagePager(
 
     if (readingMode == ReadingMode.CONTINUOUS_SCROLL) {
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = startPage)
-        LaunchedEffect(listState.firstVisibleItemIndex) { onPageChanged(listState.firstVisibleItemIndex) }
+        ReportReadingPosition(listState, pageCount) { index, _ -> onPageChanged(index) }
         Zoomable(zoomEnabled, modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
