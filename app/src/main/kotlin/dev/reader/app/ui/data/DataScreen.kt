@@ -147,7 +147,8 @@ private fun DangerZone(busy: Boolean, onDanger: (DangerAction) -> Unit) {
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "These actions permanently delete data and cannot be undone. Make a backup first.",
+                "These actions permanently delete app data and cannot be undone. Make a backup first. " +
+                    "Your original book files on your device are never deleted.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(12.dp))

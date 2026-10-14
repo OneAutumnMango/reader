@@ -8,11 +8,14 @@ enum class DangerAction(
 ) {
     REMOVE_ALL_BOOKS(
         label = "Remove all books",
-        consequence = "Every book will be removed from your library, along with all of its chapters, bookmarks " +
-            "and reading progress. Your categories, stats and settings stay. The book files on your device " +
-            "aren't deleted.",
-        finalWarning = "Your entire library, every bookmark and all reading progress will be permanently deleted. " +
-            "There is no way to get them back unless you have a backup.",
+        consequence = "Every book will be removed from this app's library, along with the reader data the app " +
+            "keeps for it: chapters, bookmarks, reading progress, custom titles, covers and chapter settings. " +
+            "Your categories, stats and settings stay.\n\n" +
+            "Your original book files are NOT deleted. They stay exactly where they are on your device, " +
+            "and you can add them again at any time.",
+        finalWarning = "All reader data for every book (bookmarks, reading progress, custom titles and covers) " +
+            "will be permanently deleted and can't be recovered without a backup.\n\n" +
+            "Your original book files will not be touched.",
         confirmLabel = "Yes, remove all books",
     ),
     RESET_STATS(
