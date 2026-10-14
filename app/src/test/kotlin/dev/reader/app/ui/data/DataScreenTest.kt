@@ -1,13 +1,10 @@
 package dev.reader.app.ui.data
 
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextClearance
-import androidx.compose.ui.test.performTextInput
 import dev.reader.data.export.ExportScope
 import org.junit.Rule
 import org.junit.Test
@@ -79,21 +76,18 @@ class DangerConfirmDialogTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `needs a continue and the typed confirmation word before it runs`() {
+    fun `needs two explicit confirmations before it runs`() {
         var confirmed = false
         composeRule.setContent {
             DangerConfirmDialog(DangerAction.REMOVE_ALL_BOOKS, onConfirm = { confirmed = true }, onDismiss = {})
         }
 
+        composeRule.onNodeWithText(DangerAction.REMOVE_ALL_BOOKS.consequence).assertExists()
         composeRule.onNodeWithTag("danger-continue").performClick()
-        composeRule.onNodeWithTag("danger-confirm").assertIsNotEnabled()
-        composeRule.onNodeWithTag("danger-confirm-field").performTextInput("delete")
-        composeRule.onNodeWithTag("danger-confirm").assertIsNotEnabled()
         assertFalse(confirmed)
 
-        composeRule.onNodeWithTag("danger-confirm-field").performTextClearance()
-        composeRule.onNodeWithTag("danger-confirm-field").performTextInput(DANGER_CONFIRM_WORD)
-        composeRule.onNodeWithTag("danger-confirm").assertIsEnabled().performClick()
+        composeRule.onNodeWithText(DangerAction.REMOVE_ALL_BOOKS.finalWarning).assertExists()
+        composeRule.onNodeWithTag("danger-confirm").performClick()
 
         assertTrue(confirmed)
     }

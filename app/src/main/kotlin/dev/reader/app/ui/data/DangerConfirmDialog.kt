@@ -1,12 +1,10 @@
 package dev.reader.app.ui.data
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,26 +17,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-const val DANGER_CONFIRM_WORD = "DELETE"
-
-enum class DangerAction(val label: String, val consequence: String) {
-    REMOVE_ALL_BOOKS(
-        "Remove all books",
-        "Every book is removed from your library, along with its chapters, bookmarks and reading progress. " +
-            "Your book files on disk aren't touched.",
-    ),
-    RESET_STATS(
-        "Reset all stats",
-        "Every recorded reading session is deleted: reading time, words read, streaks and insights " +
-            "all go back to zero.",
-    ),
-}
-
-/** Two confirmations on top of the original tap: an explanation, then typing [DANGER_CONFIRM_WORD]. */
+/** Two explicit confirmations on top of the original tap, each spelling out what will be lost. */
 @Composable
 fun DangerConfirmDialog(action: DangerAction, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     var step by remember { mutableStateOf(1) }
-    var typed by remember { mutableStateOf("") }
     val dangerColors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
 
     if (step == 1) {
@@ -60,25 +42,23 @@ fun DangerConfirmDialog(action: DangerAction, onConfirm: () -> Unit, onDismiss: 
     } else {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("This can't be undone", color = MaterialTheme.colorScheme.error) },
+            title = { Text("Are you absolutely sure?", color = MaterialTheme.colorScheme.error) },
             text = {
                 Column {
-                    Text("Type $DANGER_CONFIRM_WORD to ${action.label.lowercase()}.", fontWeight = FontWeight.SemiBold)
-                    OutlinedTextField(
-                        value = typed,
-                        onValueChange = { typed = it },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("danger-confirm-field"),
+                    Text(action.finalWarning, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "This cannot be undone.",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
                     )
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = onConfirm,
-                    enabled = typed.trim() == DANGER_CONFIRM_WORD,
                     colors = dangerColors,
                     modifier = Modifier.testTag("danger-confirm"),
-                ) { Text(action.label) }
+                ) { Text(action.confirmLabel) }
             },
             dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
         )
