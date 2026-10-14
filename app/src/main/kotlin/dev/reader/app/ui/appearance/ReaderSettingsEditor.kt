@@ -31,7 +31,7 @@ private fun keepScreenAwakeLabel(option: KeepScreenAwake): String = when (option
     KeepScreenAwake.ALWAYS -> "Always"
 }
 
-/** Scrolling mode, selectable text, keep-awake and CSS-styling toggles. */
+/** Scrolling mode, selectable text, zoom, keep-awake and CSS-styling toggles. */
 @Composable
 fun ReaderSettingsEditor(settings: ReaderSettings, onChange: (ReaderSettings) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -60,6 +60,18 @@ fun ReaderSettingsEditor(settings: ReaderSettings, onChange: (ReaderSettings) ->
         ) {
             Text("Enable selectable text")
             Switch(checked = settings.selectableText, onCheckedChange = null)
+        }
+
+        Row(
+            modifier = Modifier
+                .testTag("zoom-toggle")
+                .fillMaxWidth()
+                .clickable { onChange(settings.copy(zoomEnabled = !settings.zoomEnabled)) },
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Pinch to zoom")
+            Switch(checked = settings.zoomEnabled, onCheckedChange = null)
         }
 
         Text("Keep screen awake")

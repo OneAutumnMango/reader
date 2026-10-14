@@ -3,7 +3,7 @@ package dev.reader.app.ui.reader
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import dev.reader.core.model.BookFormat
-import dev.reader.core.reader.TapZoneConfig
+import dev.reader.core.reader.ReaderSettings
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,7 +36,7 @@ class ComicReaderScreenTest {
                 file = buildCbz(),
                 format = BookFormat.CBZ,
                 pages = listOf("page1.jpg"),
-                tapZones = TapZoneConfig(),
+                settings = ReaderSettings(),
                 showTapZoneLabels = true,
             )
         }

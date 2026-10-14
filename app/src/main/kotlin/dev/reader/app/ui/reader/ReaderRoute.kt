@@ -40,6 +40,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+
+private val MIN_SESSION = 5.seconds
 
 @Composable
 fun ReaderRoute(
@@ -74,6 +77,9 @@ fun ReaderRoute(
     val pagerState = rememberPagerState(initialPage = initialPage) { chapters.size }
     val currentChapter = chapters.getOrNull(pagerState.currentPage) ?: chapters[initialPage]
     val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
+    val pdfRenderMode = if (book.format == BookFormat.PDF) book.pdfRenderMode ?: PdfRenderMode.FIXED_PAGE else null
+    val pageBased = book.format == BookFormat.CBZ || book.format == BookFormat.CBR ||
+        pdfRenderMode == PdfRenderMode.FIXED_PAGE
 
     Box(modifier = modifier.fillMaxSize()) {
         HorizontalPager(
@@ -95,7 +101,7 @@ fun ReaderRoute(
 
         if (showMenu) {
             ReaderMenuOverlay(
-                progressLabel = readerProgressLabel(readingMode, position.first, position.second),
+                progressLabel = readerProgressLabel(readingMode, position.first, position.second, pageBased),
                 theme = theme,
                 onThemeChange = { updated ->
                     scope.launch {
@@ -112,11 +118,7 @@ fun ReaderRoute(
                 onBack = onOpenMenu,
                 expanded = menuExpanded,
                 onExpandedChange = { menuExpanded = it },
-                pdfRenderMode = if (book.format == BookFormat.PDF) {
-                    book.pdfRenderMode ?: PdfRenderMode.FIXED_PAGE
-                } else {
-                    null
-                },
+                pdfRenderMode = pdfRenderMode,
                 onPdfRenderModeChange = { mode ->
                     scope.launch { graph.library.updateBookDetails(book.copy(pdfRenderMode = mode)) }
                 },
@@ -156,18 +158,23 @@ private fun ChapterPage(
     var loadFailed by remember(chapter.id, book.pdfRenderMode) { mutableStateOf(false) }
     var initialPositionFraction by remember(chapter.id) { mutableStateOf<Float?>(null) }
     var lastFraction by remember(chapter.id) { mutableStateOf(0f) }
+    var lastIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
+    var pagesTurned by remember(chapter.id) { mutableStateOf(0) }
     val sessionStartedAt = remember(chapter.id) { Clock.System.now() }
 
     DisposableEffect(chapter.id) {
         onDispose {
+            val endedAt = Clock.System.now()
+            if (endedAt - sessionStartedAt < MIN_SESSION) return@onDispose
             scope.launch {
                 graph.stats.recordSession(
                     ReadingSessionEvent(
                         bookId = book.id,
                         chapterId = chapter.id,
                         startedAt = sessionStartedAt,
-                        endedAt = Clock.System.now(),
+                        endedAt = endedAt,
                         wordsRead = (chapter.wordCount * lastFraction).toInt(),
+                        pagesTurned = pagesTurned,
                     ),
                 )
             }
@@ -204,6 +211,8 @@ private fun ChapterPage(
 
     fun onPageChanged(index: Int, pageCount: Int) {
         onPositionChanged(index, pageCount)
+        if (lastIndex != null && lastIndex != index) pagesTurned++
+        lastIndex = index
         if (pageCount > 0) {
             lastFraction = index.toFloat() / pageCount
             scope.launch {
@@ -232,18 +241,20 @@ private fun ChapterPage(
             onPageChanged = ::onPageChanged,
             modifier = Modifier.fillMaxSize(),
         )
-        loaded is ChapterContent.Comic -> ComicReaderScreen(
+        loaded is ChapterContent.Comic && startFraction != null -> ComicReaderScreen(
             file = loaded.file,
             format = loaded.format,
             pages = loaded.pages,
-            tapZones = settings.tapZones,
+            settings = settings,
+            initialPositionFraction = startFraction,
             onTapAction = ::onTapAction,
             onPageChanged = ::onPageChanged,
             modifier = Modifier.fillMaxSize(),
         )
-        loaded is ChapterContent.Pdf -> PdfReaderScreen(
+        loaded is ChapterContent.Pdf && startFraction != null -> PdfReaderScreen(
             file = loaded.file,
-            tapZones = settings.tapZones,
+            settings = settings,
+            initialPositionFraction = startFraction,
             onTapAction = ::onTapAction,
             onPageChanged = ::onPageChanged,
             modifier = Modifier.fillMaxSize(),

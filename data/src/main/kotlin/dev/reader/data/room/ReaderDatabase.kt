@@ -2,6 +2,8 @@ package dev.reader.data.room
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import dev.reader.data.room.dao.BookDao
 import dev.reader.data.room.dao.BookmarkDao
 import dev.reader.data.room.dao.CategoryDao
@@ -32,7 +34,7 @@ import dev.reader.data.room.entity.ReadingSessionEntity
         ReadingSessionEntity::class,
         ChapterFtsEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class ReaderDatabase : RoomDatabase() {
@@ -44,4 +46,12 @@ abstract class ReaderDatabase : RoomDatabase() {
     abstract fun chapterProgress(): ChapterProgressDao
     abstract fun sessions(): ReadingSessionDao
     abstract fun search(): SearchDao
+
+    companion object {
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE reading_sessions ADD COLUMN pagesTurned INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+    }
 }

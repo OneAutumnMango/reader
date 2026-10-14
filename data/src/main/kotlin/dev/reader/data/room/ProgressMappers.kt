@@ -68,6 +68,7 @@ fun ReadingSessionEntity.toEvent() = ReadingSessionEvent(
     startedAt = Instant.fromEpochMilliseconds(startedAt),
     endedAt = Instant.fromEpochMilliseconds(endedAt),
     wordsRead = wordsRead,
+    pagesTurned = pagesTurned,
 )
 
 fun ReadingSessionEvent.toEntity() = ReadingSessionEntity(
@@ -76,4 +77,5 @@ fun ReadingSessionEvent.toEntity() = ReadingSessionEntity(
     startedAt = startedAt.toEpochMilliseconds(),
     endedAt = endedAt.toEpochMilliseconds(),
     wordsRead = wordsRead,
+    pagesTurned = pagesTurned,
 )

@@ -54,6 +54,30 @@ class ReaderMenuOverlayTest {
     }
 
     @Test
+    fun `expanded menu offers a PDF display selector`() {
+        var mode = PdfRenderMode.FIXED_PAGE
+        composeRule.setContent {
+            ReaderMenuOverlay(
+                progressLabel = "Page 1 of 10",
+                theme = ReaderTheme.Default,
+                onThemeChange = {},
+                settings = ReaderSettings(),
+                onSettingsChange = {},
+                onBack = {},
+                expanded = true,
+                onExpandedChange = {},
+                pdfRenderMode = PdfRenderMode.FIXED_PAGE,
+                onPdfRenderModeChange = { mode = it },
+            )
+        }
+
+        composeRule.onNodeWithText("PDF display").assertExists()
+        composeRule.onNodeWithTag("pdf-mode-REFLOW_TEXT").performClick()
+
+        assertEquals(PdfRenderMode.REFLOW_TEXT, mode)
+    }
+
+    @Test
     fun `shows the progress label and nothing expanded by default`() {
         composeRule.setContent {
             ReaderMenuOverlay(
@@ -120,5 +144,6 @@ class ReaderMenuOverlayTest {
         assertEquals("Page 3 of 10", readerProgressLabel(ReadingMode.PAGED_VERTICAL, 2, 10))
         assertEquals("30%", readerProgressLabel(ReadingMode.CONTINUOUS_SCROLL, 2, 10))
         assertEquals("", readerProgressLabel(ReadingMode.CONTINUOUS_SCROLL, 0, 0))
+        assertEquals("Page 3 of 10", readerProgressLabel(ReadingMode.CONTINUOUS_SCROLL, 2, 10, pageBased = true))
     }
 }

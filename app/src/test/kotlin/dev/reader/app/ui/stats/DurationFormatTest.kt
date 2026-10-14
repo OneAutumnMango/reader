@@ -3,6 +3,7 @@ package dev.reader.app.ui.stats
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 class DurationFormatTest {
 
@@ -19,5 +20,10 @@ class DurationFormatTest {
     @Test
     fun `formats zero as 0m`() {
         assertEquals("0m", 0.minutes.toReadableDuration())
+    }
+
+    @Test
+    fun `formats sub-minute reading as under a minute`() {
+        assertEquals("<1m", 30.seconds.toReadableDuration())
     }
 }

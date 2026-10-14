@@ -1,5 +1,6 @@
 package dev.reader.data.room.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -78,4 +79,5 @@ data class ReadingSessionEntity(
     val startedAt: Long,
     val endedAt: Long,
     val wordsRead: Int,
+    @ColumnInfo(defaultValue = "0") val pagesTurned: Int = 0,
 )

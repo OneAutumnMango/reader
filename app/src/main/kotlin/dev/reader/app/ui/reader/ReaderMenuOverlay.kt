@@ -8,25 +8,27 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,10 +48,13 @@ private val MENU_SHADOW_ELEVATION = 8.dp
 private const val PERCENT_MAX = 100
 private const val SWIPE_EXPAND_THRESHOLD_PX = 60f
 
-/** Formats chapter position as "Page X of Y" for paged modes, or a percentage for continuous scroll. */
-fun readerProgressLabel(readingMode: ReadingMode, index: Int, total: Int): String {
+/**
+ * Formats chapter position as "Page X of Y" for paged modes and page-image content (PDF pages,
+ * comics), or a percentage for continuously scrolled text.
+ */
+fun readerProgressLabel(readingMode: ReadingMode, index: Int, total: Int, pageBased: Boolean = false): String {
     if (total <= 0) return ""
-    return if (readingMode == ReadingMode.CONTINUOUS_SCROLL) {
+    return if (readingMode == ReadingMode.CONTINUOUS_SCROLL && !pageBased) {
         "${((index + 1) * PERCENT_MAX / total).coerceIn(0, PERCENT_MAX)}%"
     } else {
         "Page ${index + 1} of $total"
@@ -107,6 +112,11 @@ fun ReaderMenuOverlay(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp),
                 ) {
+                    if (pdfRenderMode != null) {
+                        Text("PDF display", style = MaterialTheme.typography.titleSmall)
+                        PdfModeSelector(pdfRenderMode, onPdfRenderModeChange)
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                    }
                     Text("Appearance", style = MaterialTheme.typography.titleSmall)
                     ReaderThemeEditor(theme, onThemeChange)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
@@ -129,30 +139,20 @@ fun ReaderMenuOverlay(
                     }
                     Text(progressLabel, style = MaterialTheme.typography.labelLarge)
                     if (pdfRenderMode != null) {
-                        val nextMode = if (pdfRenderMode == PdfRenderMode.FIXED_PAGE) {
-                            PdfRenderMode.REFLOW_TEXT
-                        } else {
-                            PdfRenderMode.FIXED_PAGE
-                        }
-                        val label = if (nextMode == PdfRenderMode.REFLOW_TEXT) {
-                            "Show extracted text"
-                        } else {
-                            "Show PDF pages"
-                        }
-                        TooltipBox(
-                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                                TooltipAnchorPosition.Above,
-                            ),
-                            tooltip = { PlainTooltip { Text(label) } },
-                            state = rememberTooltipState(),
-                        ) {
-                            IconButton(
-                                onClick = { onPdfRenderModeChange(nextMode) },
-                                modifier = Modifier.testTag("reader-menu-pdf-mode"),
-                            ) {
-                                Icon(Icons.Filled.Refresh, contentDescription = label)
-                            }
-                        }
+                        val showingPages = pdfRenderMode == PdfRenderMode.FIXED_PAGE
+                        val nextMode = if (showingPages) PdfRenderMode.REFLOW_TEXT else PdfRenderMode.FIXED_PAGE
+                        AssistChip(
+                            onClick = { onPdfRenderModeChange(nextMode) },
+                            label = { Text(if (showingPages) "Text view" else "Page view") },
+                            leadingIcon = {
+                                Icon(
+                                    if (showingPages) Icons.Filled.TextFields else Icons.Filled.PictureAsPdf,
+                                    contentDescription = if (showingPages) "Show extracted text" else "Show PDF pages",
+                                    modifier = Modifier.size(AssistChipDefaults.IconSize),
+                                )
+                            },
+                            modifier = Modifier.testTag("reader-menu-pdf-mode"),
+                        )
                     }
                     IconButton(
                         onClick = { onExpandedChange(!expanded) },
@@ -164,6 +164,24 @@ fun ReaderMenuOverlay(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun PdfModeSelector(mode: PdfRenderMode, onChange: (PdfRenderMode) -> Unit) {
+    val options = listOf(PdfRenderMode.FIXED_PAGE to "Original pages", PdfRenderMode.REFLOW_TEXT to "Extracted text")
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        options.forEachIndexed { index, (option, label) ->
+            SegmentedButton(
+                selected = mode == option,
+                onClick = { onChange(option) },
+                shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                modifier = Modifier.testTag("pdf-mode-${option.name}"),
+            ) {
+                Text(label)
             }
         }
     }

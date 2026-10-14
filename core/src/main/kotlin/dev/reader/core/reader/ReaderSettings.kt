@@ -17,4 +17,5 @@ data class ReaderSettings(
     val keepScreenAwake: KeepScreenAwake = KeepScreenAwake.WHILE_READING,
     val useBookStyling: Boolean = true,
     val customCss: String = "",
+    val zoomEnabled: Boolean = true,
 )

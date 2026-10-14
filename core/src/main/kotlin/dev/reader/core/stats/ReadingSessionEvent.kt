@@ -13,4 +13,5 @@ data class ReadingSessionEvent(
     val startedAt: Instant,
     val endedAt: Instant,
     val wordsRead: Int,
+    val pagesTurned: Int = 0,
 )

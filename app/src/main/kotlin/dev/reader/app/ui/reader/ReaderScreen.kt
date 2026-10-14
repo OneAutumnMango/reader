@@ -27,23 +27,25 @@ fun ReaderScreen(
 
     Box(modifier = modifier.fillMaxSize().background(theme.backgroundColor())) {
         TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
-            when (settings.readingMode) {
-                ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(
-                    document,
-                    theme,
-                    settings,
-                    Modifier.fillMaxSize(),
-                    initialPositionFraction,
-                    onPageChanged,
-                )
-                else -> PagedReader(
-                    document,
-                    theme,
-                    settings,
-                    Modifier.fillMaxSize(),
-                    initialPositionFraction,
-                    onPageChanged,
-                )
+            Zoomable(settings.zoomEnabled, Modifier.fillMaxSize()) {
+                when (settings.readingMode) {
+                    ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(
+                        document,
+                        theme,
+                        settings,
+                        Modifier.fillMaxSize(),
+                        initialPositionFraction,
+                        onPageChanged,
+                    )
+                    else -> PagedReader(
+                        document,
+                        theme,
+                        settings,
+                        Modifier.fillMaxSize(),
+                        initialPositionFraction,
+                        onPageChanged,
+                    )
+                }
             }
         }
     }

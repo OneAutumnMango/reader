@@ -41,4 +41,16 @@ class ReaderSettingsEditorTest {
 
         assertFalse(settings.selectableText)
     }
+
+    @Test
+    fun `toggling zoom off is reflected`() {
+        var settings = ReaderSettings()
+        composeRule.setContent {
+            ReaderSettingsEditor(settings, onChange = { settings = it })
+        }
+
+        composeRule.onNodeWithTag("zoom-toggle").performClick()
+
+        assertFalse(settings.zoomEnabled)
+    }
 }

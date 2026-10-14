@@ -27,7 +27,7 @@ class ReaderGraph(context: Context) {
         context.applicationContext,
         ReaderDatabase::class.java,
         "reader.db",
-    ).fallbackToDestructiveMigration(true).build()
+    ).addMigrations(ReaderDatabase.MIGRATION_2_3).fallbackToDestructiveMigration(true).build()
 
     private val stores = ReaderStores(
         fileSystem = FileSystem.SYSTEM,
