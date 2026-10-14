@@ -2,6 +2,7 @@ package dev.reader.app.ui.reader
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.richtext.Block
@@ -19,6 +20,18 @@ class ContinuousReaderTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun `renders book illustrations instead of skipping them`() {
+        composeRule.setContent {
+            ContinuousReader(
+                RichDocument(listOf(Block.Image("/missing.png", "Chapter illustration"))),
+                ReaderTheme.Default,
+                ReaderSettings(),
+            )
+        }
+        composeRule.onNodeWithContentDescription("Chapter illustration").assertIsDisplayed()
+    }
 
     private val document = RichDocument(
         listOf(

@@ -1,11 +1,10 @@
 package dev.reader.parser.fb2
 
 import dev.reader.core.model.BookFormat
-import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.RichDocument
-import dev.reader.core.richtext.Span
 import dev.reader.parser.ParsedBook
 import dev.reader.parser.ParsedChapter
+import dev.reader.parser.html.parseHtmlToRichDocument
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
@@ -62,9 +61,12 @@ object Fb2Parser {
     }
 
     private fun Element.toDocument(): RichDocument {
-        val blocks = select("> p").mapNotNull { paragraph ->
-            paragraph.text().trim().takeIf { it.isNotEmpty() }?.let { Block.Paragraph(listOf(Span(it))) }
+        val content = clone()
+        content.select("title").remove()
+        content.select("image").forEach { image ->
+            val href = image.attr("l:href").ifBlank { image.attr("xlink:href") }
+            image.tagName("img").attr("src", href)
         }
-        return RichDocument(blocks)
+        return parseHtmlToRichDocument(content.html())
     }
 }

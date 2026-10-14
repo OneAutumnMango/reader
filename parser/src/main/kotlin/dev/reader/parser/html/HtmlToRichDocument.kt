@@ -36,28 +36,49 @@ private fun walkBlocks(root: Element, classRules: Map<String, CssStyle>, blocks:
         val tag = element.tagName()
         val textAlign = styleOf(element, classRules).textAlign
         when {
-            tag == "img" -> blocks += Block.Image(element.attr("src"), element.attr("alt"))
+            tag == "img" || tag == "image" -> blocks += element.imageBlock()
             tag.matches(HEADING_PATTERN) -> {
-                blocks += Block.Heading(tag.drop(1).toInt(), spansOf(element, classRules), textAlign)
+                appendTextBlocks(element, classRules, blocks) { Block.Heading(tag.drop(1).toInt(), it, textAlign) }
             }
-            element.looksLikeTitle() -> blocks += Block.Heading(2, spansOf(element, classRules), textAlign)
+            element.looksLikeTitle() -> appendTextBlocks(element, classRules, blocks) {
+                Block.Heading(2, it, textAlign)
+            }
             tag == "ul" -> element.children().forEachIndexed { i, li ->
-                blocks += Block.ListItem(spansOf(li, classRules), ordered = false, index = i)
+                appendTextBlocks(li, classRules, blocks) { Block.ListItem(it, ordered = false, index = i) }
             }
             tag == "ol" -> element.children().forEachIndexed { i, li ->
-                blocks += Block.ListItem(spansOf(li, classRules), ordered = true, index = i)
+                appendTextBlocks(li, classRules, blocks) { Block.ListItem(it, ordered = true, index = i) }
             }
             tag in CONTAINER_TAGS -> walkBlocks(element, classRules, blocks)
-            element.text().isNotBlank() -> blocks += Block.Paragraph(spansOf(element, classRules), textAlign)
+            element.text().isNotBlank() -> appendTextBlocks(element, classRules, blocks) {
+                Block.Paragraph(it, textAlign)
+            }
             else -> walkBlocks(element, classRules, blocks)
         }
     }
 }
 
-private fun spansOf(element: Element, classRules: Map<String, CssStyle>): List<Span> {
+private fun Element.imageBlock() = Block.Image(
+    attr("src").ifBlank { attr("href").ifBlank { attr("xlink:href") } },
+    attr("alt"),
+)
+
+private fun appendTextBlocks(
+    element: Element,
+    classRules: Map<String, CssStyle>,
+    blocks: MutableList<Block>,
+    textBlock: (List<Span>) -> Block,
+) {
     val spans = mutableListOf<Span>()
-    collectSpans(element, CssStyle(), TagEmphasis(), classRules, spans)
-    return spans
+    fun flush() {
+        if (spans.isNotEmpty()) blocks += textBlock(spans.toList())
+        spans.clear()
+    }
+    collectSpans(element, CssStyle(), TagEmphasis(), classRules, spans) {
+        flush()
+        blocks += it
+    }
+    flush()
 }
 
 /** Tag-based emphasis, tracked independently of CSS so a bare `<b>` still works with no CSS at all. */
@@ -74,6 +95,7 @@ private fun collectSpans(
     tagEmphasis: TagEmphasis,
     classRules: Map<String, CssStyle>,
     spans: MutableList<Span>,
+    onImage: (Block.Image) -> Unit,
 ) {
     val css = styleOf(element, classRules).mergeOver(inheritedCss)
     val tag = element.tagName()
@@ -90,7 +112,11 @@ private fun collectSpans(
                     spans += Span(text, resolvedBold, resolvedItalic, resolvedUnderline, css.color)
                 }
             }
-            is Element -> collectSpans(node, css, resolvedEmphasis, classRules, spans)
+            is Element -> if (node.tagName() == "img" || node.tagName() == "image") {
+                onImage(node.imageBlock())
+            } else {
+                collectSpans(node, css, resolvedEmphasis, classRules, spans, onImage)
+            }
         }
     }
 }

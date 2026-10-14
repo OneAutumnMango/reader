@@ -3,6 +3,7 @@ package dev.reader.app.ui.reader
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.ReaderSettings
@@ -15,12 +16,35 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import kotlin.test.assertEquals
 
 @RunWith(RobolectricTestRunner::class)
 class PagedReaderTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun `illustrations get a page before the following text`() {
+        val document = RichDocument(
+            listOf(
+                Block.Image("/missing.png", "Map"),
+                Block.Paragraph(listOf(Span("Following text"))),
+            ),
+        )
+        var pageCount = 0
+        composeRule.setContent {
+            PagedReader(
+                document,
+                ReaderTheme.Default,
+                ReaderSettings(readingMode = ReadingMode.PAGED_HORIZONTAL_LTR),
+                modifier = Modifier.size(300.dp, 500.dp),
+                onPageChanged = { _, count -> pageCount = count },
+            )
+        }
+        composeRule.onNodeWithContentDescription("Map").assertExists()
+        assertEquals(2, pageCount)
+    }
 
     @Test
     fun `renders the first page within the measured viewport`() {

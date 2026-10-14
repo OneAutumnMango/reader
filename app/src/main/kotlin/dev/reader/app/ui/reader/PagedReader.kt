@@ -55,11 +55,10 @@ fun PagedReader(
                 constraints = Constraints(maxWidth = textWidthPx),
             )
             paginate(
-                // Images aren't rendered in text mode yet, so they'd only produce blank pages.
-                items = document.blocks.filterNot { it is Block.Image },
+                items = document.blocks,
                 pageHeight = pageHeightPx,
                 spacing = spacingPx,
-                measure = { layout(it).size.height.toFloat() },
+                measure = { if (it is Block.Image) pageHeightPx else layout(it).size.height.toFloat() },
                 split = { block, available -> splitBlock(block, available, theme, ::layout) },
                 keepWithNext = { it is Block.Heading },
             )
@@ -165,10 +164,13 @@ private fun Block.styleOf(theme: ReaderTheme, useBookStyling: Boolean) = when (t
 
 @Composable
 private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean) {
-    if (block is Block.Image) return
-    Text(
-        text = block.annotated(theme, useBookStyling),
-        style = block.styleOf(theme, useBookStyling),
-        modifier = Modifier.fillMaxWidth(),
-    )
+    if (block is Block.Image) {
+        ReaderImage(block, Modifier.fillMaxSize())
+    } else {
+        Text(
+            text = block.annotated(theme, useBookStyling),
+            style = block.styleOf(theme, useBookStyling),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }

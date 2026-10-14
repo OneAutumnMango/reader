@@ -26,7 +26,8 @@ object EpubParser {
         val manifest = opf.select("manifest > item").associateBy { it.attr("id") }
         val entries = opf.select("spine > itemref").mapNotNull { manifest[it.attr("idref")] }
         val entry = entries.getOrNull(orderIndex) ?: return@use null
-        val document = parseHtmlToRichDocument(zip.readEntryText(entry.resolve(opfPath.substringBeforeLast('/', ""))))
+        val entryName = entry.resolve(opfPath.substringBeforeLast('/', ""))
+        val document = parseDocument(zip.readEntryText(entryName), entryName)
         val title = (document.blocks.firstOrNull() as? Block.Heading)
             ?.spans?.joinToString("") { it.text }?.ifBlank { null } ?: "Chapter ${orderIndex + 1}"
         ParsedChapter.TextChapter(title, document)
@@ -60,7 +61,7 @@ object EpubParser {
             var chapterNumber = 0
             val chapters = spine.mapIndexed { index, (entryName, linear) ->
                 val html = zip.readEntryText(entryName)
-                val document = parseHtmlToRichDocument(html)
+                val document = parseDocument(html, entryName)
                 val heading = document.headingText()
                 val extraLabel = EpubExtras.classify(
                     SpineItem(
@@ -128,6 +129,16 @@ object EpubParser {
     private fun RichDocument.headingText(): String? =
         (blocks.firstOrNull() as? Block.Heading)?.spans?.joinToString("") { it.text }?.trim()?.ifBlank { null }
 
+    private fun parseDocument(html: String, entryName: String): RichDocument = RichDocument(
+        parseHtmlToRichDocument(html).blocks.map { block ->
+            if (block is Block.Image && !block.path.contains(':')) {
+                block.copy(path = resolvePath(entryName.substringBeforeLast('/', ""), block.path))
+            } else {
+                block
+            }
+        },
+    )
+
     /** Reads the cover image's raw bytes out of the epub, by its manifest-resolved entry name. */
     fun extractCover(file: File, entryName: String): ByteArray? = runCatching {
         ZipFile(file).use { zip ->
@@ -148,22 +159,21 @@ object EpubParser {
 
     private fun Element.resolve(baseDir: String): String = resolvePath(baseDir, attr("href"))
 
-    /** Resolves an href relative to [baseDir] into a zip entry name, dropping any #fragment and `..` segments. */
-    private fun resolvePath(baseDir: String, href: String): String {
-        val decoded = URLDecoder.decode(href.substringBefore('#'), "UTF-8")
-        val segments = ArrayDeque<String>()
-        (if (baseDir.isEmpty()) decoded else "$baseDir/$decoded").split('/').forEach { segment ->
-            when (segment) {
-                "", "." -> Unit
-                ".." -> segments.removeLastOrNull()
-                else -> segments.addLast(segment)
-            }
-        }
-        return segments.joinToString("/")
-    }
-
     private fun ZipFile.readEntryText(name: String): String {
         val entry = getEntry(name) ?: error("EPUB is missing entry: $name")
         return getInputStream(entry).bufferedReader().use { it.readText() }
     }
+}
+
+private fun resolvePath(baseDir: String, href: String): String {
+    val decoded = URLDecoder.decode(href.substringBefore('#'), "UTF-8")
+    val segments = ArrayDeque<String>()
+    (if (baseDir.isEmpty()) decoded else "$baseDir/$decoded").split('/').forEach { segment ->
+        when (segment) {
+            "", "." -> Unit
+            ".." -> segments.removeLastOrNull()
+            else -> segments.addLast(segment)
+        }
+    }
+    return segments.joinToString("/")
 }

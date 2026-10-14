@@ -41,6 +41,22 @@ private fun buildFb2(): File {
 class Fb2ParserTest {
 
     @Test
+    fun `keeps embedded images and text in chapter order`() {
+        val file = createTempFile(suffix = ".fb2").toFile()
+        try {
+            file.writeText(
+                """<FictionBook><body><section><p>Before</p><image l:href="#art"/>
+                <p>After</p></section></body><binary id="art">aGVsbG8=</binary></FictionBook>""",
+            )
+            val document = (Fb2Parser.parse(file).chapters.single() as ParsedChapter.TextChapter).document
+            assertEquals(Block.Image("#art"), document.blocks[1])
+            assertEquals(3, document.blocks.size)
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
     fun `reads metadata and splits sections into chapters`() {
         val book = Fb2Parser.parse(buildFb2())
 

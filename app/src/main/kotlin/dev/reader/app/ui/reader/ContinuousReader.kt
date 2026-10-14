@@ -3,6 +3,7 @@ package dev.reader.app.ui.reader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +22,7 @@ import dev.reader.core.theme.ReaderTheme
 
 private val READER_TOP_SPACING = 48.dp
 private val READER_BOTTOM_SPACING = 24.dp
+private val READER_IMAGE_HEIGHT = 320.dp
 
 @Composable
 fun ContinuousReader(
@@ -75,6 +77,9 @@ private fun ReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolea
             style = theme.bodyTextStyle(useBookStyling = useBookStyling),
             modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp),
         )
-        is Block.Image -> Unit // Rendered by the caller once cover/image caching exists (M5).
+        is Block.Image -> ReaderImage(
+            block,
+            Modifier.fillMaxWidth().height(READER_IMAGE_HEIGHT).padding(horizontal = 16.dp),
+        )
     }
 }

@@ -33,7 +33,9 @@ object ChapterLoader {
                 when (book.format) {
                     BookFormat.CBZ, BookFormat.CBR -> loadComic(sourceFile, book.format)
                     BookFormat.PDF -> loadPdf(context, sourceFile, book.pdfRenderMode)
-                    else -> loadText(sourceFile, book, chapter.orderIndex)
+                    else -> loadText(sourceFile, book, chapter.orderIndex)?.let {
+                        ChapterContent.Text(BookImages.resolve(context, sourceFile, book.format, it.document))
+                    }
                 }
             }
             result.onFailure { Log.e(LOG_TAG, "Failed to load chapter '${chapter.title}'", it) }

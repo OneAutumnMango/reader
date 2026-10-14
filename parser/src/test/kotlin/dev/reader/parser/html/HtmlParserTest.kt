@@ -1,6 +1,7 @@
 package dev.reader.parser.html
 
 import dev.reader.core.richtext.Block
+import dev.reader.core.richtext.Span
 import dev.reader.parser.ParsedChapter
 import org.junit.jupiter.api.Test
 import kotlin.io.path.createTempFile
@@ -9,6 +10,25 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class HtmlParserTest {
+
+    @Test
+    fun `keeps nested images between styled text blocks`() {
+        val document = parseHtmlToRichDocument(
+            """<p><b>Before<img src="images/map.png" alt="Map">After</b></p>""",
+        )
+
+        assertEquals(Block.Paragraph(listOf(Span("Before", bold = true))), document.blocks[0])
+        assertEquals(Block.Image("images/map.png", "Map"), document.blocks[1])
+        assertEquals(Block.Paragraph(listOf(Span("After", bold = true))), document.blocks[2])
+    }
+
+    @Test
+    fun `keeps image only paragraphs and svg image references`() {
+        val document = parseHtmlToRichDocument(
+            """<p><img src="art.png"></p><svg><image xlink:href="cover.jpg" /></svg>""",
+        )
+        assertEquals(listOf(Block.Image("art.png"), Block.Image("cover.jpg")), document.blocks)
+    }
 
     @Test
     fun `converts headings, paragraphs and inline formatting`() {
