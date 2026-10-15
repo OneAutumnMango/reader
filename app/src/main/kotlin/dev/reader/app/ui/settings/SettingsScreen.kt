@@ -124,7 +124,7 @@ fun SettingsScreen(
 }
 
 private fun collectionKindLabel(kind: CollectionKind?): String = when (kind) {
-    CollectionKind.FILES -> "Each file is a book"
+    CollectionKind.FILES -> "Each file is a book, including in subfolders"
     CollectionKind.FOLDERS -> "Each folder is a book"
     null -> "Files and folders are both books"
 }

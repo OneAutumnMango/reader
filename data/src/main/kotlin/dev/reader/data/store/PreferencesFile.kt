@@ -12,7 +12,7 @@ const val STORE_VERSION: Int = 1
 /** How a library folder's contents map to books. */
 @Serializable
 enum class CollectionKind {
-    /** Every file directly inside is its own book. */
+    /** Every book file inside, including in subfolders, is its own book. */
     FILES,
 
     /** Every subfolder is one book, its files being the chapters. */

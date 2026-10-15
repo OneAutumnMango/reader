@@ -49,12 +49,10 @@ class RootFolderScanner(
             return 0
         }
         var imported = 0
-        val entries = root.listFiles().filter { entry ->
-            when (kind) {
-                CollectionKind.FILES -> entry.isFile
-                CollectionKind.FOLDERS -> entry.isDirectory
-                null -> true
-            }
+        val entries = when (kind) {
+            CollectionKind.FILES -> collectBookFiles(root)
+            CollectionKind.FOLDERS -> root.listFiles().filter { it.isDirectory }
+            null -> root.listFiles().toList()
         }
         AppLog.debug("Found ${entries.size} matching library-folder entry(s)", "LibraryScan")
         for (child in entries) {
@@ -87,5 +85,20 @@ class RootFolderScanner(
             return null
         }
         return importer.importFile(file, pdfContext = context, originUri = entry.uri.toString())
+    }
+}
+
+private const val MAX_FOLDER_DEPTH = 12
+
+/** Every supported book file under [folder], however deeply nested; hidden folders (".thumbnails" etc.) are skipped. */
+internal fun collectBookFiles(folder: DocumentFile, depth: Int = 0): List<DocumentFile> {
+    if (depth > MAX_FOLDER_DEPTH) return emptyList()
+    return folder.listFiles().flatMap { entry ->
+        val name = entry.name.orEmpty()
+        when {
+            entry.isDirectory && !name.startsWith(".") -> collectBookFiles(entry, depth + 1)
+            entry.isFile && BookFormat.fromExtension(name.substringAfterLast('.', "")) != null -> listOf(entry)
+            else -> emptyList()
+        }
     }
 }

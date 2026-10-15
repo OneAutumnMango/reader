@@ -66,7 +66,7 @@ class SettingsScreenTest {
     fun `library folders show their kind and can be removed or scanned`() {
         setContent(listOf(RootFolderDisplay("content://tree/1", "Books", CollectionKind.FILES)))
 
-        composeRule.onNodeWithText("Each file is a book").assertExists()
+        composeRule.onNodeWithText("Each file is a book, including in subfolders").assertExists()
         composeRule.onNodeWithContentDescription("Remove Books").performScrollTo().performClick()
         composeRule.onNodeWithTag("scan-root-folders").performScrollTo().performClick()
 
