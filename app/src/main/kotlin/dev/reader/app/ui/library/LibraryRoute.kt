@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.data.markBookRead
+import dev.reader.app.data.markBookUnread
 import dev.reader.app.ui.ScreenTopBar
 import dev.reader.app.ui.rememberImportActions
 import dev.reader.core.model.Book
@@ -156,6 +157,7 @@ fun LibraryRoute(
                 BookContextMenu(
                     book = book,
                     categories = categories,
+                    allRead = (fractionByBook[book.id] ?: 0f) >= 1f,
                     onChangeCategories = { ids ->
                         scope.launch { graph.library.updateCategories(book.id, ids) }
                     },
@@ -167,6 +169,7 @@ fun LibraryRoute(
                         coverPickerLauncher.launch(arrayOf("image/*"))
                     },
                     onMarkAllRead = { scope.launch { graph.markBookRead(book.id) } },
+                    onMarkAllUnread = { scope.launch { graph.markBookUnread(book.id) } },
                     onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
                     onDismiss = { longPressedBook = null },
                     onShowDetails = { onOpenDetails(book) },

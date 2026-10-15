@@ -5,6 +5,7 @@ import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
 import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.Span
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val PARAGRAPH_MARK = "\u2029"
@@ -84,3 +85,72 @@ internal fun paragraphs(lines: List<PdfLine>): List<Block> {
 /** A word hyphenated across lines: "dis-" followed by "tance". */
 private fun continuesWord(line: String, next: String): Boolean =
     line.endsWith('-') && line.getOrNull(line.length - 2)?.isLetter() == true && next.first().isLowerCase()
+
+private const val LINE_Y_TOLERANCE = 3f // PDF user-space units (~1 mm on a typical A4 page)
+
+/**
+ * For each page, returns the real bounding box of every non-blank extracted line using PDFBox
+ * TextPosition data. The k-th entry corresponds to pageToLineIndices[page][k]. Lines matching the
+ * page-number pattern are skipped to match [extractLines] behaviour.
+ */
+internal fun extractPageLineBounds(
+    doc: PDDocument,
+    pageToLineIndices: Map<Int, List<Int>>,
+): Map<Int, List<PdfLineBounds>> {
+    data class Group(
+        val yCenter: Float,
+        var xMin: Float, var xMax: Float,
+        var yMin: Float, var yMax: Float,
+        val text: StringBuilder = StringBuilder(),
+    )
+
+    val pageGroups = mutableMapOf<Int, MutableList<Group>>()
+
+    val stripper = object : PDFTextStripper() {
+        override fun writeString(string: String, textPositions: List<TextPosition>) {
+            if (string.isBlank() || textPositions.isEmpty()) return
+            val entries = textPositions.filter { it.unicode.isNotBlank() }
+            if (entries.isEmpty()) return
+            val page = currentPageNo - 1
+            val baseline = entries.first().yDirAdj
+            // yDirAdj is the baseline (y from page top); characters sit ABOVE the baseline.
+            val ascent = entries.maxOf { it.heightDir }
+            val xMin = entries.minOf { it.xDirAdj }
+            val xMax = entries.maxOf { it.xDirAdj + it.widthDirAdj }
+            val yMin = baseline - ascent              // top of characters
+            val yMax = baseline + ascent * 0.25f      // small buffer below baseline for descenders
+            val groups = pageGroups.getOrPut(page) { mutableListOf() }
+            val existing = groups.firstOrNull { abs(it.yCenter - baseline) < LINE_Y_TOLERANCE }
+            if (existing != null) {
+                existing.xMin = minOf(existing.xMin, xMin)
+                existing.xMax = maxOf(existing.xMax, xMax)
+                existing.yMin = minOf(existing.yMin, yMin)
+                existing.yMax = maxOf(existing.yMax, yMax)
+                existing.text.append(string.trim())
+            } else {
+                groups += Group(baseline, xMin, xMax, yMin, yMax, StringBuilder(string.trim()))
+            }
+        }
+    }
+    for (p in 0 until doc.numberOfPages) {
+        stripper.startPage = p + 1
+        stripper.endPage = p + 1
+        stripper.getText(doc)
+    }
+
+    val result = mutableMapOf<Int, List<PdfLineBounds>>()
+    pageToLineIndices.forEach { (page, lineIndices) ->
+        val mediaBox = doc.getPage(page).mediaBox
+        val pH = mediaBox.height.coerceAtLeast(1f)
+        val pW = mediaBox.width.coerceAtLeast(1f)
+        val groups = pageGroups[page]?.sortedBy { it.yCenter }
+            ?.filter { g -> !g.text.toString().trim().matches(PAGE_NUMBER) }
+            ?: return@forEach
+        result[page] = lineIndices.mapIndexedNotNull { k, lineIdx ->
+            val g = groups.getOrNull(k) ?: return@mapIndexedNotNull null
+            PdfLineBounds(lineIdx, (g.yMin / pH).coerceIn(0f, 1f), (g.yMax / pH).coerceIn(0f, 1f),
+                (g.xMin / pW).coerceIn(0f, 1f), (g.xMax / pW).coerceIn(0f, 1f))
+        }
+    }
+    return result
+}

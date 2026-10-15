@@ -1,10 +1,13 @@
 package dev.reader.app.ui.library
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -39,28 +43,41 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import dev.reader.app.ui.reader.Zoomable
+import dev.reader.app.ui.reader.Zoomable
+import dev.reader.parser.pdf.PdfLineBounds
 import dev.reader.parser.pdf.PdfPageRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import kotlin.math.roundToInt
+import kotlin.math.abs
+
 
 private val BLANK_LINE_HEIGHT = 8.dp
 private const val FALLBACK_RATIO = 0.707f
+private const val MAX_ZOOM = 5f
 
 /**
  * Full-screen picker: tap any text line to mark it as a chapter start. For PDF books pass
- * [pdfFile] to enable a "Pages" toggle that swaps the text list for the rendered page images.
+ * [pdfFile] to enable a "Pages" toggle — each page renders with pinch-to-zoom and the text lines
+ * belonging to that page are listed below so any one can be individually picked.
  */
 @Composable
 fun ChapterLinePicker(
@@ -69,6 +86,7 @@ fun ChapterLinePicker(
     onToggle: (Int) -> Unit,
     onDone: () -> Unit,
     pdfFile: File? = null,
+    pdfPageLineBounds: Map<Int, List<PdfLineBounds>>? = null,
 ) {
     val lines = remember(text) { text.lines() }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = picked.minOrNull() ?: 0)
@@ -109,7 +127,13 @@ fun ChapterLinePicker(
                 }
 
                 if (showPages && pdfFile != null) {
-                    PdfPagesPreview(pdfFile, Modifier.weight(1f).fillMaxWidth())
+                    PdfPagesPreview(
+                        file = pdfFile,
+                        pageLineBounds = pdfPageLineBounds,
+                        picked = picked,
+                        onToggle = onToggle,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
                 } else {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -143,55 +167,123 @@ fun ChapterLinePicker(
 }
 
 @Composable
-private fun PdfPagesPreview(file: File, modifier: Modifier = Modifier) {
+private fun PdfPagesPreview(
+    file: File,
+    modifier: Modifier = Modifier,
+    pageLineBounds: Map<Int, List<PdfLineBounds>>? = null,
+    picked: Set<Int> = emptySet(),
+    onToggle: (Int) -> Unit = {},
+) {
     var renderer by remember(file) { mutableStateOf<PdfPageRenderer?>(null) }
     LaunchedEffect(file) {
         renderer = withContext(Dispatchers.IO) { runCatching { PdfPageRenderer(file) }.getOrNull() }
     }
     DisposableEffect(file) { onDispose { renderer?.close() } }
 
-    val r = renderer
-    if (r == null) {
+    val r = renderer ?: run {
         Box(modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
-    LazyColumn(modifier = modifier) {
-        items(r.pageCount) { index -> PdfPageItem(r, index) }
+    // Pre-cache all aspect ratios so each page Box has the right size immediately.
+    val ratios = remember(r) {
+        mutableStateMapOf<Int, Float>().also { map ->
+            // populated lazily as each page is composed
+        }
+    }
+    Zoomable(enabled = true, modifier = modifier) {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(r.pageCount) { pageIndex ->
+                PdfPickerPage(
+                    renderer = r,
+                    pageIndex = pageIndex,
+                    lineBounds = pageLineBounds?.get(pageIndex) ?: emptyList(),
+                    picked = picked,
+                    onToggle = onToggle,
+                    onRatioCached = { ratios[pageIndex] = it },
+                    cachedRatio = ratios[pageIndex],
+                )
+            }
+        }
     }
 }
 
+/**
+ * One PDF page inside the parent [Zoomable].
+ */
 @Composable
-private fun PdfPageItem(renderer: PdfPageRenderer, index: Int) {
-    val ratio by produceState<Float?>(null, renderer, index) {
-        value = withContext(Dispatchers.IO) {
-            runCatching { renderer.aspectRatio(index) }.getOrNull() ?: FALLBACK_RATIO
+private fun PdfPickerPage(
+    renderer: PdfPageRenderer,
+    pageIndex: Int,
+    lineBounds: List<PdfLineBounds>,
+    picked: Set<Int>,
+    onToggle: (Int) -> Unit,
+    cachedRatio: Float? = null,
+    onRatioCached: (Float) -> Unit = {},
+) {
+    val pickedColor = MaterialTheme.colorScheme.primary
+    val ratio by produceState(cachedRatio, renderer, pageIndex) {
+        if (value == null) value = withContext(Dispatchers.IO) {
+            runCatching { renderer.aspectRatio(pageIndex) }.getOrNull() ?: FALLBACK_RATIO
+        }
+        value?.let(onRatioCached)
+    }
+    var w by remember { mutableStateOf(1) }
+    var h by remember { mutableStateOf(1) }
+    val bitmap by produceState<android.graphics.Bitmap?>(null, renderer, pageIndex, w, h) {
+        if (w > 1 && h > 1) value = withContext(Dispatchers.IO) {
+            runCatching { renderer.renderPage(pageIndex, w, h) }.getOrNull()
         }
     }
-    BoxWithConstraints(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.fillMaxWidth().aspectRatio(ratio ?: FALLBACK_RATIO),
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(ratio ?: FALLBACK_RATIO)
+            .onSizeChanged { s -> w = s.width.coerceAtLeast(1); h = s.height.coerceAtLeast(1) }
+            .detectLineTap(lineBounds, onToggle),
     ) {
-        if (ratio == null) { CircularProgressIndicator(); return@BoxWithConstraints }
-        val density = LocalDensity.current
-        val w = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
-        val h = with(density) { maxHeight.roundToPx() }.coerceAtLeast(1)
-        val bitmap by produceState<android.graphics.Bitmap?>(null, renderer, index, w, h) {
-            value = withContext(Dispatchers.IO) {
-                runCatching { renderer.renderPage(index, w, h) }.getOrNull()
+        if (ratio == null) { CircularProgressIndicator(); return@Box }
+        val bmp = bitmap ?: run { CircularProgressIndicator(); return@Box }
+        Image(bitmap = bmp.asImageBitmap(), contentDescription = "Page ${pageIndex + 1}", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+        if (lineBounds.isNotEmpty()) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                lineBounds.forEach { b ->
+                    if (b.lineIndex in picked) {
+                        drawRect(
+                            color = pickedColor.copy(alpha = 0.35f),
+                            topLeft = Offset(b.left * size.width, b.top * size.height),
+                            size = Size((b.right - b.left) * size.width, (b.bottom - b.top) * size.height),
+                        )
+                    }
+                }
             }
-        }
-        when (val bmp = bitmap) {
-            null -> CircularProgressIndicator()
-            else -> Image(
-                bitmap = bmp.asImageBitmap(),
-                contentDescription = "Page ${index + 1}",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
         }
     }
     HorizontalDivider()
 }
+
+/** Mirrors [detectTapGestures] but works inside [Zoomable]: ignores consumed moves and cancels on multi-touch. */
+private fun Modifier.detectLineTap(lineBounds: List<PdfLineBounds>, onToggle: (Int) -> Unit): Modifier =
+    if (lineBounds.isEmpty()) this
+    else pointerInput(lineBounds) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            var up: PointerInputChange? = null
+            while (up == null) {
+                val event = awaitPointerEvent()
+                val ptr = event.changes.firstOrNull { it.id == down.id } ?: break
+                if (!ptr.pressed) up = ptr
+                else if (event.changes.count { it.pressed } > 1 || (ptr.positionChanged() && ptr.isConsumed)) break
+            }
+            if (up != null && (up.position - down.position).getDistance() < viewConfiguration.touchSlop) {
+                val xf = (down.position.x / size.width).coerceIn(0f, 1f)
+                val yf = (down.position.y / size.height).coerceIn(0f, 1f)
+                val hit = lineBounds.firstOrNull { b -> yf in b.top..b.bottom }
+                    ?: lineBounds.minBy { b -> abs((b.top + b.bottom) / 2f - yf) }
+                onToggle(hit.lineIndex)
+            }
+        }
+    }
 
 @Composable
 private fun PickableLine(line: String, index: Int, picked: Boolean, onClick: () -> Unit) {

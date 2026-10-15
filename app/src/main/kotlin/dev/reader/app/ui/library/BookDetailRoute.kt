@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.data.markBookRead
+import dev.reader.app.data.markBookUnread
 import dev.reader.app.ui.ScreenTopBar
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Chapter
@@ -91,9 +92,12 @@ fun BookDetailRoute(
     )
 
     if (showMenu) {
+        val allRead = regularChapters.isNotEmpty() &&
+            regularChapters.all { chapterProgress[it.id]?.finished == true }
         BookContextMenu(
             book = book,
             categories = categories,
+            allRead = allRead,
             onChangeCategories = { ids ->
                 scope.launch { graph.library.updateCategories(book.id, ids) }
             },
@@ -102,6 +106,7 @@ fun BookDetailRoute(
             },
             onChangeCover = { coverPickerLauncher.launch(arrayOf("image/*")) },
             onMarkAllRead = { scope.launch { graph.markBookRead(book.id) } },
+            onMarkAllUnread = { scope.launch { graph.markBookUnread(book.id) } },
             onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
             onDismiss = { showMenu = false },
             onShowDetails = onOpenDetails,
