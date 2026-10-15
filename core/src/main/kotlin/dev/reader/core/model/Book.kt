@@ -26,6 +26,8 @@ data class Book(
     val chapterPattern: String? = null,
     /** Line numbers matched by [chapterPattern] that the user chose not to treat as a chapter break. */
     val chapterExcludedLines: Set<Int> = emptySet(),
+    /** Where on the device the book was picked from (a content:// URI), when known. */
+    val originUri: String? = null,
 )
 
 @Serializable

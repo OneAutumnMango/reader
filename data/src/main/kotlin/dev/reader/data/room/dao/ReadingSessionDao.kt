@@ -14,4 +14,7 @@ interface ReadingSessionDao {
 
     @Query("SELECT * FROM reading_sessions ORDER BY startedAt")
     fun observeAll(): Flow<List<ReadingSessionEntity>>
+
+    @Query("SELECT * FROM reading_sessions WHERE bookId = :bookId ORDER BY startedAt")
+    fun observeForBook(bookId: String): Flow<List<ReadingSessionEntity>>
 }

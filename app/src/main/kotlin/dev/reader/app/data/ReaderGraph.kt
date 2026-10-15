@@ -36,6 +36,7 @@ class ReaderGraph(context: Context) {
         ReaderDatabase.MIGRATION_3_4,
         ReaderDatabase.MIGRATION_4_5,
         ReaderDatabase.MIGRATION_5_6,
+        ReaderDatabase.MIGRATION_6_7,
     )
         .fallbackToDestructiveMigration(true)
         .build()

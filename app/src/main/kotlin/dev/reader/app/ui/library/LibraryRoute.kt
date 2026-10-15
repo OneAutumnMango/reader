@@ -31,11 +31,13 @@ import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.data.markBookRead
+import dev.reader.app.ui.ScreenTopBar
 import dev.reader.app.ui.rememberImportActions
 import dev.reader.core.model.Book
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
 import dev.reader.core.theme.LibraryLayout
+import dev.reader.data.store.LibrarySort
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -44,6 +46,7 @@ fun LibraryRoute(
     graph: ReaderGraph,
     onOpenBook: (Book) -> Unit,
     onSearchClick: () -> Unit,
+    onOpenDetails: (Book) -> Unit = {},
     gridStateFor: (CategoryId?) -> LazyGridState? = { null },
     selectedCategory: CategoryId? = null,
     onCategorySelected: (CategoryId?) -> Unit = {},
@@ -78,6 +81,19 @@ fun LibraryRoute(
         if (importActions.status.isNotBlank()) snackbarHostState.showSnackbar(importActions.status)
     }
 
+    val sort = preferences?.librarySort ?: LibrarySort.ADDED
+    val descending = preferences?.librarySortDescending ?: true
+    val sortedBooks = remember(books, sort, descending, progressByBook, fractionByBook) {
+        sortBooks(books, sort, descending, { progressByBook[it]?.updatedAt }, { fractionByBook[it] })
+    }
+    ScreenTopBar(title = null) {
+        LibrarySortMenu(sort, descending) { newSort, newDescending ->
+            scope.launch {
+                graph.settings.update { it.copy(librarySort = newSort, librarySortDescending = newDescending) }
+            }
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -90,7 +106,7 @@ fun LibraryRoute(
             },
         ) {
             LibraryScreen(
-                books = books,
+                books = sortedBooks,
                 categories = categories,
                 selectedCategory = selectedCategory,
                 progressFor = { id ->
@@ -135,6 +151,7 @@ fun LibraryRoute(
                 onMarkAllRead = { scope.launch { graph.markBookRead(book.id) } },
                 onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
                 onDismiss = { longPressedBook = null },
+                onShowDetails = { onOpenDetails(book) },
                 onDetectChapters = if (book.supportsChapterDetection()) ({ chapterDetectBook = book }) else null,
             )
         }

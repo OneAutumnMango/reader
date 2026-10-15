@@ -27,6 +27,7 @@ fun BookEntity.toBook(categoryIds: List<String>) = Book(
     contentHash = contentHash,
     chapterPattern = chapterPattern,
     chapterExcludedLines = chapterExcludedLines.orEmpty().split(',').mapNotNull { it.toIntOrNull() }.toSet(),
+    originUri = originUri,
 )
 
 fun Book.toEntity() = BookEntity(
@@ -42,6 +43,7 @@ fun Book.toEntity() = BookEntity(
     contentHash = contentHash,
     chapterPattern = chapterPattern,
     chapterExcludedLines = chapterExcludedLines.takeIf { it.isNotEmpty() }?.joinToString(","),
+    originUri = originUri,
 )
 
 fun ChapterEntity.toChapter() = Chapter(

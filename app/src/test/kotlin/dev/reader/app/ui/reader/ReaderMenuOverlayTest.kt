@@ -1,12 +1,16 @@
 package dev.reader.app.ui.reader
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -21,6 +25,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -32,10 +38,8 @@ class ReaderMenuOverlayTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `PDF button toggles between original pages and extracted text`() {
-        var mode = PdfRenderMode.FIXED_PAGE
+    fun `the bar shows only back, centred progress, search and expand`() {
         composeRule.setContent {
-            var selected by remember { mutableStateOf(PdfRenderMode.FIXED_PAGE) }
             ReaderMenuOverlay(
                 progressLabel = "Page 1 of 10",
                 theme = ReaderTheme.Default,
@@ -45,17 +49,18 @@ class ReaderMenuOverlayTest {
                 onBack = {},
                 expanded = false,
                 onExpandedChange = {},
-                pdfRenderMode = selected,
-                onPdfRenderModeChange = {
-                    selected = it
-                    mode = it
-                },
+                pdfRenderMode = PdfRenderMode.FIXED_PAGE,
+                onSearch = {},
             )
         }
-        composeRule.onNodeWithContentDescription("Show extracted text").performClick()
-        assertEquals(PdfRenderMode.REFLOW_TEXT, mode)
-        composeRule.onNodeWithContentDescription("Show PDF pages").performClick()
-        assertEquals(PdfRenderMode.FIXED_PAGE, mode)
+
+        val bar = composeRule.onNodeWithTag("reader-menu-bar").getUnclippedBoundsInRoot()
+        val progress = composeRule.onNodeWithTag("reader-menu-progress").getUnclippedBoundsInRoot()
+        val barCentre = (bar.left + bar.right) / 2
+        val progressCentre = (progress.left + progress.right) / 2
+        assertTrue(abs((barCentre - progressCentre).value) < 1f)
+        composeRule.onNodeWithTag("reader-menu-search").assertExists()
+        composeRule.onNodeWithText("Text view").assertDoesNotExist()
     }
 
     @Test
@@ -124,23 +129,27 @@ class ReaderMenuOverlayTest {
     }
 
     @Test
-    fun `swiping up on the bar expands and pulling the panel down from the top collapses`() {
+    @Config(qualifiers = "w411dp-h900dp")
+    fun `swiping the bar up expands, the top strip goes full screen, and swiping it down closes`() {
         var expanded = false
         composeRule.setContent {
             var state by remember { mutableStateOf(false) }
-            ReaderMenuOverlay(
-                progressLabel = "50%",
-                theme = ReaderTheme.Default,
-                onThemeChange = {},
-                settings = ReaderSettings(),
-                onSettingsChange = {},
-                onBack = {},
-                expanded = state,
-                onExpandedChange = {
-                    state = it
-                    expanded = it
-                },
-            )
+            Box(Modifier.fillMaxSize()) {
+                ReaderMenuOverlay(
+                    progressLabel = "50%",
+                    theme = ReaderTheme.Default,
+                    onThemeChange = {},
+                    settings = ReaderSettings(),
+                    onSettingsChange = {},
+                    onBack = {},
+                    expanded = state,
+                    onExpandedChange = {
+                        state = it
+                        expanded = it
+                    },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
         }
 
         composeRule.onNodeWithTag("reader-menu-bar").performTouchInput {
@@ -148,10 +157,42 @@ class ReaderMenuOverlayTest {
         }
         composeRule.waitForIdle()
         assertTrue(expanded)
+        val before = composeRule.onNodeWithTag("reader-menu-handle").getUnclippedBoundsInRoot().top
+
+        composeRule.onNodeWithTag("reader-menu-handle").performTouchInput {
+            swipe(start = center, end = center - Offset(0f, 300f), durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+        val after = composeRule.onNodeWithTag("reader-menu-handle").getUnclippedBoundsInRoot().top
+        assertTrue(after < before, "panel should grow to full screen ($before -> $after)")
+        assertTrue(expanded)
+
+        composeRule.onNodeWithTag("reader-menu-handle").performTouchInput {
+            swipe(start = center, end = center + Offset(0f, 300f), durationMillis = 300)
+        }
+        composeRule.waitForIdle()
+        assertFalse(expanded)
+    }
+
+    @Test
+    fun `scrolling the panel's content doesn't close it`() {
+        var expanded = true
+        composeRule.setContent {
+            ReaderMenuOverlay(
+                progressLabel = "50%",
+                theme = ReaderTheme.Default,
+                onThemeChange = {},
+                settings = ReaderSettings(),
+                onSettingsChange = {},
+                onBack = {},
+                expanded = true,
+                onExpandedChange = { expanded = it },
+            )
+        }
 
         composeRule.onNodeWithTag("reader-menu-panel").performTouchInput { swipeDown() }
         composeRule.waitForIdle()
-        assertFalse(expanded)
+        assertTrue(expanded)
     }
 
     @Test

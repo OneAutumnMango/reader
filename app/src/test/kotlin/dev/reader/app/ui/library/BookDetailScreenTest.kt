@@ -29,6 +29,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -120,7 +122,7 @@ class BookDetailScreenTest {
     }
 
     @Test
-    fun `long-pressing a chapter toggles it read`() {
+    fun `long-pressing starts selection, taps add to it, and actions mark the chosen chapters`() {
         var change: Pair<List<Chapter>, Boolean>? = null
         composeRule.setContent {
             BookDetailScreen(book, chapters, emptyList(), onChapterClick = {}, onSetRead = { c, r -> change = c to r })
@@ -131,9 +133,43 @@ class BookDetailScreenTest {
             advanceEventTime(LONG_PRESS_MILLIS)
             up()
         }
-        composeRule.onNodeWithTag("chapter-toggle-read").performClick()
+        composeRule.onNodeWithText("1 selected").assertExists()
+        composeRule.onNodeWithTag("chapter-ch-1").performClick()
+        composeRule.onNodeWithText("2 selected").assertExists()
+        composeRule.onNodeWithTag("chapter-selection-MARK_READ").performClick()
 
-        assertEquals(listOf(chapters[1]) to true, change)
+        assertEquals(chapters to true, change)
+        composeRule.onNodeWithTag("chapter-selection-bar").assertDoesNotExist()
+    }
+
+    @Test
+    fun `select all, invert and close change only the selection`() {
+        var marked = false
+        composeRule.setContent {
+            BookDetailScreen(book, chapters, emptyList(), onChapterClick = {}, onSetRead = { _, _ -> marked = true })
+        }
+
+        composeRule.onNodeWithTag("chapter-ch-1").performTouchInput {
+            down(center)
+            advanceEventTime(LONG_PRESS_MILLIS)
+            up()
+        }
+        composeRule.onNodeWithTag("chapter-selection-SELECT_ALL").performClick()
+        composeRule.onNodeWithText("2 selected").assertExists()
+        composeRule.onNodeWithTag("chapter-selection-INVERT").performClick()
+        composeRule.onNodeWithTag("chapter-selection-bar").assertDoesNotExist()
+        assertFalse(marked)
+    }
+
+    @Test
+    fun `range actions cover everything up to or from the selection`() {
+        val five = (1..5).map { Chapter(ChapterId("c$it"), book.id, "C$it", "", it) }
+
+        val (c2, c3, c4) = listOf("c2", "c3", "c4").map(::ChapterId)
+        assertEquals(five.take(3), ChapterSelectionAction.READ_UP_TO.targets(five, setOf(c2, c3)))
+        assertEquals(five.drop(1), ChapterSelectionAction.UNREAD_FROM.targets(five, setOf(c2, c4)))
+        assertEquals(listOf(five[3]), ChapterSelectionAction.MARK_UNREAD.targets(five, setOf(ChapterId("c4"))))
+        assertNull(ChapterSelectionAction.INVERT.targets(five, emptySet()))
     }
 
     @Test

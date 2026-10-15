@@ -20,6 +20,9 @@ enum class CollectionKind {
 }
 
 @Serializable
+enum class LibrarySort { TITLE, AUTHOR, LAST_READ, ADDED, PROGRESS }
+
+@Serializable
 data class PreferencesFile(
     val version: Int = STORE_VERSION,
     val appTheme: AppTheme = AppTheme(),
@@ -33,4 +36,6 @@ data class PreferencesFile(
     val rootEntryBooks: Map<String, String> = emptyMap(),
     val libraryLayout: LibraryLayout = LibraryLayout.MEDIUM,
     val showAllCategory: Boolean = true,
+    val librarySort: LibrarySort = LibrarySort.ADDED,
+    val librarySortDescending: Boolean = true,
 )

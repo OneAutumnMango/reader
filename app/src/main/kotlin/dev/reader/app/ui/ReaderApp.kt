@@ -42,6 +42,7 @@ import dev.reader.app.ui.categories.CategoriesRoute
 import dev.reader.app.ui.data.DataRoute
 import dev.reader.app.ui.library.BookDetailRoute
 import dev.reader.app.ui.library.BookDetailState
+import dev.reader.app.ui.library.BookInfoRoute
 import dev.reader.app.ui.library.LibraryRoute
 import dev.reader.app.ui.reader.ReaderRoute
 import dev.reader.app.ui.search.SearchRoute
@@ -73,6 +74,7 @@ private fun titleFor(destination: Destination): String = when (destination) {
     Destination.Categories -> "Categories"
     Destination.LogHistory -> "Log history"
     is Destination.BookDetail -> "Book"
+    is Destination.BookInfo -> "Details"
     is Destination.Bookmarks -> "Bookmarks"
     is Destination.Reader -> ""
 }
@@ -155,6 +157,7 @@ fun ReaderApp(graph: ReaderGraph) {
                     Destination.Library -> LibraryRoute(
                         graph,
                         onOpenBook = { navigator.push(Destination.BookDetail(it.id)) },
+                        onOpenDetails = { navigator.push(Destination.BookInfo(it.id)) },
                         onSearchClick = { navigator.push(Destination.Search) },
                         gridStateFor = { libraryGridStates.getOrPut(it) { LazyGridState() } },
                         selectedCategory = libraryCategory,
@@ -181,9 +184,11 @@ fun ReaderApp(graph: ReaderGraph) {
                         destination.bookId,
                         onOpenChapter = { navigator.push(Destination.Reader(destination.bookId, it.id)) },
                         onOpenBookmarks = { navigator.push(Destination.Bookmarks(destination.bookId)) },
+                        onOpenDetails = { navigator.push(Destination.BookInfo(destination.bookId)) },
                         modifier = content,
                         state = bookDetailStates.getOrPut(destination.bookId) { BookDetailState() },
                     )
+                    is Destination.BookInfo -> BookInfoRoute(graph, destination.bookId, content)
                     is Destination.Bookmarks -> BookmarksRoute(
                         graph,
                         destination.bookId,

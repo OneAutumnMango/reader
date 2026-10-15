@@ -75,7 +75,10 @@ class RootFolderScanner(
 
     private suspend fun importEntry(entry: DocumentFile): Book? {
         if (entry.isDirectory) {
-            return importer.importLightNovelFolder(ContentFileCopier.copyFolderToCache(context, entry))
+            return importer.importLightNovelFolder(
+                ContentFileCopier.copyFolderToCache(context, entry),
+                originUri = entry.uri.toString(),
+            )
         }
         BookFormat.fromExtension(entry.name.orEmpty().substringAfterLast('.', "")) ?: return null
         val file = ContentFileCopier.copyDocumentToCache(context, entry)
@@ -83,6 +86,6 @@ class RootFolderScanner(
             AppLog.warn("Couldn't read a supported library-folder entry", "LibraryScan")
             return null
         }
-        return importer.importFile(file, pdfContext = context)
+        return importer.importFile(file, pdfContext = context, originUri = entry.uri.toString())
     }
 }

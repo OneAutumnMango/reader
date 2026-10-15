@@ -9,6 +9,7 @@ import dev.reader.data.room.toEntity
 import dev.reader.data.room.toEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 
 class StatsRepository(private val database: ReaderDatabase) {
 
@@ -25,6 +26,9 @@ class StatsRepository(private val database: ReaderDatabase) {
     }
 
     suspend fun recordSession(session: ReadingSessionEvent) = database.sessions().insert(session.toEntity())
+
+    fun observeSessions(bookId: BookId): Flow<List<ReadingSessionEvent>> =
+        database.sessions().observeForBook(bookId.value).map { rows -> rows.map { it.toEvent() } }
 
     suspend fun resetAll() = database.maintenance().deleteSessions()
 }

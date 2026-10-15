@@ -37,6 +37,7 @@ fun BookContextMenu(
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
     onDetectChapters: (() -> Unit)? = null,
+    onShowDetails: (() -> Unit)? = null,
 ) {
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -73,6 +74,12 @@ fun BookContextMenu(
         title = { Text(book.title) },
         text = {
             Column {
+                if (onShowDetails != null) {
+                    MenuRow("Details", Modifier.testTag("book-menu-details")) {
+                        onShowDetails()
+                        onDismiss()
+                    }
+                }
                 MenuRow("Rename", Modifier.testTag("book-menu-rename")) {
                     showRenameDialog = true
                 }

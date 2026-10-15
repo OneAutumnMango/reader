@@ -38,6 +38,7 @@ class BookImporter(
         categoryIds: Set<CategoryId> = emptySet(),
         pdfContext: Context? = null,
         target: Book? = null,
+        originUri: String? = null,
     ): Book {
         val format = requireNotNull(BookFormat.fromExtension(file.extension)) {
             "unsupported extension: ${file.extension}"
@@ -60,6 +61,7 @@ class BookImporter(
             contentHash = hash,
             chapterPattern = existing?.chapterPattern,
             chapterExcludedLines = existing?.chapterExcludedLines.orEmpty(),
+            originUri = originUri ?: existing?.originUri,
         )
         val chapterIds = existingChapterIds(existing)
         val chapters = parsed.chapters.mapIndexed { index, chapter ->
@@ -81,7 +83,11 @@ class BookImporter(
         return importFile(File(book.sourcePath), pdfContext = pdfContext, target = updated)
     }
 
-    suspend fun importLightNovelFolder(folder: File, categoryIds: Set<CategoryId> = emptySet()): Book {
+    suspend fun importLightNovelFolder(
+        folder: File,
+        categoryIds: Set<CategoryId> = emptySet(),
+        originUri: String? = null,
+    ): Book {
         val files = (folder.listFiles { f -> f.isFile } ?: emptyArray())
             .sortedWith(compareBy(NaturalSortComparator) { it.name })
 
@@ -115,6 +121,7 @@ class BookImporter(
             categoryIds = existing?.categoryIds ?: categoryIds.ifEmpty { library.defaultCategoryIds() },
             addedAt = existing?.addedAt ?: now(),
             contentHash = hash,
+            originUri = originUri ?: existing?.originUri,
         )
         library.upsertBook(book, chapters)
         return book

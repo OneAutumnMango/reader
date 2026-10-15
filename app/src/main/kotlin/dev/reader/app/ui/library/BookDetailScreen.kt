@@ -1,5 +1,6 @@
 package dev.reader.app.ui.library
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -78,6 +80,7 @@ class BookDetailState {
     val listState = LazyListState()
     var showExtras by mutableStateOf(false)
     var sort by mutableStateOf(ChapterSort.ASCENDING)
+    var selected by mutableStateOf<Set<ChapterId>>(emptySet())
 }
 
 /** A chapter's place in the book (1-based, extras excluded), whatever order the list is sorted in. */
@@ -107,6 +110,23 @@ fun BookDetailScreen(
         ChapterSort.UNREAD_FIRST -> numbered.sortedBy { isFinished(it.chapter) }
     }
     val current = numbered.find { it.chapter.id == currentChapterId }
+    val selecting = state.selected.isNotEmpty()
+    fun toggle(chapter: Chapter) {
+        state.selected = if (chapter.id in state.selected) state.selected - chapter.id else state.selected + chapter.id
+    }
+    fun act(action: ChapterSelectionAction) {
+        val all = chapters.map { it.id }.toSet()
+        when (action) {
+            ChapterSelectionAction.SELECT_ALL -> state.selected = all
+            ChapterSelectionAction.INVERT -> state.selected = all - state.selected
+            else -> {
+                val read = action == ChapterSelectionAction.MARK_READ || action == ChapterSelectionAction.READ_UP_TO
+                action.targets(chapters, state.selected)?.let { onSetRead(it, read) }
+                state.selected = emptySet()
+            }
+        }
+    }
+    BackHandler(enabled = selecting) { state.selected = emptySet() }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(state = state.listState, modifier = Modifier.fillMaxSize()) {
@@ -130,15 +150,22 @@ fun BookDetailScreen(
                     chapter = chapter,
                     isCurrent = chapter.id == currentChapterId,
                     progress = chapterProgress[chapter.id],
-                    onClick = { onChapterClick(chapter) },
-                    onSetRead = { read -> onSetRead(listOf(chapter), read) },
-                    onMarkPreviousRead = { onSetRead(chapters.take(number - 1), true) },
+                    selection = if (selecting) chapter.id in state.selected else null,
+                    onClick = { if (selecting) toggle(chapter) else onChapterClick(chapter) },
+                    onLongClick = { toggle(chapter) },
                 )
             }
             item { Spacer(Modifier.height(FAB_CLEARANCE)) }
         }
 
-        if (resumeLabel != null) {
+        if (selecting) {
+            ChapterSelectionBar(
+                selectedCount = state.selected.size,
+                onAction = ::act,
+                onClose = { state.selected = emptySet() },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        } else if (resumeLabel != null) {
             ExtendedFloatingActionButton(
                 onClick = onResume,
                 icon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
@@ -291,74 +318,59 @@ private fun ChapterRow(
     chapter: Chapter,
     isCurrent: Boolean,
     progress: Progress?,
+    selection: Boolean?,
     onClick: () -> Unit,
-    onSetRead: (Boolean) -> Unit,
-    onMarkPreviousRead: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     val isRead = progress?.finished == true
     val partial = progress?.position?.takeIf { !isRead && it > 0f }
-    var menuOpen by remember { mutableStateOf(false) }
-    Box {
-        ListItem(
-            headlineContent = {
-                Text(
-                    chapter.title,
-                    fontWeight = if (isCurrent) FontWeight.SemiBold else null,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            },
-            supportingContent = if (isCurrent || partial != null) {
-                { ChapterProgressLine(isCurrent, partial) }
-            } else {
-                null
-            },
-            leadingContent = {
-                Text("$number", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 4.dp))
-            },
-            trailingContent = if (isRead) {
-                { Icon(Icons.Filled.CheckCircle, contentDescription = "Read", Modifier.size(18.dp)) }
-            } else {
-                null
-            },
-            colors = when {
-                isCurrent -> ListItemDefaults.colors(
-                    headlineColor = MaterialTheme.colorScheme.primary,
-                    supportingColor = MaterialTheme.colorScheme.primary,
-                    leadingIconColor = MaterialTheme.colorScheme.primary,
-                )
-                isRead -> ListItemDefaults.colors(
-                    headlineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = READ_CHAPTER_ALPHA),
-                    leadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = READ_CHAPTER_ALPHA),
-                    trailingIconColor = MaterialTheme.colorScheme.primary.copy(alpha = READ_CHAPTER_ALPHA),
-                )
-                else -> ListItemDefaults.colors()
-            },
-            modifier = Modifier
-                .testTag("chapter-${chapter.id.value}")
-                .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true }),
-        )
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-                text = { Text(if (isRead) "Mark as unread" else "Mark as read") },
-                onClick = {
-                    menuOpen = false
-                    onSetRead(!isRead)
-                },
-                modifier = Modifier.testTag("chapter-toggle-read"),
+    ListItem(
+        headlineContent = {
+            Text(
+                chapter.title,
+                fontWeight = if (isCurrent) FontWeight.SemiBold else null,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            if (number > 1) {
-                DropdownMenuItem(
-                    text = { Text("Mark all before as read") },
-                    onClick = {
-                        menuOpen = false
-                        onMarkPreviousRead()
-                    },
-                    modifier = Modifier.testTag("chapter-mark-previous"),
-                )
+        },
+        supportingContent = if (isCurrent || partial != null) {
+            { ChapterProgressLine(isCurrent, partial) }
+        } else {
+            null
+        },
+        leadingContent = {
+            if (selection != null) {
+                Checkbox(checked = selection, onCheckedChange = null, modifier = Modifier.size(24.dp))
+            } else {
+                Text("$number", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 4.dp))
             }
-        }
-    }
+        },
+        trailingContent = if (isRead) {
+            { Icon(Icons.Filled.CheckCircle, contentDescription = "Read", Modifier.size(18.dp)) }
+        } else {
+            null
+        },
+        colors = when {
+            selection == true -> ListItemDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                headlineColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            isCurrent -> ListItemDefaults.colors(
+                headlineColor = MaterialTheme.colorScheme.primary,
+                supportingColor = MaterialTheme.colorScheme.primary,
+                leadingIconColor = MaterialTheme.colorScheme.primary,
+            )
+            isRead -> ListItemDefaults.colors(
+                headlineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = READ_CHAPTER_ALPHA),
+                leadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = READ_CHAPTER_ALPHA),
+                trailingIconColor = MaterialTheme.colorScheme.primary.copy(alpha = READ_CHAPTER_ALPHA),
+            )
+            else -> ListItemDefaults.colors()
+        },
+        modifier = Modifier
+            .testTag("chapter-${chapter.id.value}")
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+    )
 }
 
 @Composable

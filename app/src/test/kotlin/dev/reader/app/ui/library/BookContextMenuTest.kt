@@ -39,6 +39,30 @@ class BookContextMenuTest {
     )
 
     @Test
+    fun `details opens the book's details and dismisses`() {
+        var shown = false
+        var dismissed = false
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = {},
+                onRename = {},
+                onChangeCover = {},
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = { dismissed = true },
+                onShowDetails = { shown = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-details").performClick()
+
+        assertTrue(shown)
+        assertTrue(dismissed)
+    }
+
+    @Test
     fun `mark all read triggers the callback and dismisses`() {
         var marked = false
         var dismissed = false

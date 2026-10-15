@@ -33,6 +33,7 @@ fun BookDetailRoute(
     onOpenBookmarks: () -> Unit,
     modifier: Modifier = Modifier,
     state: BookDetailState = remember { BookDetailState() },
+    onOpenDetails: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -99,6 +100,7 @@ fun BookDetailRoute(
             onMarkAllRead = { scope.launch { graph.markBookRead(book.id) } },
             onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
             onDismiss = { showMenu = false },
+            onShowDetails = onOpenDetails,
             onDetectChapters = if (book.supportsChapterDetection()) ({ showChapterDetect = true }) else null,
         )
     }

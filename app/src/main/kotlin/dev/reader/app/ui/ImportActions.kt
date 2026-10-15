@@ -1,5 +1,8 @@
 package dev.reader.app.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -24,6 +27,13 @@ internal fun describeImportError(error: Throwable): String {
 
 class ImportActions(val status: String, val addFiles: () -> Unit, val addFolder: () -> Unit)
 
+/** Keeps permission to the picked file/folder so its original can be opened from the book's details later. */
+private fun keepReadAccess(context: Context, uri: Uri) {
+    runCatching {
+        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }.onFailure { AppLog.debug("No persistable access to the picked item", LOG_TAG) }
+}
+
 /** Add-files / add-light-novel-folder pickers, shared by the library quick-add FAB and Settings. */
 @Composable
 fun rememberImportActions(graph: ReaderGraph): ImportActions {
@@ -42,7 +52,8 @@ fun rememberImportActions(graph: ReaderGraph): ImportActions {
                     val file = requireNotNull(ContentFileCopier.copyToCache(context, uri)) {
                         "Could not read the selected file"
                     }
-                    graph.importer.importFile(file, pdfContext = context)
+                    keepReadAccess(context, uri)
+                    graph.importer.importFile(file, pdfContext = context, originUri = uri.toString())
                 }
                     .onSuccess { imported++ }
                     .onFailure {
@@ -66,7 +77,8 @@ fun rememberImportActions(graph: ReaderGraph): ImportActions {
                 val folder = requireNotNull(ContentFileCopier.copyTreeToCache(context, treeUri)) {
                     "Could not read that folder"
                 }
-                graph.importer.importLightNovelFolder(folder)
+                keepReadAccess(context, treeUri)
+                graph.importer.importLightNovelFolder(folder, originUri = treeUri.toString())
             }.fold(
                 onSuccess = {
                     AppLog.info("Imported book from folder", LOG_TAG)
