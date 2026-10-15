@@ -101,7 +101,7 @@ object ChapterLoader {
         BookFormat.HTML -> HtmlParser.parse(file)
         BookFormat.MOBI -> MobiParser.parse(file)
         BookFormat.RTF -> RtfParser.parse(file)
-        BookFormat.DOCX -> DocxParser.parse(file)
+        BookFormat.DOCX -> DocxParser.parse(file, book.patternFor(), book.excludedLinesFor())
         else -> error("${book.format} has no text loader")
     }
 

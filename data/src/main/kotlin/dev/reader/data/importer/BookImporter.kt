@@ -162,7 +162,7 @@ class BookImporter(
         BookFormat.FB2 -> Fb2Parser.parse(file)
         BookFormat.MOBI -> MobiParser.parse(file)
         BookFormat.RTF -> RtfParser.parse(file)
-        BookFormat.DOCX -> DocxParser.parse(file)
+        BookFormat.DOCX -> DocxParser.parse(file, chapterPattern, chapterExcludedLines)
     }
 
     /** Extracts an archive-internal cover image (epub/cbz/cbr) to a real file next to the source. */

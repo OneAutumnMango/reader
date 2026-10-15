@@ -1,6 +1,7 @@
 package dev.reader.app.ui.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,14 +33,29 @@ fun BookCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     finished: Boolean = false,
+    selected: Boolean = false,
     onLongClick: () -> Unit = {},
 ) {
     Card(modifier = modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
         Column(modifier = Modifier.padding(8.dp)) {
             Box(modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO)) {
                 BookCover(book, modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO))
-                if (finished) {
-                    Icon(
+                when {
+                    selected -> Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(COVER_ASPECT_RATIO)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.CheckCircle,
+                            contentDescription = "Selected",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(32.dp).testTag("book-selected-badge"),
+                        )
+                    }
+                    finished -> Icon(
                         Icons.Filled.CheckCircle,
                         contentDescription = "Finished",
                         tint = MaterialTheme.colorScheme.primary,

@@ -39,6 +39,7 @@ fun LibraryScreen(
     finishedFor: (BookId) -> Boolean = { false },
     showAllCategory: Boolean = true,
     gridStateFor: (CategoryId?) -> LazyGridState? = { null },
+    selectedBookIds: Set<BookId> = emptySet(),
     modifier: Modifier = Modifier,
 ) {
     // "All" can only be hidden when there's another category to show instead.
@@ -78,6 +79,7 @@ fun LibraryScreen(
                         finished = finishedFor(book.id),
                         onClick = { onBookClick(book) },
                         onLongClick = { onBookLongClick(book) },
+                        selected = book.id in selectedBookIds,
                         modifier = Modifier.padding(4.dp),
                     )
                 }

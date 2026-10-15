@@ -22,6 +22,7 @@ import dev.reader.app.data.markBookRead
 import dev.reader.app.ui.ScreenTopBar
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Chapter
+import dev.reader.core.reader.PdfRenderMode
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
@@ -82,6 +83,9 @@ fun BookDetailRoute(
                 progress?.takeIf { !read && it.finished }?.let { graph.progress.update(it.copy(finished = false)) }
             }
         },
+        onPdfRenderModeChange = if (book.format == dev.reader.core.model.BookFormat.PDF) { mode ->
+            scope.launch { graph.library.updateBookDetails(book.copy(pdfRenderMode = mode)) }
+        } else null,
         state = state,
         modifier = modifier,
     )

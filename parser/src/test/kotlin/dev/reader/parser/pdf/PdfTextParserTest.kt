@@ -164,4 +164,18 @@ class PdfTextParserTest {
         val picked = parser.parse(file, ChapterSplitter.linesPattern(breakLines.map { it.index })).chapters
         assertEquals(listOf("Chapter 1", "Chapter 2"), picked.map { it.title })
     }
+
+    @Test
+    fun `default pdf import stays as one chapter unless a user pattern is specified`() {
+        val file = pdf(
+            listOf(
+                listOf(listOf("Chapter One"), listOf("First chapter text.")),
+                listOf(listOf("Chapter Two"), listOf("Second chapter text.")),
+            ),
+        )
+
+        val chapters = PdfTextParser(context).parse(file).chapters.map { it as ParsedChapter.TextChapter }
+
+        assertEquals(listOf(file.nameWithoutExtension), chapters.map { it.title })
+    }
 }

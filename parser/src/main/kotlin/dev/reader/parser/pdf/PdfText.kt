@@ -2,8 +2,10 @@ package dev.reader.parser.pdf
 
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import com.tom_roush.pdfbox.text.TextPosition
 import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.Span
+import kotlin.math.roundToInt
 
 private const val PARAGRAPH_MARK = "\u2029"
 private const val SHORT_LINE_RATIO = 0.6f
@@ -12,7 +14,7 @@ private val PAGE_NUMBER = Regex("^(page\\s+)?\\d{1,4}(\\s*(of|/)\\s*\\d{1,4})?$"
 private val SENTENCE_END = Regex("[.!?:;\"”’)\\]]$")
 
 /** One line of extracted text; blank lines separate paragraphs, so [text] line numbers match the chapter dialog's. */
-internal data class PdfLine(val text: String, val page: Int)
+internal data class PdfLine(val text: String, val page: Int, val fontSize: Float = 0f, val bold: Boolean = false)
 
 private data class RawLine(val text: String, val page: Int, val marked: Boolean)
 
