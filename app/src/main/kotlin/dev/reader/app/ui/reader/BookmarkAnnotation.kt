@@ -41,11 +41,11 @@ internal fun BookmarkAwareText(
         maxLines = maxLines,
         modifier = modifier.pointerInput(text) {
             awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false)
+                val down = awaitFirstDown(requireUnconsumed = false)
                 var up: PointerInputChange? = null
                 while (up == null) {
                     val event = awaitPointerEvent(PointerEventPass.Main)
-                val up = event.changes.firstOrNull { !it.pressed && it.previousPressed }
+                    up = event.changes.firstOrNull { it.id == down.id && !it.pressed }
                     // Bail out if something else (e.g. SelectionContainer) consumed the gesture.
                     if (up == null && event.changes.any { it.isConsumed }) return@awaitEachGesture
                 }

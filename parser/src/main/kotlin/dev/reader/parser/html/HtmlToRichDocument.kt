@@ -61,18 +61,32 @@ private fun walkBlocks(root: Element, classRules: Map<String, CssStyle>, blocks:
     }
 }
 
-private fun Element.imageBlock() = Block.Image(
-    attr("src").ifBlank { attr("href").ifBlank { attr("xlink:href") } },
-    attr("alt"),
-)
+private fun Element.imageBlock() = Block.Image(resolvedImageHref(), attr("alt"))
 
 private fun Element.isSvgFallbackImage(): Boolean {
     if (tagName() != "img") return false
-    // Inside an SVG that also has an <image> element
+    // Inside an SVG that also has an <image> element (e.g. <svg><switch><image/><foreignObject><img/></foreignObject></switch></svg>)
     if (parents().any { ancestor -> ancestor.tagName() == "svg" && ancestor.selectFirst("image") != null }) return true
-    // Immediately after an SVG that contains <image> — the common EPUB fallback pattern
-    return previousElementSibling()?.let { it.tagName() == "svg" && it.selectFirst("image") != null } == true
+    // Directly before or after a sibling SVG that contains an <image> — fallback order varies by toolchain
+    if (adjacentElementSiblings().any { it.tagName() == "svg" && it.selectFirst("image") != null }) return true
+    // Not siblings, but both wrapped a level or two up (e.g. two <p>/<div> wrappers next to each
+    // other) and pointing at the same resource — still the SVG/<img> fallback pair, just nested.
+    val href = resolvedImageHref()
+    if (href.isBlank()) return false
+    var scope = parent()
+    repeat(2) {
+        val match = scope?.select("svg image")?.any { it.resolvedImageHref() == href } == true
+        if (match) return true
+        scope = scope?.parent()
+    }
+    return false
 }
+
+private fun Element.adjacentElementSiblings(): List<Element> =
+    listOfNotNull(previousElementSibling(), nextElementSibling())
+
+private fun Element.resolvedImageHref(): String =
+    attr("src").ifBlank { attr("href") }.ifBlank { attr("xlink:href") }
 
 private fun appendTextBlocks(
     element: Element,

@@ -6,6 +6,8 @@ import dev.reader.core.richtext.RichDocument
 import dev.reader.core.richtext.Span
 import kotlin.math.abs
 
+private const val POSITION_TOLERANCE = 0.02f
+
 internal fun RichDocument.withSavedHighlights(bookmarks: List<Bookmark>): RichDocument {
     val spansByBlock = blocks.map { block ->
         when (block) {
@@ -27,10 +29,20 @@ internal fun RichDocument.withSavedHighlights(bookmarks: List<Bookmark>): RichDo
         }
         if (quote.isNullOrEmpty()) return@mapNotNull null
         val pattern = quote.split(Regex("\\s+")).joinToString("\\s+") { Regex.escape(it) }.toRegex()
-        val range = pattern.findAll(text).minByOrNull { match ->
+        val matches = pattern.findAll(text).toList()
+        fun fractionOf(match: MatchResult): Float {
             val blockIndex = starts.indexOfLast { it <= match.range.first }.coerceAtMost(blocks.lastIndex)
-            abs(blockIndex.toFloat() / blocks.size.coerceAtLeast(1) - bookmark.position)
-        }?.range ?: return@mapNotNull null
+            return blockIndex.toFloat() / blocks.size.coerceAtLeast(1)
+        }
+        // bookmark.position is recorded from the top of the viewport at selection time, so the
+        // actual selected text is at or below it on screen — prefer the nearest match at or after
+        // that position over one that merely looks closer by raw distance (which systematically
+        // favored earlier occurrences the viewport had already scrolled past).
+        val range = matches.filter { fractionOf(it) >= bookmark.position - POSITION_TOLERANCE }
+            .minByOrNull { fractionOf(it) }
+            ?.range
+            ?: matches.minByOrNull { abs(fractionOf(it) - bookmark.position) }?.range
+            ?: return@mapNotNull null
         range to bookmark.id.value
     }
     if (rangesWithId.isEmpty()) return this
