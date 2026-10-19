@@ -6,10 +6,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,21 +44,16 @@ fun BookCard(
     Column(
         modifier = modifier.fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .clip(COVER_SHAPE)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, COVER_SHAPE)
             .testTag("book-card-${book.id.value}"),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(COVER_ASPECT_RATIO)
-                .clip(COVER_SHAPE)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, COVER_SHAPE),
-        ) {
-            BookCover(book, modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO))
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO)) {
+            BookCover(book, modifier = Modifier.fillMaxSize())
             when {
                 selected -> Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(COVER_ASPECT_RATIO)
+                        .fillMaxSize()
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -82,23 +76,24 @@ fun BookCard(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            book.title,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (book.author.isNotBlank()) {
+        Column(modifier = Modifier.padding(4.dp)) {
             Text(
-                book.author,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
+                book.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-        if (progress != null) {
-            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            if (book.author.isNotBlank()) {
+                Text(
+                    book.author,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (progress != null) {
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            }
         }
     }
 }

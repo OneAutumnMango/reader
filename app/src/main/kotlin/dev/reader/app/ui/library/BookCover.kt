@@ -7,14 +7,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import dev.reader.core.model.Book
 
-/** The book's cover image, or a lettered placeholder when none has been set. */
+/** The book's cover image, or a lettered placeholder when none has been set. Fills its frame, cropping any overflow. */
 @Composable
 fun BookCover(book: Book, modifier: Modifier = Modifier) {
     if (book.coverPath != null) {
-        AsyncImage(model = book.coverPath, contentDescription = book.title, modifier = modifier)
+        AsyncImage(
+            model = book.coverPath,
+            contentDescription = book.title,
+            modifier = modifier,
+            contentScale = ContentScale.Crop,
+        )
     } else {
         Box(
             modifier = modifier.background(MaterialTheme.colorScheme.secondaryContainer),

@@ -12,15 +12,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 
 /**
- * Like [Text] but detects taps on spans that carry a "bookmark" string annotation.
- * When the tap lands on such a span, the event is consumed (preventing the tap-zone
- * overlay from firing) and [onBookmarkTap] is invoked with the bookmark ID.
- * Falls back to plain [Text] when [onBookmarkTap] is null.
+ * Like [Text] but detects taps on spans that carry a "bookmark" string annotation, and reports
+ * its on-screen layout via [onLayout] so a later text selection can be pinpointed to an exact
+ * character rather than just "this block".
+ * When a tap lands on a bookmark span, the event is consumed (preventing the tap-zone overlay
+ * from firing) and [onBookmarkTap] is invoked with the bookmark ID.
  */
 @Composable
 internal fun BookmarkAwareText(
@@ -29,17 +32,22 @@ internal fun BookmarkAwareText(
     modifier: Modifier = Modifier,
     onBookmarkTap: ((String) -> Unit)? = null,
     maxLines: Int = Int.MAX_VALUE,
+    onLayout: ((LayoutCoordinates, TextLayoutResult) -> Unit)? = null,
 ) {
-    if (onBookmarkTap == null) {
-        Text(text = text, style = style, modifier = modifier, maxLines = maxLines)
-        return
-    }
+    var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    Text(
-        text = text,
-        style = style,
-        maxLines = maxLines,
-        modifier = modifier.pointerInput(text) {
+    fun reportLayout() {
+        val c = coordinates
+        val t = textLayout
+        if (c != null && t != null) onLayout?.invoke(c, t)
+    }
+
+    var gestureModifier = modifier.onGloballyPositioned {
+        coordinates = it
+        reportLayout()
+    }
+    if (onBookmarkTap != null) {
+        gestureModifier = gestureModifier.pointerInput(text) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 var up: PointerInputChange? = null
@@ -57,7 +65,16 @@ internal fun BookmarkAwareText(
                     onBookmarkTap(annotations.first().item)
                 }
             }
+        }
+    }
+    Text(
+        text = text,
+        style = style,
+        maxLines = maxLines,
+        modifier = gestureModifier,
+        onTextLayout = {
+            textLayout = it
+            reportLayout()
         },
-        onTextLayout = { textLayout = it },
     )
 }

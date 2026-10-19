@@ -52,6 +52,29 @@ class ReaderSelectionActionsTest {
     }
 
     @Test
+    fun `saved highlight picks the occurrence nearest its recorded position, not the first match`() {
+        val document = RichDocument(
+            listOf(Block.Paragraph(listOf(Span("you have it when you do this")))),
+        )
+        // "you" appears at char offset 0 and 17; a position recorded near the second occurrence
+        // should resolve there, not fall back to the first occurrence in the text.
+        val secondYouOffset = 17
+        val position = secondYouOffset.toFloat() / document.toDocumentText().text.length
+        val bookmark = Bookmark(
+            BookmarkId("highlight"), BookId("book"), ChapterId("chapter"), position,
+            "[Highlight]\nyou", Instant.fromEpochSeconds(0),
+        )
+        val highlighted = document.withSavedHighlights(listOf(bookmark))
+        val spans = (highlighted.blocks[0] as Block.Paragraph).spans
+        val highlightedText = spans.filter { it.highlighted }.joinToString("") { it.text }
+        assertEquals("you", highlightedText)
+        val fullText = spans.joinToString("") { it.text }
+        val highlightStart = spans.takeWhile { !it.highlighted }.sumOf { it.text.length }
+        assertEquals(secondYouOffset, highlightStart)
+        assertEquals("you have it when you do this", fullText)
+    }
+
+    @Test
     fun `selection action waits for an asynchronous copy`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -62,7 +85,7 @@ class ReaderSelectionActionsTest {
         toolbar.showMenu(Rect.Zero, {
             copyLater = { toolbar.captureSelection("new quote") }
         }, null, null, null)
-        toolbar.dispatchSelectionAction(SelectionAction.HIGHLIGHT) { _, text -> received = text }
+        toolbar.dispatchSelectionAction(SelectionAction.HIGHLIGHT) { _, text, _ -> received = text }
         assertNull(received)
         copyLater?.invoke()
         assertEquals("new quote", received)
@@ -126,7 +149,7 @@ class ReaderSelectionActionsTest {
             null,
         )
 
-        toolbar.dispatchSelectionAction(SelectionAction.NOTE) { action, text ->
+        toolbar.dispatchSelectionAction(SelectionAction.NOTE) { action, text, _ ->
             received = action to text
         }
 
@@ -140,7 +163,7 @@ class ReaderSelectionActionsTest {
             null,
             null,
         )
-        toolbar.dispatchSelectionAction(SelectionAction.COPY) { _, _ ->
+        toolbar.dispatchSelectionAction(SelectionAction.COPY) { _, _, _ ->
             error("Copy is handled by the toolbar")
         }
 

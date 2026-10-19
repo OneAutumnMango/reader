@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
@@ -43,6 +44,10 @@ fun PagedReader(
     highlight: Regex? = null,
     jump: BlockJump? = null,
     onBookmarkTap: ((String) -> Unit)? = null,
+    // Accepted for signature parity with ContinuousReader, but not wired up: a block can be split
+    // across a page boundary here, so a local char offset wouldn't map back to the right place in
+    // the unsplit block without extra bookkeeping. Paged mode falls back to the coarser heuristic.
+    @Suppress("UNUSED_PARAMETER") onBlockLayout: ((Int, LayoutCoordinates, TextLayoutResult) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val density = LocalDensity.current

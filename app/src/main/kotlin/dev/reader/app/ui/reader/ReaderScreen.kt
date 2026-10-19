@@ -35,11 +35,12 @@ fun ReaderScreen(
     modifier: Modifier = Modifier,
     highlight: Regex? = null,
     jump: BlockJump? = null,
-    onSelectionAction: (SelectionAction, String) -> Unit = { _, _ -> },
+    onSelectionAction: (SelectionAction, String, Float?) -> Unit = { _, _, _ -> },
     onBookmarkTap: ((String) -> Unit)? = null,
 ) {
     KeepScreenAwakeEffect(settings.keepScreenAwake)
     val selectionToolbar = remember { ReaderSelectionToolbar() }
+    val blockAnchors = remember(document) { BlockAnchorRegistry() }
     val systemClipboard = LocalClipboard.current
     val context = LocalContext.current
     val selectionClipboard = remember(selectionToolbar, systemClipboard, context) {
@@ -76,6 +77,7 @@ fun ReaderScreen(
                             highlight,
                             jump,
                             onBookmarkTap,
+                            onBlockLayout = blockAnchors::record,
                         )
                         else -> PagedReader(
                             document,
@@ -92,6 +94,11 @@ fun ReaderScreen(
                 }
             }
         }
-        ReaderSelectionToolbarOverlay(selectionToolbar, onSelectionAction)
+        ReaderSelectionToolbarOverlay(selectionToolbar) { action, text, rect ->
+            val anchorFraction = selectionToolbar.coordinates?.let { root ->
+                blockAnchors.resolveFraction(document, root, rect)
+            }
+            onSelectionAction(action, text, anchorFraction)
+        }
     }
 }

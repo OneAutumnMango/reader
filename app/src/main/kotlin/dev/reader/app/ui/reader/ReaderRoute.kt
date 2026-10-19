@@ -237,6 +237,7 @@ private fun ChapterPage(
     var recordedPages by remember(chapter.id) { mutableStateOf(0) }
     var noteSelection by remember(chapter.id) { mutableStateOf<String?>(null) }
     var noteDraft by remember(chapter.id) { mutableStateOf("") }
+    var noteAnchorFraction by remember(chapter.id) { mutableStateOf<Float?>(null) }
     val sessionTimer = remember(chapter.id) { ReadingSessionTimer() }
     val latestFraction by rememberUpdatedState(lastFraction)
     val latestPagesTurned by rememberUpdatedState(pagesTurned)
@@ -348,14 +349,14 @@ private fun ChapterPage(
         }
     }
 
-    fun saveSelectionBookmark(action: SelectionAction, selectedText: String, note: String = "") {
+    fun saveSelectionBookmark(action: SelectionAction, selectedText: String, note: String = "", anchorFraction: Float? = null) {
         scope.launch {
             graph.bookmarks.add(
                 Bookmark(
                     id = BookmarkId(UUID.randomUUID().toString()),
                     bookId = book.id,
                     chapterId = chapter.id,
-                    position = lastFraction,
+                    position = anchorFraction ?: lastFraction,
                     note = selectionBookmarkNote(action, selectedText, note),
                     createdAt = Clock.System.now(),
                 ),
@@ -363,15 +364,16 @@ private fun ChapterPage(
         }
     }
 
-    fun onSelectionAction(action: SelectionAction, selectedText: String) {
+    fun onSelectionAction(action: SelectionAction, selectedText: String, anchorFraction: Float?) {
         when (action) {
             SelectionAction.TRANSLATE, SelectionAction.SEARCH, SelectionAction.DICTIONARY ->
                 launchSelectionIntent(context, action, selectedText)
             SelectionAction.NOTE -> {
                 noteSelection = selectedText
                 noteDraft = ""
+                noteAnchorFraction = anchorFraction
             }
-            SelectionAction.HIGHLIGHT -> saveSelectionBookmark(action, selectedText)
+            SelectionAction.HIGHLIGHT -> saveSelectionBookmark(action, selectedText, anchorFraction = anchorFraction)
             SelectionAction.COPY -> Unit
         }
     }
@@ -439,7 +441,7 @@ private fun ChapterPage(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        saveSelectionBookmark(SelectionAction.NOTE, selectedText, noteDraft)
+                        saveSelectionBookmark(SelectionAction.NOTE, selectedText, noteDraft, noteAnchorFraction)
                         noteSelection = null
                     },
                 ) { Text("Save") }

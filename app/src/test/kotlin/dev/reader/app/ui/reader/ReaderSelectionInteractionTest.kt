@@ -51,7 +51,7 @@ class ReaderSelectionInteractionTest {
                 ReaderTheme.Default,
                 ReaderSettings(readingMode = mode),
                 modifier = Modifier.size(300.dp, 500.dp),
-                onSelectionAction = { action, text -> received = action to text },
+                onSelectionAction = { action, text, _ -> received = action to text },
             )
         }
         composeRule.onNodeWithText("hello").performTouchInput {

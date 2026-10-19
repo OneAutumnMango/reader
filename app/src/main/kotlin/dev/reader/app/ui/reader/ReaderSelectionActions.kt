@@ -107,10 +107,11 @@ internal class ReaderSelectionToolbar : TextToolbar, TextContextMenuProvider {
 
     fun dispatchSelectionAction(
         action: SelectionAction,
-        onAction: (SelectionAction, String) -> Unit,
+        onAction: (SelectionAction, String, Rect) -> Unit,
     ) {
         val currentMenu = menu ?: return
-        pendingAction = if (action == SelectionAction.COPY) null else { text -> onAction(action, text) }
+        val rect = currentMenu.rect
+        pendingAction = if (action == SelectionAction.COPY) null else { text -> onAction(action, text, rect) }
         currentMenu.onCopyRequested()
         hide()
     }
@@ -121,7 +122,7 @@ internal data class SelectionToolbarMenu(val rect: Rect, val onCopyRequested: ()
 @Composable
 internal fun ReaderSelectionToolbarOverlay(
     toolbar: ReaderSelectionToolbar,
-    onAction: (SelectionAction, String) -> Unit,
+    onAction: (SelectionAction, String, Rect) -> Unit,
 ) {
     val menu = toolbar.menu ?: return
     val density = LocalDensity.current
