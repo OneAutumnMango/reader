@@ -38,6 +38,7 @@ fun BookContextMenu(
     onDismiss: () -> Unit,
     onDetectChapters: (() -> Unit)? = null,
     onShowDetails: (() -> Unit)? = null,
+    singleCategoryPerBook: Boolean = false,
 ) {
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -46,6 +47,7 @@ fun BookContextMenu(
         CategoryPickerDialog(
             categories = categories,
             selected = book.categoryIds,
+            singleCategoryPerBook = singleCategoryPerBook,
             onConfirm = {
                 onChangeCategories(it)
                 showCategoryPicker = false
@@ -129,6 +131,7 @@ private fun CategoryPickerDialog(
     selected: Set<CategoryId>,
     onConfirm: (Set<CategoryId>) -> Unit,
     onDismiss: () -> Unit,
+    singleCategoryPerBook: Boolean,
 ) {
     var picked by remember { mutableStateOf(selected) }
 
@@ -137,16 +140,24 @@ private fun CategoryPickerDialog(
         title = { Text("Change category") },
         text = {
             Column {
+                if (singleCategoryPerBook) {
+                    CategoryChoice("No category", selected.isEmpty(), "category-picker-none") {
+                        onConfirm(emptySet())
+                    }
+                }
                 categories.forEach { category ->
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = category.id in picked,
-                            onCheckedChange = { checked ->
-                                picked = if (checked) picked + category.id else picked - category.id
-                            },
-                            modifier = Modifier.testTag("category-picker-${category.id.value}"),
-                        )
-                        Text(category.name)
+                    CategoryChoice(
+                        category.name,
+                        category.id in picked,
+                        "category-picker-${category.id.value}",
+                    ) {
+                        picked = if (singleCategoryPerBook) {
+                            if (category.id in picked) emptySet() else setOf(category.id)
+                        } else if (category.id in picked) {
+                            picked - category.id
+                        } else {
+                            picked + category.id
+                        }
                     }
                     HorizontalDivider()
                 }
@@ -155,6 +166,17 @@ private fun CategoryPickerDialog(
         confirmButton = { TextButton(onClick = { onConfirm(picked) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+@Composable
+private fun CategoryChoice(label: String, checked: Boolean, tag: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag(tag).clickable(onClick = onClick).padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
+        Text(label, modifier = Modifier.padding(start = 8.dp))
+    }
 }
 
 @Composable

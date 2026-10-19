@@ -139,7 +139,10 @@ fun LibraryRoute(
                 book = book,
                 categories = categories,
                 onChangeCategories = { ids ->
-                    scope.launch { graph.library.updateCategories(book.id, ids) }
+                    scope.launch {
+                        val selected = if (preferences?.singleCategoryPerBook == true) ids.take(1).toSet() else ids
+                        graph.library.updateCategories(book.id, selected)
+                    }
                 },
                 onRename = { newTitle ->
                     scope.launch { graph.library.updateBookDetails(book.copy(title = newTitle)) }
@@ -152,6 +155,7 @@ fun LibraryRoute(
                 onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
                 onDismiss = { longPressedBook = null },
                 onShowDetails = { onOpenDetails(book) },
+                singleCategoryPerBook = preferences?.singleCategoryPerBook == true,
                 onDetectChapters = if (book.supportsChapterDetection()) ({ chapterDetectBook = book }) else null,
             )
         }

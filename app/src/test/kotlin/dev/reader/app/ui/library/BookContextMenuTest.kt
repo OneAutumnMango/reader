@@ -130,10 +130,32 @@ class BookContextMenuTest {
         }
 
         composeRule.onNodeWithTag("book-menu-change-category").performClick()
-        composeRule.onNodeWithTag("category-picker-${comics.value}").performClick()
+        composeRule.onNodeWithText("Comics").performClick()
         composeRule.onNodeWithText("Save").performClick()
 
         assertEquals(setOf(novels, comics), newCategories)
+    }
+
+    @Test
+    fun `single category mode chooses only the tapped category name`() {
+        var selected: Set<CategoryId>? = null
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = { selected = it },
+                onRename = {},
+                onChangeCover = {},
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = {},
+                singleCategoryPerBook = true,
+            )
+        }
+        composeRule.onNodeWithTag("book-menu-change-category").performClick()
+        composeRule.onNodeWithText("Comics").performClick()
+        composeRule.onNodeWithText("Save").performClick()
+        assertEquals(setOf(comics), selected)
     }
 
     @Test

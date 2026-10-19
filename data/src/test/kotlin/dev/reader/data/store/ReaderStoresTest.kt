@@ -78,6 +78,7 @@ class ReaderStoresTest {
         val preferences = stores(backgroundScope).preferences.data.first()
         assertEquals(emptyList(), preferences.statsGraphs)
         assertEquals(emptyMap(), preferences.rootFolderNames)
+        assertEquals(false, preferences.singleCategoryPerBook)
     }
 
     @Test
@@ -103,6 +104,7 @@ class ReaderStoresTest {
                 activeThemePresetName = "Night",
                 rootFolders = listOf("content://library"),
                 statsGraphs = listOf(firstGraph, secondGraph),
+                singleCategoryPerBook = true,
             )
         }
         assertEquals(listOf(firstGraph, secondGraph), firstRepository.preferences.first().statsGraphs)
@@ -114,6 +116,7 @@ class ReaderStoresTest {
         assertEquals(listOf(firstGraph, secondGraph), afterRestart.statsGraphs)
         assertEquals("Night", afterRestart.activeThemePresetName)
         assertEquals(listOf("content://library"), afterRestart.rootFolders)
+        assertEquals(true, afterRestart.singleCategoryPerBook)
 
         val updatedGraph = firstGraph.copy(title = "Reading time by book")
         secondRepository.update { preferences ->

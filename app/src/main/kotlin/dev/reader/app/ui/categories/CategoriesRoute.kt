@@ -1,6 +1,7 @@
 package dev.reader.app.ui.categories
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -16,13 +17,37 @@ import java.util.UUID
 fun CategoriesRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
+    val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val preferences by graph.settings.preferences.collectAsState(initial = PreferencesFile())
+
+    LaunchedEffect(preferences.singleCategoryPerBook, categories, books) {
+        if (preferences.singleCategoryPerBook) {
+            books.forEach { book ->
+                val first = categories.firstOrNull { it.id in book.categoryIds }?.id
+                val normalized = first?.let(::setOf).orEmpty()
+                if (book.categoryIds != normalized) graph.library.updateCategories(book.id, normalized)
+            }
+        }
+    }
 
     CategoriesScreen(
         categories = categories,
         showAllCategory = preferences.showAllCategory,
         onShowAllCategoryChange = { show ->
             scope.launch { graph.settings.update { it.copy(showAllCategory = show) } }
+        },
+        singleCategoryPerBook = preferences.singleCategoryPerBook,
+        onSingleCategoryPerBookChange = { singleOnly ->
+            scope.launch {
+                graph.settings.update { it.copy(singleCategoryPerBook = singleOnly) }
+                if (singleOnly) {
+                    books.forEach { book ->
+                        val first = categories.firstOrNull { it.id in book.categoryIds }?.id
+                        val normalized = first?.let(::setOf).orEmpty()
+                        if (book.categoryIds != normalized) graph.library.updateCategories(book.id, normalized)
+                    }
+                }
+            }
         },
         onAdd = { name ->
             scope.launch {

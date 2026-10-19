@@ -42,4 +42,5 @@ data class PreferencesFile(
     val librarySort: LibrarySort = LibrarySort.ADDED,
     val librarySortDescending: Boolean = true,
     val statsGraphs: List<StatsGraph> = emptyList(),
+    val singleCategoryPerBook: Boolean = false,
 )

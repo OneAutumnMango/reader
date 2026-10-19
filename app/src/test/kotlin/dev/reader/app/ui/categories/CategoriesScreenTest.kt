@@ -1,11 +1,14 @@
 package dev.reader.app.ui.categories
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
 import org.junit.Rule
@@ -29,6 +32,7 @@ class CategoriesScreenTest {
     private var deleted: Category? = null
     private var moved: Pair<Int, Int>? = null
     private var default: CategoryId? = CategoryId("unset")
+    private var singleOnly = false
 
     private fun setContent() = composeRule.setContent {
         CategoriesScreen(
@@ -39,6 +43,8 @@ class CategoriesScreenTest {
             onDelete = { deleted = it },
             onMove = { from, to -> moved = from to to },
             onDefaultChange = { default = it },
+            singleCategoryPerBook = singleOnly,
+            onSingleCategoryPerBookChange = { singleOnly = it },
         )
     }
 
@@ -53,7 +59,12 @@ class CategoriesScreenTest {
     fun `adds, reorders and deletes categories`() {
         setContent()
 
-        composeRule.onNodeWithTag("move-down-novels").performScrollTo().performClick()
+        composeRule.onNodeWithTag("single-category-toggle").performClick()
+        assertEquals(true, singleOnly)
+
+        composeRule.onNodeWithTag("drag-category-novels").performTouchInput {
+            swipe(start = center, end = center + Offset(0f, 120f), durationMillis = 300)
+        }
         assertEquals(0 to 1, moved)
 
         composeRule.onNodeWithTag("delete-comics").performScrollTo().performClick()
