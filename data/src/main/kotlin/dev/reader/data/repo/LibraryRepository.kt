@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
+@Suppress("TooManyFunctions")
 class LibraryRepository(private val database: ReaderDatabase) {
 
     fun observeBooks(): Flow<List<Book>> = database.books().observeAll().map { it.toBooks() }
@@ -25,6 +26,9 @@ class LibraryRepository(private val database: ReaderDatabase) {
 
     fun observeChapters(bookId: BookId): Flow<List<Chapter>> =
         database.chapters().observeByBook(bookId.value).map { chapters -> chapters.map { it.toChapter() } }
+
+    fun observeAllChapters(): Flow<List<Chapter>> =
+        database.chapters().observeAll().map { chapters -> chapters.map { it.toChapter() } }
 
     fun observeCategories(): Flow<List<Category>> =
         database.categories().observeAll().map { categories -> categories.map { it.toCategory() } }

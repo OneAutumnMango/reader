@@ -1,6 +1,13 @@
 package dev.reader.data.store
 
+import dev.reader.core.stats.GraphAxis
+import dev.reader.core.stats.GraphGrouping
+import dev.reader.core.stats.GraphMetric
+import dev.reader.core.stats.GraphPlot
+import dev.reader.core.stats.GraphRange
+import dev.reader.core.stats.StatsGraph
 import dev.reader.core.theme.AppThemeMode
+import dev.reader.data.repo.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -11,11 +18,12 @@ import okio.Path.Companion.toPath
 import okio.buffer
 import okio.fakefilesystem.FakeFileSystem
 import org.junit.jupiter.api.Test
+import java.util.UUID
 import kotlin.test.assertEquals
 
 class ReaderStoresTest {
 
-    private val directory = "/reader-preferences".toPath()
+    private val directory = "/reader-preferences-${UUID.randomUUID()}".toPath()
     private val fileSystem = FakeFileSystem().also { it.createDirectories(directory) }
 
     private fun stores(scope: CoroutineScope) = ReaderStores(fileSystem, directory, scope)
@@ -49,5 +57,66 @@ class ReaderStoresTest {
         fileSystem.sink(directory / "preferences.json").buffer()
             .use { it.writeUtf8("""{"activeThemePresetName":"Night","somethingNew":42}""") }
         assertEquals("Night", stores(backgroundScope).preferences.data.first().activeThemePresetName)
+    }
+
+    @Test
+    fun `preferences written by an older version default saved graphs to empty`() = runTest {
+        fileSystem.sink(directory / "preferences.json").buffer()
+            .use { it.writeUtf8("""{"activeThemePresetName":"Night"}""") }
+
+        assertEquals(emptyList(), stores(backgroundScope).preferences.data.first().statsGraphs)
+    }
+
+    @Test
+    fun `saved graphs can be replaced and deleted without changing other preferences`() = runTest {
+        val firstScope = CoroutineScope(Job() + UnconfinedTestDispatcher(testScheduler))
+        val firstRepository = SettingsRepository(stores(firstScope))
+        val firstGraph = StatsGraph(
+            id = "reading-time",
+            title = "Reading time",
+            plot = GraphPlot.AREA,
+            xAxis = GraphAxis.BOOK,
+            metrics = listOf(GraphMetric.READING_MINUTES, GraphMetric.SESSIONS),
+            grouping = GraphGrouping.BOOK,
+            bookIds = setOf("book-1", "book-2"),
+            range = GraphRange.LAST_30_DAYS,
+            independentScales = true,
+            splitByBook = true,
+        )
+        val secondGraph = StatsGraph(id = "words", title = "Words", metrics = listOf(GraphMetric.WORDS))
+
+        firstRepository.update {
+            it.copy(
+                activeThemePresetName = "Night",
+                rootFolders = listOf("content://library"),
+                statsGraphs = listOf(firstGraph, secondGraph),
+            )
+        }
+        assertEquals(listOf(firstGraph, secondGraph), firstRepository.preferences.first().statsGraphs)
+        firstScope.cancel()
+
+        val secondScope = CoroutineScope(Job() + UnconfinedTestDispatcher(testScheduler))
+        val secondRepository = SettingsRepository(stores(secondScope))
+        val afterRestart = secondRepository.preferences.first()
+        assertEquals(listOf(firstGraph, secondGraph), afterRestart.statsGraphs)
+        assertEquals("Night", afterRestart.activeThemePresetName)
+        assertEquals(listOf("content://library"), afterRestart.rootFolders)
+
+        val updatedGraph = firstGraph.copy(title = "Reading time by book")
+        secondRepository.update { preferences ->
+            preferences.copy(
+                statsGraphs = preferences.statsGraphs.map { if (it.id == firstGraph.id) updatedGraph else it },
+            )
+        }
+        assertEquals(listOf(updatedGraph, secondGraph), secondRepository.preferences.first().statsGraphs)
+
+        secondRepository.update { preferences ->
+            preferences.copy(statsGraphs = preferences.statsGraphs.filterNot { it.id == updatedGraph.id })
+        }
+        val afterDelete = secondRepository.preferences.first()
+        assertEquals(listOf(secondGraph), afterDelete.statsGraphs)
+        assertEquals("Night", afterDelete.activeThemePresetName)
+        assertEquals(listOf("content://library"), afterDelete.rootFolders)
+        secondScope.cancel()
     }
 }

@@ -49,6 +49,30 @@ class StatsAndSearchRepositoryTest {
     }
 
     @Test
+    fun `all sessions are observed in chronological order across books`() = runBlocking {
+        val repository = StatsRepository(database)
+        val first = ReadingSessionEvent(
+            bookId = BookId("book-1"),
+            chapterId = ChapterId("ch-1"),
+            startedAt = Instant.parse("2026-01-01T10:00:00Z"),
+            endedAt = Instant.parse("2026-01-01T10:10:00Z"),
+            wordsRead = 100,
+        )
+        val second = first.copy(
+            bookId = BookId("book-2"),
+            chapterId = ChapterId("ch-2"),
+            startedAt = Instant.parse("2026-01-02T10:00:00Z"),
+            endedAt = Instant.parse("2026-01-02T10:10:00Z"),
+            wordsRead = 200,
+        )
+        repository.recordSession(second)
+        repository.recordSession(first)
+
+        assertEquals(listOf(first, second), repository.observeAllSessions().first())
+        assertEquals(listOf(first), repository.observeSessions(BookId("book-1")).first())
+    }
+
+    @Test
     fun `indexed chapter text is searchable`() = runBlocking {
         val repository = SearchRepository(database)
         val chapterId = ChapterId("ch-1")

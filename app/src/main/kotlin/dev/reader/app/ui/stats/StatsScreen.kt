@@ -43,9 +43,19 @@ private val MIN_BAR_HEIGHT = 4.dp
 private const val INACTIVE_BAR_ALPHA = 0.5f
 
 @Composable
-fun StatsScreen(summary: StatsSummary, modifier: Modifier = Modifier) {
+fun StatsScreen(
+    summary: StatsSummary,
+    modifier: Modifier = Modifier,
+    graphs: @Composable () -> Unit = {},
+) {
     if (summary.sessionCount == 0 && summary.booksFinished == 0) {
-        EmptyStats(modifier)
+        Column(
+            modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            graphs()
+            EmptyStats(Modifier.fillMaxWidth().height(220.dp))
+        }
         return
     }
 
@@ -69,6 +79,8 @@ fun StatsScreen(summary: StatsSummary, modifier: Modifier = Modifier) {
                 modifier = Modifier.weight(1f),
             )
         }
+
+        graphs()
 
         MenuSection("Last 7 days") { WeekChart(summary.last7Days) }
 

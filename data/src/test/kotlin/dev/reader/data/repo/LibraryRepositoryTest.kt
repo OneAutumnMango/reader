@@ -69,6 +69,37 @@ class LibraryRepositoryTest {
     }
 
     @Test
+    fun `observeAllChapters orders chapters by book and chapter order`() = runBlocking {
+        val firstBook = Book(
+            id = BookId("book-a"),
+            title = "A",
+            format = BookFormat.TXT,
+            sourcePath = "/books/a.txt",
+            addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+        val secondBook = Book(
+            id = BookId("book-b"),
+            title = "B",
+            format = BookFormat.TXT,
+            sourcePath = "/books/b.txt",
+            addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+        repository.upsertBook(
+            secondBook,
+            listOf(Chapter(ChapterId("b-1"), secondBook.id, "B1", "b1.txt", orderIndex = 0)),
+        )
+        repository.upsertBook(
+            firstBook,
+            listOf(
+                Chapter(ChapterId("a-2"), firstBook.id, "A2", "a2.txt", orderIndex = 1),
+                Chapter(ChapterId("a-1"), firstBook.id, "A1", "a1.txt", orderIndex = 0),
+            ),
+        )
+
+        assertEquals(listOf("a-1", "a-2", "b-1"), repository.observeAllChapters().first().map { it.id.value })
+    }
+
+    @Test
     fun `deleteBook removes the book and its chapters`() = runBlocking {
         val book = Book(
             id = BookId("book-1"),

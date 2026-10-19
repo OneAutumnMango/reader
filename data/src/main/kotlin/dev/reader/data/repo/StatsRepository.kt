@@ -27,6 +27,9 @@ class StatsRepository(private val database: ReaderDatabase) {
 
     suspend fun recordSession(session: ReadingSessionEvent) = database.sessions().insert(session.toEntity())
 
+    fun observeAllSessions(): Flow<List<ReadingSessionEvent>> =
+        database.sessions().observeAll().map { rows -> rows.map { it.toEvent() } }
+
     fun observeSessions(bookId: BookId): Flow<List<ReadingSessionEvent>> =
         database.sessions().observeForBook(bookId.value).map { rows -> rows.map { it.toEvent() } }
 

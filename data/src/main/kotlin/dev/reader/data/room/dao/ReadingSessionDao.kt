@@ -12,7 +12,7 @@ interface ReadingSessionDao {
     @Insert
     suspend fun insert(session: ReadingSessionEntity)
 
-    @Query("SELECT * FROM reading_sessions ORDER BY startedAt")
+    @Query("SELECT * FROM reading_sessions ORDER BY startedAt, id")
     fun observeAll(): Flow<List<ReadingSessionEntity>>
 
     @Query("SELECT * FROM reading_sessions WHERE bookId = :bookId ORDER BY startedAt")

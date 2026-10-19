@@ -1,6 +1,7 @@
 package dev.reader.data.store
 
 import dev.reader.core.reader.ReaderSettings
+import dev.reader.core.stats.StatsGraph
 import dev.reader.core.theme.AppTheme
 import dev.reader.core.theme.LibraryLayout
 import dev.reader.core.theme.ReaderTheme
@@ -38,4 +39,5 @@ data class PreferencesFile(
     val showAllCategory: Boolean = true,
     val librarySort: LibrarySort = LibrarySort.ADDED,
     val librarySortDescending: Boolean = true,
+    val statsGraphs: List<StatsGraph> = emptyList(),
 )
