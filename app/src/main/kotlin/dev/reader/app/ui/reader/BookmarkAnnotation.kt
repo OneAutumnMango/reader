@@ -17,6 +17,10 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
+
+/** How far off a bookmarked span a tap can land and still count, so small highlights are easier to hit. */
+private val BOOKMARK_TAP_SLOP = 6.dp
 
 /**
  * Like [Text] but detects taps on spans that carry a "bookmark" string annotation, and reports
@@ -58,11 +62,21 @@ internal fun BookmarkAwareText(
                     if (up == null && event.changes.any { it.isConsumed }) return@awaitEachGesture
                 }
                 val layout = textLayout ?: return@awaitEachGesture
-                val charOffset = layout.getOffsetForPosition(up.position)
-                val annotations = text.getStringAnnotations("bookmark", charOffset, charOffset)
-                if (annotations.isNotEmpty()) {
+                val slopPx = BOOKMARK_TAP_SLOP.toPx()
+                val candidates = listOf(
+                    up.position,
+                    up.position.copy(x = up.position.x - slopPx),
+                    up.position.copy(x = up.position.x + slopPx),
+                    up.position.copy(y = up.position.y - slopPx),
+                    up.position.copy(y = up.position.y + slopPx),
+                )
+                val annotation = candidates.firstNotNullOfOrNull { point ->
+                    val charOffset = layout.getOffsetForPosition(point)
+                    text.getStringAnnotations("bookmark", charOffset, charOffset).firstOrNull()
+                }
+                if (annotation != null) {
                     up.consume()
-                    onBookmarkTap(annotations.first().item)
+                    onBookmarkTap(annotation.item)
                 }
             }
         }
