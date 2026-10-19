@@ -1,6 +1,9 @@
 package dev.reader.app.ui.library
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -9,6 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.dp
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.core.model.BookId
@@ -80,6 +84,27 @@ class LibraryScreenTest {
 
         composeRule.onNodeWithText("Alpha").assertExists()
         composeRule.onAllNodesWithText("Beta").assertCountEquals(0)
+    }
+
+    @Test
+    fun `book cards keep a consistent edge margin in the grid`() {
+        composeRule.setContent {
+            LibraryScreen(
+                listOf(book("1", "Alpha")),
+                categories,
+                null,
+                progressFor = { null },
+                onCategorySelected = {},
+                onBookClick = {},
+                onBookLongClick = {},
+                onSearchClick = {},
+                onAddCategory = {},
+                modifier = Modifier.size(360.dp, 640.dp),
+            )
+        }
+
+        val card = composeRule.onNodeWithTag("book-card-1").getUnclippedBoundsInRoot()
+        assertEquals(8.dp, card.left)
     }
 
     @Test

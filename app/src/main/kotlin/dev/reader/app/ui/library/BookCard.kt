@@ -34,8 +34,12 @@ fun BookCard(
     finished: Boolean = false,
     onLongClick: () -> Unit = {},
 ) {
-    Card(modifier = modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
-        Column(modifier = Modifier.padding(8.dp)) {
+    Card(
+        modifier = modifier.fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .testTag("book-card-${book.id.value}"),
+    ) {
+        Column(modifier = Modifier.padding(4.dp)) {
             Box(modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO)) {
                 BookCover(book, modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO))
                 if (finished) {
@@ -51,8 +55,20 @@ fun BookCard(
                     )
                 }
             }
-            Text(book.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (book.author.isNotBlank()) Text(book.author, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                book.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (book.author.isNotBlank()) {
+                Text(
+                    book.author,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (progress != null) {
                 LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
             }

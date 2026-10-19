@@ -68,7 +68,7 @@ fun LibraryScreen(
             LazyVerticalGrid(
                 state = gridStateFor(category) ?: rememberLazyGridState(),
                 columns = GridCells.Adaptive(minSize = layout.gridColumnMinWidthDp.dp),
-                contentPadding = PaddingValues(8.dp),
+                contentPadding = PaddingValues(4.dp),
                 modifier = Modifier.fillMaxSize().testTag("library-grid"),
             ) {
                 items(pageBooks, key = { it.id.value }) { book ->
