@@ -83,6 +83,7 @@ fun ReaderScreen(
                             jump,
                             onBookmarkTap,
                             onBlockLayout = blockAnchors::record,
+                            onBlockDisposed = blockAnchors::remove,
                             onSelectionContainerLayout = { selectionContainerCoordinates = it },
                         )
                         else -> PagedReader(

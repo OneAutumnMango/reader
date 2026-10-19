@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,6 +40,7 @@ fun ContinuousReader(
     jump: BlockJump? = null,
     onBookmarkTap: ((String) -> Unit)? = null,
     onBlockLayout: ((Int, LayoutCoordinates, TextLayoutResult) -> Unit)? = null,
+    onBlockDisposed: ((Int) -> Unit)? = null,
     onSelectionContainerLayout: ((LayoutCoordinates) -> Unit)? = null,
 ) {
     val initialIndex = (initialPositionFraction * document.blocks.size)
@@ -73,6 +75,10 @@ fun ContinuousReader(
             verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
         ) {
             itemsIndexed(document.blocks) { index, block ->
+                // A recycled LazyColumn slot can get reused for a different index as the user
+                // scrolls; drop this index's anchor when that happens so a stale entry can't
+                // later alias onto whatever block now lives at that slot's current position.
+                DisposableEffect(index) { onDispose { onBlockDisposed?.invoke(index) } }
                 ReaderBlock(block, theme, settings.useBookStyling, highlight, onBookmarkTap) { coordinates, layout ->
                     onBlockLayout?.invoke(index, coordinates, layout)
                 }
