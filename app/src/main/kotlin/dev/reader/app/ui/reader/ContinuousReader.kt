@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.ReaderSettings
@@ -38,6 +39,7 @@ fun ContinuousReader(
     jump: BlockJump? = null,
     onBookmarkTap: ((String) -> Unit)? = null,
     onBlockLayout: ((Int, LayoutCoordinates, TextLayoutResult) -> Unit)? = null,
+    onSelectionContainerLayout: ((LayoutCoordinates) -> Unit)? = null,
 ) {
     val initialIndex = (initialPositionFraction * document.blocks.size)
         .toInt()
@@ -79,7 +81,12 @@ fun ContinuousReader(
     }
 
     if (settings.selectableText) {
-        SelectionContainer { content() }
+        // The selection toolbar's reported rect is relative to SelectionContainer's own layout
+        // node, not any ancestor Box, so this is the exact coordinate frame a resolved selection
+        // anchor needs to be converted through.
+        SelectionContainer(modifier = Modifier.onGloballyPositioned { onSelectionContainerLayout?.invoke(it) }) {
+            content()
+        }
     } else {
         DisableSelection { content() }
     }

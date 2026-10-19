@@ -8,8 +8,12 @@ import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
@@ -41,6 +45,7 @@ fun ReaderScreen(
     KeepScreenAwakeEffect(settings.keepScreenAwake)
     val selectionToolbar = remember { ReaderSelectionToolbar() }
     val blockAnchors = remember(document) { BlockAnchorRegistry() }
+    var selectionContainerCoordinates by remember(document) { mutableStateOf<LayoutCoordinates?>(null) }
     val systemClipboard = LocalClipboard.current
     val context = LocalContext.current
     val selectionClipboard = remember(selectionToolbar, systemClipboard, context) {
@@ -78,6 +83,7 @@ fun ReaderScreen(
                             jump,
                             onBookmarkTap,
                             onBlockLayout = blockAnchors::record,
+                            onSelectionContainerLayout = { selectionContainerCoordinates = it },
                         )
                         else -> PagedReader(
                             document,
@@ -95,7 +101,10 @@ fun ReaderScreen(
             }
         }
         ReaderSelectionToolbarOverlay(selectionToolbar) { action, text, rect ->
-            val anchorFraction = selectionToolbar.coordinates?.let { root ->
+            // rect is relative to SelectionContainer's own coordinates, not selectionToolbar's
+            // (which tracks this outer Box, used only for positioning the toolbar popup) — using
+            // the wrong frame here silently resolved to the wrong, nearby character.
+            val anchorFraction = selectionContainerCoordinates?.let { root ->
                 blockAnchors.resolveFraction(document, root, rect)
             }
             onSelectionAction(action, text, anchorFraction)
