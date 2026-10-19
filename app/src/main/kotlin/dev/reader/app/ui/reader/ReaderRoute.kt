@@ -1,11 +1,15 @@
 package dev.reader.app.ui.reader
 
+import android.os.SystemClock
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -15,10 +19,14 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.reader.app.data.ChapterContent
 import dev.reader.app.data.ChapterLoader
 import dev.reader.app.data.ReaderGraph
@@ -54,8 +62,19 @@ fun ReaderRoute(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var isResumed by remember(lifecycle) {
+        mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val allChapters by graph.library.observeChapters(bookId).collectAsState(initial = emptyList())
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            isResumed = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     // Extras (title page, copyright…) open on their own; otherwise only real chapters are swipeable.
     val chapters = remember(allChapters, chapterId, books) {
         val pdfPages = books.find { it.id == bookId }
@@ -105,6 +124,7 @@ fun ReaderRoute(
                 scope = scope,
                 book = book,
                 chapter = chapters[page],
+                isActive = page == pagerState.settledPage && !pagerState.isScrollInProgress && isResumed,
                 settings = prefs.readerSettings,
                 theme = theme,
                 onToggleMenu = { showMenu = !showMenu },
@@ -166,7 +186,10 @@ fun ReaderRoute(
         }
     }
 
-    LaunchedEffect(currentChapter.id) {
+    LaunchedEffect(currentChapter.id, pagerState.settledPage, pagerState.isScrollInProgress, isResumed) {
+        if (pagerState.currentPage != pagerState.settledPage || pagerState.isScrollInProgress || !isResumed) {
+            return@LaunchedEffect
+        }
         // Keep the book-level "last opened" pointer up to date as chapters are swiped through.
         val existing = graph.progress.observe(bookId).first()
         graph.progress.update(
@@ -186,6 +209,7 @@ private fun ChapterPage(
     scope: CoroutineScope,
     book: Book,
     chapter: Chapter,
+    isActive: Boolean,
     settings: ReaderSettings,
     theme: ReaderTheme,
     onToggleMenu: () -> Unit,
@@ -194,6 +218,8 @@ private fun ChapterPage(
     jump: BlockJump?,
 ) {
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val bookmarks by graph.bookmarks.observe(book.id).collectAsState(initial = emptyList())
     var content by remember(chapter.id, book.pdfRenderMode) { mutableStateOf<ChapterContent?>(null) }
     var loadFailed by remember(chapter.id, book.pdfRenderMode) { mutableStateOf(false) }
     var initialPositionFraction by remember(chapter.id) { mutableStateOf<Float?>(null) }
@@ -201,24 +227,64 @@ private fun ChapterPage(
     var lastFraction by remember(chapter.id) { mutableStateOf(0f) }
     var lastIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
     var pagesTurned by remember(chapter.id) { mutableStateOf(0) }
-    val sessionStartedAt = remember(chapter.id) { Clock.System.now() }
+    var recordedWords by remember(chapter.id) { mutableStateOf(0) }
+    var recordedPages by remember(chapter.id) { mutableStateOf(0) }
+    var noteSelection by remember(chapter.id) { mutableStateOf<String?>(null) }
+    var noteDraft by remember(chapter.id) { mutableStateOf("") }
+    val sessionTimer = remember(chapter.id) { ReadingSessionTimer() }
+    val latestFraction by rememberUpdatedState(lastFraction)
+    val latestPagesTurned by rememberUpdatedState(pagesTurned)
+    val latestRecordedWords by rememberUpdatedState(recordedWords)
+    val latestRecordedPages by rememberUpdatedState(recordedPages)
 
-    DisposableEffect(chapter.id) {
+    val loaded = content
+    val startFraction = initialPositionFraction
+    val sessionActive = isActive && loaded != null && startFraction != null
+
+    fun flushSession() {
+        val interval = sessionTimer.setActive(false, SystemClock.elapsedRealtimeNanos(), Clock.System.now()) ?: return
+        if (interval.duration < MIN_SESSION) return
+        val words = (chapter.wordCount * latestFraction).toInt()
+        val wordsRead = (words - latestRecordedWords).coerceAtLeast(0)
+        val pagesRead = (latestPagesTurned - latestRecordedPages).coerceAtLeast(0)
+        recordedWords = maxOf(latestRecordedWords, words)
+        recordedPages = maxOf(latestRecordedPages, latestPagesTurned)
+        graph.recordReadingSession(
+            ReadingSessionEvent(
+                bookId = book.id,
+                chapterId = chapter.id,
+                startedAt = interval.startedAt,
+                endedAt = interval.endedAt,
+                wordsRead = wordsRead,
+                pagesTurned = pagesRead,
+            ),
+        )
+    }
+
+    DisposableEffect(sessionActive, lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) flushSession()
+        }
+        lifecycle.addObserver(observer)
+        if (sessionActive && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            sessionTimer.setActive(true, SystemClock.elapsedRealtimeNanos(), Clock.System.now())
+            recordedWords = maxOf(recordedWords, (chapter.wordCount * lastFraction).toInt())
+            recordedPages = pagesTurned
+            val isFinished = finished || lastFraction >= 1f
+            finished = isFinished
+            graph.saveChapterProgress(
+                Progress(
+                    bookId = book.id,
+                    chapterId = chapter.id,
+                    position = lastFraction,
+                    updatedAt = Clock.System.now(),
+                    finished = isFinished,
+                ),
+            )
+        }
         onDispose {
-            val endedAt = Clock.System.now()
-            if (endedAt - sessionStartedAt < MIN_SESSION) return@onDispose
-            scope.launch {
-                graph.stats.recordSession(
-                    ReadingSessionEvent(
-                        bookId = book.id,
-                        chapterId = chapter.id,
-                        startedAt = sessionStartedAt,
-                        endedAt = endedAt,
-                        wordsRead = (chapter.wordCount * lastFraction).toInt(),
-                        pagesTurned = pagesTurned,
-                    ),
-                )
-            }
+            lifecycle.removeObserver(observer)
+            flushSession()
         }
     }
 
@@ -229,9 +295,11 @@ private fun ChapterPage(
 
     LaunchedEffect(chapter.id) {
         val saved = graph.progress.observeChapterProgress(book.id, chapter.id).first()
-        finished = saved?.finished == true
+        finished = false
         // A finished chapter is being re-read, so start it from the top.
-        initialPositionFraction = if (finished) 0f else saved?.position ?: 0f
+        initialPositionFraction = if (saved?.finished == true) 0f else saved?.position ?: 0f
+        lastFraction = initialPositionFraction ?: 0f
+        recordedWords = (chapter.wordCount * lastFraction).toInt()
     }
 
     fun onTapAction(action: TapAction) {
@@ -258,30 +326,55 @@ private fun ChapterPage(
         lastIndex = index
         if (pageCount > 0) {
             val atEnd = index >= pageCount - 1
-            if (atEnd) finished = true
             lastFraction = if (atEnd) 1f else index.toFloat() / pageCount
-            val position = lastFraction
-            val done = finished
-            scope.launch {
-                graph.progress.updateChapterProgress(
+            if (isActive) {
+                if (atEnd) finished = true
+                graph.saveChapterProgress(
                     Progress(
                         bookId = book.id,
                         chapterId = chapter.id,
-                        position = position,
+                        position = lastFraction,
                         updatedAt = Clock.System.now(),
-                        finished = done,
+                        finished = finished,
                     ),
                 )
             }
         }
     }
 
-    val loaded = content
-    val startFraction = initialPositionFraction
+    fun saveSelectionBookmark(action: SelectionAction, selectedText: String, note: String = "") {
+        scope.launch {
+            graph.bookmarks.add(
+                Bookmark(
+                    id = BookmarkId(UUID.randomUUID().toString()),
+                    bookId = book.id,
+                    chapterId = chapter.id,
+                    position = lastFraction,
+                    note = selectionBookmarkNote(action, selectedText, note),
+                    createdAt = Clock.System.now(),
+                ),
+            )
+        }
+    }
+
+    fun onSelectionAction(action: SelectionAction, selectedText: String) {
+        when (action) {
+            SelectionAction.TRANSLATE, SelectionAction.SEARCH, SelectionAction.DICTIONARY ->
+                launchSelectionIntent(context, action, selectedText)
+            SelectionAction.NOTE -> {
+                noteSelection = selectedText
+                noteDraft = ""
+            }
+            SelectionAction.HIGHLIGHT -> saveSelectionBookmark(action, selectedText)
+            SelectionAction.COPY -> Unit
+        }
+    }
 
     when {
         loaded is ChapterContent.Text && startFraction != null -> ReaderScreen(
-            document = loaded.document,
+            document = remember(loaded.document, bookmarks, chapter.id) {
+                loaded.document.withSavedHighlights(bookmarks.filter { it.chapterId == chapter.id })
+            },
             theme = theme,
             settings = settings,
             initialPositionFraction = startFraction,
@@ -290,6 +383,7 @@ private fun ChapterPage(
             modifier = Modifier.fillMaxSize(),
             highlight = highlight,
             jump = jump,
+            onSelectionAction = ::onSelectionAction,
         )
         loaded is ChapterContent.Comic && startFraction != null -> ComicReaderScreen(
             file = loaded.file,
@@ -315,5 +409,31 @@ private fun ChapterPage(
         else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
+    }
+
+    noteSelection?.let { selectedText ->
+        AlertDialog(
+            onDismissRequest = { noteSelection = null },
+            title = { Text("Add note") },
+            text = {
+                OutlinedTextField(
+                    value = noteDraft,
+                    onValueChange = { noteDraft = it },
+                    label = { Text("Note") },
+                    supportingText = { Text(selectedText) },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        saveSelectionBookmark(SelectionAction.NOTE, selectedText, noteDraft)
+                        noteSelection = null
+                    },
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { noteSelection = null }) { Text("Cancel") }
+            },
+        )
     }
 }

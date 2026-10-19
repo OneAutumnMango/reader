@@ -9,6 +9,7 @@ import org.jsoup.nodes.TextNode
 
 private val BOLD_TAGS = setOf("b", "strong")
 private val ITALIC_TAGS = setOf("i", "em")
+private val IMAGE_TAGS = setOf("img", "image")
 private val CONTAINER_TAGS = setOf(
     "div", "section", "article", "main", "header", "footer", "body", "html", "blockquote",
 )
@@ -36,7 +37,9 @@ private fun walkBlocks(root: Element, classRules: Map<String, CssStyle>, blocks:
         val tag = element.tagName()
         val textAlign = styleOf(element, classRules).textAlign
         when {
-            tag == "img" || tag == "image" -> blocks += element.imageBlock()
+            tag in IMAGE_TAGS -> {
+                if (!element.isSvgFallbackImage()) blocks += element.imageBlock()
+            }
             tag.matches(HEADING_PATTERN) -> {
                 appendTextBlocks(element, classRules, blocks) { Block.Heading(tag.drop(1).toInt(), it, textAlign) }
             }
@@ -62,6 +65,11 @@ private fun Element.imageBlock() = Block.Image(
     attr("src").ifBlank { attr("href").ifBlank { attr("xlink:href") } },
     attr("alt"),
 )
+
+private fun Element.isSvgFallbackImage(): Boolean =
+    tagName() == "img" && parents().any { ancestor ->
+        ancestor.tagName() == "svg" && ancestor.selectFirst("image") != null
+    }
 
 private fun appendTextBlocks(
     element: Element,
@@ -112,10 +120,10 @@ private fun collectSpans(
                     spans += Span(text, resolvedBold, resolvedItalic, resolvedUnderline, css.color)
                 }
             }
-            is Element -> if (node.tagName() == "img" || node.tagName() == "image") {
-                onImage(node.imageBlock())
-            } else {
-                collectSpans(node, css, resolvedEmphasis, classRules, spans, onImage)
+            is Element -> when {
+                node.isSvgFallbackImage() -> Unit
+                node.tagName() in IMAGE_TAGS -> onImage(node.imageBlock())
+                else -> collectSpans(node, css, resolvedEmphasis, classRules, spans, onImage)
             }
         }
     }

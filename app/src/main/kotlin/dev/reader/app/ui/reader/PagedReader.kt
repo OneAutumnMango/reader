@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,7 +64,7 @@ fun PagedReader(
                 spacing = spacingPx,
                 measure = { if (it.value is Block.Image) pageHeightPx else layout(it.value).size.height.toFloat() },
                 split = { item, available ->
-                    splitBlock(item.value, available, theme, ::layout)
+                    splitBlock(item.value, available, ::layout)
                         ?.let { (head, tail) -> IndexedValue(item.index, head) to IndexedValue(item.index, tail) }
                 },
                 keepWithNext = { it.value is Block.Heading },
@@ -90,7 +91,12 @@ fun PagedReader(
                 ),
                 verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
             ) {
-                pages.getOrNull(index)?.forEach { PagedReaderBlock(it.value, theme, useBookStyling, highlight) }
+                val content: @Composable () -> Unit = {
+                    Column(verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp)) {
+                        pages.getOrNull(index)?.forEach { PagedReaderBlock(it.value, theme, useBookStyling, highlight) }
+                    }
+                }
+                if (settings.selectableText) SelectionContainer { content() } else content()
             }
         }
 
@@ -107,7 +113,7 @@ fun PagedReader(
 /** The exact text that gets drawn for [this] block, so measuring and rendering always agree. */
 private fun Block.annotated(theme: ReaderTheme, useBookStyling: Boolean): AnnotatedString = when (this) {
     is Block.Paragraph -> spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling)
-    else -> spansOrEmpty().toAnnotatedString(useBookStyling = useBookStyling)
+    else -> spansOrEmpty().toAnnotatedString(theme.wordSpacingSp, useBookStyling)
 }
 
 /**
@@ -117,7 +123,6 @@ private fun Block.annotated(theme: ReaderTheme, useBookStyling: Boolean): Annota
 private fun splitBlock(
     block: Block,
     available: Float,
-    theme: ReaderTheme,
     layout: (Block) -> TextLayoutResult,
 ): Pair<Block, Block>? {
     if (block !is Block.Paragraph && block !is Block.ListItem) return null
@@ -127,8 +132,7 @@ private fun splitBlock(
     if (line < 0) return null
     val end = result.getLineEnd(line)
     if (end <= 0 || end >= result.layoutInput.text.length) return null
-    val separator = if (block is Block.Paragraph && theme.wordSpacingSp > 0f) 1 else 0
-    val (head, tail) = splitSpans(block.spansOrEmpty(), end, separator)
+    val (head, tail) = splitSpans(block.spansOrEmpty(), end)
     return if (block is Block.Paragraph) {
         block.copy(spans = head) to block.copy(spans = tail)
     } else {

@@ -3,8 +3,19 @@ package dev.reader.app.ui.reader
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuDropdownProvider
+import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode
 import dev.reader.core.reader.TapAction
@@ -24,35 +35,60 @@ fun ReaderScreen(
     modifier: Modifier = Modifier,
     highlight: Regex? = null,
     jump: BlockJump? = null,
+    onSelectionAction: (SelectionAction, String) -> Unit = { _, _ -> },
 ) {
     KeepScreenAwakeEffect(settings.keepScreenAwake)
+    val selectionToolbar = remember { ReaderSelectionToolbar() }
+    val systemClipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val selectionClipboard = remember(selectionToolbar, systemClipboard, context) {
+        object : Clipboard by systemClipboard {
+            override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+                val text = clipEntry?.clipData?.takeIf { it.itemCount > 0 }
+                    ?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
+                if (!selectionToolbar.captureSelection(text)) systemClipboard.setClipEntry(clipEntry)
+            }
+        }
+    }
+    DisposableEffect(selectionToolbar) { onDispose { selectionToolbar.dismiss() } }
 
-    Box(modifier = modifier.fillMaxSize().background(theme.backgroundColor())) {
-        TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
-            Zoomable(settings.zoomEnabled, Modifier.fillMaxSize()) {
-                when (settings.readingMode) {
-                    ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(
-                        document,
-                        theme,
-                        settings,
-                        Modifier.fillMaxSize(),
-                        initialPositionFraction,
-                        onPageChanged,
-                        highlight,
-                        jump,
-                    )
-                    else -> PagedReader(
-                        document,
-                        theme,
-                        settings,
-                        Modifier.fillMaxSize(),
-                        initialPositionFraction,
-                        onPageChanged,
-                        highlight,
-                        jump,
-                    )
+    Box(
+        modifier = modifier.fillMaxSize().background(theme.backgroundColor())
+            .onGloballyPositioned { selectionToolbar.coordinates = it },
+    ) {
+        CompositionLocalProvider(
+            LocalTextToolbar provides selectionToolbar,
+            LocalClipboard provides selectionClipboard,
+            LocalTextContextMenuToolbarProvider provides selectionToolbar,
+            LocalTextContextMenuDropdownProvider provides selectionToolbar,
+        ) {
+            TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
+                Zoomable(settings.zoomEnabled, Modifier.fillMaxSize()) {
+                    when (settings.readingMode) {
+                        ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(
+                            document,
+                            theme,
+                            settings,
+                            Modifier.fillMaxSize(),
+                            initialPositionFraction,
+                            onPageChanged,
+                            highlight,
+                            jump,
+                        )
+                        else -> PagedReader(
+                            document,
+                            theme,
+                            settings,
+                            Modifier.fillMaxSize(),
+                            initialPositionFraction,
+                            onPageChanged,
+                            highlight,
+                            jump,
+                        )
+                    }
                 }
             }
         }
+        ReaderSelectionToolbarOverlay(selectionToolbar, onSelectionAction)
     }
 }

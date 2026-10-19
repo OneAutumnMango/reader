@@ -10,7 +10,10 @@ import kotlin.io.path.createTempFile
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-private fun buildEpub(includeMissingChapter: Boolean = false): File {
+private fun buildEpub(
+    includeMissingChapter: Boolean = false,
+    chapterHtml: String = "<html><body><h1>Chapter One</h1><p>Hello world.</p></body></html>",
+): File {
     val file = createTempFile(suffix = ".epub").toFile()
     ZipOutputStream(file.outputStream()).use { zip ->
         fun entry(name: String, content: String) {
@@ -46,7 +49,7 @@ private fun buildEpub(includeMissingChapter: Boolean = false): File {
             </package>
             """.trimIndent(),
         )
-        entry("OEBPS/chapter1.xhtml", "<html><body><h1>Chapter One</h1><p>Hello world.</p></body></html>")
+        entry("OEBPS/chapter1.xhtml", chapterHtml)
         entry("OEBPS/cover.jpg", "fake-jpeg-bytes")
     }
     return file
@@ -69,6 +72,33 @@ class EpubParserTest {
         assertEquals(expected, EpubParser.parseChapter(file, 0))
         assertNull(EpubParser.parseChapter(file, -1))
         assertNull(EpubParser.parseChapter(file, 1))
+    }
+
+    @Test
+    fun `uses svg image instead of its html fallback and preserves repeated images`() {
+        val file = buildEpub(
+            chapterHtml = """
+                <html><body><h1>Chapter One</h1><figure>
+                    <svg><switch>
+                        <image href="images/diagram.png"/>
+                        <foreignObject><img src="images/diagram-fallback.png"/></foreignObject>
+                    </switch></svg>
+                </figure>
+                <img src="images/repeated.png"/><img src="images/repeated.png"/>
+                </body></html>
+            """.trimIndent(),
+        )
+
+        val chapter = EpubParser.parse(file).chapters.single() as ParsedChapter.TextChapter
+
+        assertEquals(
+            listOf(
+                Block.Image("OEBPS/images/diagram.png"),
+                Block.Image("OEBPS/images/repeated.png"),
+                Block.Image("OEBPS/images/repeated.png"),
+            ),
+            chapter.document.blocks.filterIsInstance<Block.Image>(),
+        )
     }
 
     @Test

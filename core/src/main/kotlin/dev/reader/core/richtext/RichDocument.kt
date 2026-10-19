@@ -19,6 +19,7 @@ data class Span(
     val underline: Boolean = false,
     /** CSS colour override; null means "use the reader theme's text colour". */
     val color: Long? = null,
+    val highlighted: Boolean = false,
 )
 
 fun RichDocument.wordCount(): Int = blocks.sumOf { it.wordCount() }

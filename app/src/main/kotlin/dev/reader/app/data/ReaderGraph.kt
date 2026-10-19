@@ -2,6 +2,8 @@ package dev.reader.app.data
 
 import android.content.Context
 import androidx.room.Room
+import dev.reader.core.model.Progress
+import dev.reader.core.stats.ReadingSessionEvent
 import dev.reader.data.export.BackupRepository
 import dev.reader.data.export.ExportRepository
 import dev.reader.data.importer.BookImporter
@@ -71,5 +73,13 @@ class ReaderGraph(context: Context) {
                 .onSuccess { AppLog.info("Launch-time library refresh complete", "Startup") }
                 .onFailure { AppLog.error("Launch-time library scan failed", "Startup", it) }
         }
+    }
+
+    fun saveChapterProgress(progress: Progress) {
+        scope.launch(Dispatchers.IO) { this@ReaderGraph.progress.updateChapterProgress(progress) }
+    }
+
+    fun recordReadingSession(session: ReadingSessionEvent) {
+        scope.launch(Dispatchers.IO) { stats.recordSession(session) }
     }
 }

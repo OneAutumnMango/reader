@@ -167,6 +167,11 @@ fun ReaderMenuOverlay(
                     Column(
                         modifier = Modifier
                             .then(if (fullScreen) Modifier.fillMaxHeight() else Modifier.heightIn(max = PANEL_MAX))
+                            .readerScrollIndicator(MaterialTheme.colorScheme.onSurfaceVariant) {
+                                val total = panelScroll.maxValue.toFloat() + panelScroll.viewportSize
+                                val visible = if (total > 0f) panelScroll.viewportSize / total else 1f
+                                panelScroll.value.toFloat() / panelScroll.maxValue.coerceAtLeast(1) to visible
+                            }
                             .verticalScroll(panelScroll)
                             .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                             .testTag("reader-menu-panel"),

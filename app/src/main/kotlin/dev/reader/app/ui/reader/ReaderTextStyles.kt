@@ -92,12 +92,13 @@ fun List<Span>.toAnnotatedString(
     wordSpacingSp: Float = 0f,
     useBookStyling: Boolean = false,
 ): AnnotatedString = buildAnnotatedString {
-    forEachIndexed { index, span ->
+    forEach { span ->
         val color = span.color.takeIf { useBookStyling }?.let { Color(it) } ?: Color.Unspecified
         // Only set what the span actually changes, so a heading's bold/size isn't reset to normal.
         withStyle(
             SpanStyle(
                 color = color,
+                background = if (span.highlighted) SEARCH_HIGHLIGHT else Color.Unspecified,
                 fontWeight = if (span.bold) FontWeight.Bold else null,
                 fontStyle = if (span.italic) FontStyle.Italic else null,
                 textDecoration = if (span.underline) TextDecoration.Underline else null,
@@ -105,6 +106,10 @@ fun List<Span>.toAnnotatedString(
         ) {
             append(span.text)
         }
-        if (wordSpacingSp > 0f && index != lastIndex) append(" ")
+    }
+    if (wordSpacingSp != 0f) {
+        toAnnotatedString().text.forEachIndexed { index, character ->
+            if (character == ' ') addStyle(SpanStyle(letterSpacing = wordSpacingSp.sp), index, index + 1)
+        }
     }
 }

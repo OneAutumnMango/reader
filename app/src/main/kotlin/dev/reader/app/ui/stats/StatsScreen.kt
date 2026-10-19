@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoStories
-import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ElevatedCard
@@ -72,15 +71,6 @@ fun StatsScreen(summary: StatsSummary, modifier: Modifier = Modifier) {
         }
 
         MenuSection("Last 7 days") { WeekChart(summary.last7Days) }
-
-        val insights = statsInsights(summary)
-        if (insights.isNotEmpty()) {
-            MenuSection("Insights") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    insights.forEach { InsightRow(it) }
-                }
-            }
-        }
 
         MenuSection("All time") { StatGrid(statTiles(summary)) }
 
@@ -172,19 +162,6 @@ private fun WeekChart(days: List<DailyReading>) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun InsightRow(text: String) {
-    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(
-            Icons.Filled.Lightbulb,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

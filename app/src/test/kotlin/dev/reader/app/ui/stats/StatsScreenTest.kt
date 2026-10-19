@@ -1,6 +1,7 @@
 package dev.reader.app.ui.stats
 
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import dev.reader.core.model.BookId
@@ -12,6 +13,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.minutes
 
 @RunWith(RobolectricTestRunner::class)
@@ -21,7 +23,7 @@ class StatsScreenTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `shows streak, insights and all-time stats`() {
+    fun `shows streak and all-time stats without insights`() {
         val summary = StatsSummary(
             booksFinished = 3,
             totalReadingTime = 90.minutes,
@@ -43,7 +45,7 @@ class StatsScreenTest {
         composeRule.onNodeWithText("150 wpm").assertExists()
         composeRule.onNodeWithText("42").assertExists()
         composeRule.onNodeWithTag("week-chart").assertExists()
-        composeRule.onNodeWithText("You're on your longest streak ever: 5 days!").assertExists()
+        assertEquals(0, composeRule.onAllNodesWithText("Insights").fetchSemanticsNodes().size)
         composeRule.onNodeWithText("Dune").assertExists()
     }
 
