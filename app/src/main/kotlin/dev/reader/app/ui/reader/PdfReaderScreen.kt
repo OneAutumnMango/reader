@@ -10,6 +10,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -47,15 +48,21 @@ fun PdfReaderScreen(
     var renderer by remember(file) { mutableStateOf<PdfPageRenderer?>(null) }
     var openFailed by remember(file) { mutableStateOf(false) }
 
-    DisposableEffect(file) {
+    // Open the renderer off the main thread — parsing even a small PDF on the UI thread blocks it
+    // for several seconds on first open.
+    LaunchedEffect(file) {
         AppLog.debug("Opening PDF renderer", "PdfReader")
-        val opened = runCatching { PdfPageRenderer(file) }
-            .onSuccess { AppLog.debug("Opened PDF with ${it.pageCount} page(s)", "PdfReader") }
-            .onFailure { AppLog.error("Couldn't open PDF", "PdfReader", it) }
-        renderer = opened.getOrNull()
-        openFailed = opened.isFailure
+        val result = withContext(Dispatchers.IO) {
+            runCatching { PdfPageRenderer(file) }
+                .onSuccess { AppLog.debug("Opened PDF with ${it.pageCount} page(s)", "PdfReader") }
+                .onFailure { AppLog.error("Couldn't open PDF", "PdfReader", it) }
+        }
+        renderer = result.getOrNull()
+        openFailed = result.isFailure
+    }
+    DisposableEffect(file) {
         onDispose {
-            runCatching { opened.getOrNull()?.close() }
+            runCatching { renderer?.close() }
                 .onFailure { AppLog.warn("Couldn't close PDF renderer", "PdfReader", it) }
         }
     }

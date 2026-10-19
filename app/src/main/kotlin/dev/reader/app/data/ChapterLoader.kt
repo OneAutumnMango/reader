@@ -10,6 +10,7 @@ import dev.reader.parser.ParsedBook
 import dev.reader.parser.ParsedChapter
 import dev.reader.parser.TextBookParser
 import dev.reader.parser.comic.ComicArchiveParser
+import dev.reader.parser.docx.DocxParser
 import dev.reader.parser.epub.EpubParser
 import dev.reader.parser.fb2.Fb2Parser
 import dev.reader.parser.pdf.PdfTextParser
@@ -110,7 +111,8 @@ object ChapterLoader {
     private fun parseWholeBook(file: File, book: Book) = when (book.format) {
         BookFormat.EPUB -> EpubParser.parse(file)
         BookFormat.FB2 -> Fb2Parser.parse(file)
-        BookFormat.TXT, BookFormat.MARKDOWN, BookFormat.HTML, BookFormat.MOBI, BookFormat.RTF, BookFormat.DOCX,
+        BookFormat.DOCX -> DocxParser.parse(file, book.patternFor(), book.excludedLinesFor())
+        BookFormat.TXT, BookFormat.MARKDOWN, BookFormat.HTML, BookFormat.MOBI, BookFormat.RTF,
         BookFormat.ODT,
         ->
             TextBookParser.parse(file, book.format, book.patternFor(), book.excludedLinesFor())

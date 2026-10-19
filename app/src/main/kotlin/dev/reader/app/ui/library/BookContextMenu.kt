@@ -34,8 +34,10 @@ fun BookContextMenu(
     onRename: (String) -> Unit,
     onChangeCover: () -> Unit,
     onMarkAllRead: () -> Unit,
+    onMarkAllUnread: () -> Unit = {},
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
+    allRead: Boolean = false,
     onDetectChapters: (() -> Unit)? = null,
     onShowDetails: (() -> Unit)? = null,
     singleCategoryPerBook: Boolean = false,
@@ -98,8 +100,11 @@ fun BookContextMenu(
                         onDismiss()
                     }
                 }
-                MenuRow("Mark all chapters as read", Modifier.testTag("book-menu-mark-read")) {
-                    onMarkAllRead()
+                MenuRow(
+                    if (allRead) "Mark all chapters as unread" else "Mark all chapters as read",
+                    Modifier.testTag("book-menu-mark-read"),
+                ) {
+                    if (allRead) onMarkAllUnread() else onMarkAllRead()
                     onDismiss()
                 }
                 MenuRow("Remove from library", Modifier.testTag("book-menu-remove")) {

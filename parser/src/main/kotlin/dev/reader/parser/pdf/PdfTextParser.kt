@@ -13,6 +13,18 @@ import dev.reader.parser.text.toChapters
 import java.io.File
 
 /**
+ * Bounding box of a single text line within its page; coordinates are fractions 0..1
+ * (0 = top/left edge, 1 = bottom/right edge).
+ */
+data class PdfLineBounds(
+    val lineIndex: Int,
+    val top: Float,
+    val bottom: Float,
+    val left: Float,
+    val right: Float,
+)
+
+/**
  * Reflow mode: extracts the text so it can be themed like any other format. Chapters come from a
  * user [chapterPattern] when set, otherwise the PDF's own bookmarks.
  */
@@ -24,6 +36,33 @@ class PdfTextParser(context: Context) {
 
     /** The extracted text, line-numbered exactly as [parse] splits it on a chapter pattern. */
     fun text(file: File): String = PDDocument.load(file).use { doc -> extractLines(doc).joinToString("\n") { it.text } }
+
+    /** Maps each PDF page number to the index of the first non-blank extracted text line on that page. */
+    fun pageLineMap(file: File): Map<Int, Int> = PDDocument.load(file).use { doc ->
+        val lines = extractLines(doc)
+        buildMap { lines.forEachIndexed { i, line -> if (line.text.isNotBlank()) putIfAbsent(line.page, i) } }
+    }
+
+    /** Maps each PDF page number to all extracted text line indices on that page (non-blank only). */
+    fun pageLines(file: File): Map<Int, List<Int>> = PDDocument.load(file).use { doc ->
+        val lines = extractLines(doc)
+        buildMap<Int, MutableList<Int>> {
+            lines.forEachIndexed { i, line ->
+                if (line.text.isNotBlank()) getOrPut(line.page) { mutableListOf() }.add(i)
+            }
+        }
+    }
+
+    /** Real bounding boxes (fractions 0..1) of each non-blank line per page, from actual TextPosition data. */
+    fun pageLineBounds(file: File): Map<Int, List<PdfLineBounds>> = PDDocument.load(file).use { doc ->
+        val lines = extractLines(doc)
+        val pageToIndices = buildMap<Int, MutableList<Int>> {
+            lines.forEachIndexed { i, line ->
+                if (line.text.isNotBlank()) getOrPut(line.page) { mutableListOf() }.add(i)
+            }
+        }
+        extractPageLineBounds(doc, pageToIndices)
+    }
 
     fun parse(file: File, chapterPattern: String? = null, excludedLines: Set<Int> = emptySet()): ParsedBook {
         val chapters = PDDocument.load(file).use { doc ->

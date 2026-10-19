@@ -20,6 +20,30 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:pathPattern=".*\\.epub" />
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\.md" />
+                <data android:pathPattern=".*\\.markdown" />
+                <data android:pathPattern=".*\\.html" />
+                <data android:pathPattern=".*\\.htm" />
+                <data android:pathPattern=".*\\.xhtml" />
+                <data android:pathPattern=".*\\.pdf" />
+                <data android:pathPattern=".*\\.cbz" />
+                <data android:pathPattern=".*\\.cbr" />
+                <data android:pathPattern=".*\\.fb2" />
+                <data android:pathPattern=".*\\.mobi" />
+                <data android:pathPattern=".*\\.azw" />
+                <data android:pathPattern=".*\\.azw3" />
+                <data android:pathPattern=".*\\.rtf" />
+                <data android:pathPattern=".*\\.docx" />
+            </intent-filter>
         </activity>
 
     </application>

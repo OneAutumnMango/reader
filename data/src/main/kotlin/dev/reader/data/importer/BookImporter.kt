@@ -14,6 +14,7 @@ import dev.reader.parser.ParsedBook
 import dev.reader.parser.ParsedChapter
 import dev.reader.parser.TextBookParser
 import dev.reader.parser.comic.ComicArchiveParser
+import dev.reader.parser.docx.DocxParser
 import dev.reader.parser.epub.EpubParser
 import dev.reader.parser.fb2.Fb2Parser
 import dev.reader.parser.pdf.PdfTextParser
@@ -169,8 +170,8 @@ class BookImporter(
         chapterPattern: String? = null,
         chapterExcludedLines: Set<Int> = emptySet(),
     ): ParsedBook = when (format) {
-        BookFormat.TXT, BookFormat.MARKDOWN, BookFormat.HTML, BookFormat.MOBI, BookFormat.RTF, BookFormat.DOCX,
-        BookFormat.ODT,
+        BookFormat.DOCX -> DocxParser.parse(file, chapterPattern, chapterExcludedLines)
+        BookFormat.TXT, BookFormat.MARKDOWN, BookFormat.HTML, BookFormat.MOBI, BookFormat.RTF, BookFormat.ODT,
         ->
             TextBookParser.parse(file, format, chapterPattern, chapterExcludedLines)
         BookFormat.EPUB -> EpubParser.parse(file)

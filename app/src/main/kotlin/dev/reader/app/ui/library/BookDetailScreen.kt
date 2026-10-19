@@ -43,6 +43,9 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,6 +64,7 @@ import dev.reader.core.model.Bookmark
 import dev.reader.core.model.Chapter
 import dev.reader.core.model.ChapterId
 import dev.reader.core.model.Progress
+import dev.reader.core.reader.PdfRenderMode
 
 private val COVER_WIDTH = 120.dp
 private val COVER_HEIGHT = 180.dp
@@ -100,6 +104,7 @@ fun BookDetailScreen(
     onOpenBookmarks: () -> Unit = {},
     onSetRead: (chapters: List<Chapter>, read: Boolean) -> Unit = { _, _ -> },
     extras: List<Chapter> = emptyList(),
+    onPdfRenderModeChange: ((PdfRenderMode) -> Unit)? = null,
     state: BookDetailState = remember { BookDetailState() },
 ) {
     val numbered = chapters.mapIndexed { index, chapter -> NumberedChapter(index + 1, chapter) }
@@ -131,7 +136,7 @@ fun BookDetailScreen(
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(state = state.listState, modifier = Modifier.fillMaxSize()) {
             item {
-                BookHeader(book, chapters.size, current?.number, bookmarks.size, onOpenBookmarks)
+                BookHeader(book, chapters.size, current?.number, bookmarks.size, onOpenBookmarks, onPdfRenderModeChange)
             }
             if (extras.isNotEmpty()) {
                 item { BookInfoCard(extras, state.showExtras, { state.showExtras = it }, onChapterClick) }
@@ -186,6 +191,7 @@ private fun BookHeader(
     currentNumber: Int?,
     bookmarkCount: Int,
     onOpenBookmarks: () -> Unit,
+    onPdfRenderModeChange: ((PdfRenderMode) -> Unit)?,
 ) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         BookCover(
@@ -223,6 +229,22 @@ private fun BookHeader(
                     OutlinedButton(onClick = onOpenBookmarks, modifier = Modifier.testTag("bookmarks-button")) {
                         Icon(Icons.Filled.Bookmark, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
                         Text("$bookmarkCount", modifier = Modifier.padding(start = 6.dp))
+                    }
+                }
+            }
+            if (onPdfRenderModeChange != null) {
+                val mode = book.pdfRenderMode ?: PdfRenderMode.FIXED_PAGE
+                val options = listOf(PdfRenderMode.FIXED_PAGE to "Pages", PdfRenderMode.REFLOW_TEXT to "Text")
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                ) {
+                    options.forEachIndexed { index, (option, label) ->
+                        SegmentedButton(
+                            selected = mode == option,
+                            onClick = { onPdfRenderModeChange(option) },
+                            shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                            modifier = Modifier.testTag("book-detail-pdf-mode-${option.name}"),
+                        ) { Text(label) }
                     }
                 }
             }

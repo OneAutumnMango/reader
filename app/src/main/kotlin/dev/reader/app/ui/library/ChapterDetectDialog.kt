@@ -46,6 +46,8 @@ import dev.reader.app.data.ReaderGraph
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.parser.TextBookParser
+import dev.reader.parser.docx.DocxParser
+import dev.reader.parser.pdf.PdfLineBounds
 import dev.reader.parser.pdf.PdfTextParser
 import dev.reader.parser.text.ChapterBreak
 import dev.reader.parser.text.ChapterSplitter
@@ -81,14 +83,20 @@ fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val file = File(book.sourcePath)
-                if (book.format == BookFormat.PDF) {
-                    PdfTextParser(context).text(file)
-                } else {
-                    TextBookParser.detectionText(file, book.format)
+                when (book.format) {
+                    BookFormat.PDF -> PdfTextParser(context).text(file)
+                    BookFormat.DOCX -> DocxParser.text(file)
+                    else -> TextBookParser.detectionText(file, book.format)
                 }
             }
                 .onFailure { AppLog.error("Couldn't read book for chapter detection", "ChapterDetection", it) }
                 .getOrDefault("")
+        }
+    }
+    val pdfPageLineBounds by produceState<Map<Int, List<PdfLineBounds>>?>(null, book.sourcePath) {
+        if (book.format != BookFormat.PDF) return@produceState
+        value = withContext(Dispatchers.IO) {
+            runCatching { PdfTextParser(context).pageLineBounds(File(book.sourcePath)) }.getOrNull()
         }
     }
     ChapterDetectDialog(
@@ -96,6 +104,8 @@ fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
         markdown = book.format == BookFormat.MARKDOWN,
         currentPattern = book.chapterPattern,
         currentExcludedLines = book.chapterExcludedLines,
+        pdfFile = if (book.format == BookFormat.PDF) File(book.sourcePath) else null,
+        pdfPageLineBounds = pdfPageLineBounds,
         onApply = { pattern, excludedLines ->
             scope.launch {
                 withContext(Dispatchers.IO) {
@@ -124,6 +134,8 @@ fun ChapterDetectDialog(
     onApply: (String?, Set<Int>) -> Unit,
     onDismiss: () -> Unit,
     currentExcludedLines: Set<Int> = emptySet(),
+    pdfFile: File? = null,
+    pdfPageLineBounds: Map<Int, List<PdfLineBounds>>? = null,
 ) {
     var mode by remember {
         mutableStateOf(
@@ -181,6 +193,8 @@ fun ChapterDetectDialog(
             picked = picked,
             onToggle = { line -> picked = if (line in picked) picked - line else picked + line },
             onDone = { showPicker = false },
+            pdfFile = pdfFile,
+            pdfPageLineBounds = pdfPageLineBounds,
         )
     }
 
@@ -342,7 +356,7 @@ private fun ModeDropdown(mode: ChapterDetectMode, onSelect: (ChapterDetectMode) 
     }
 }
 
-private val ChapterDetectMode.label: String
+internal val ChapterDetectMode.label: String
     get() = when (this) {
         ChapterDetectMode.AUTO -> "Auto-detect"
         ChapterDetectMode.STARTS_WITH -> "Lines starting with"
