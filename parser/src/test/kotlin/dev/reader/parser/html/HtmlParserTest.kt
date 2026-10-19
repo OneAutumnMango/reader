@@ -31,6 +31,19 @@ class HtmlParserTest {
     }
 
     @Test
+    fun `skips the mobi7-only low-res duplicate of a calibre heading image`() {
+        val document = parseHtmlToRichDocument(
+            """
+            <div class="heading-image-size-container1">
+                <img src="../Images/00006.jpeg" alt="" class="heading-image-image" data-amznremoved="mobi7"/>
+                <img height="120" alt="" class="heading-image-image1" src="../Images/00003.jpeg" width="120" data-amznremoved-m8="true"/>
+            </div>
+            """.trimIndent(),
+        )
+        assertEquals(listOf(Block.Image("../Images/00006.jpeg")), document.blocks)
+    }
+
+    @Test
     fun `converts headings, paragraphs and inline formatting`() {
         val file = createTempFile(suffix = ".html").apply {
             writeText(
