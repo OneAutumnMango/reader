@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import dev.reader.data.export.ExportScope
+import dev.reader.data.store.AutomaticBackupFrequency
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,6 +24,10 @@ class DataScreenTest {
     private var exported: Set<ExportScope>? = null
     private var includeBooks = false
     private var danger: DangerAction? = null
+    private var automaticBackupsEnabled = false
+    private var backupFolderName: String? = null
+    private var backupFrequency = AutomaticBackupFrequency.DAILY
+    private var automaticIncludeBooks = false
 
     private fun setContent() = composeRule.setContent {
         DataScreen(
@@ -35,6 +40,14 @@ class DataScreenTest {
             onCreateBackup = {},
             onRestoreBackup = {},
             onDanger = { danger = it },
+            automaticBackupsEnabled = automaticBackupsEnabled,
+            onAutomaticBackupsEnabledChange = { automaticBackupsEnabled = it },
+            automaticBackupFolderName = backupFolderName,
+            onChooseAutomaticBackupFolder = { backupFolderName = "Reader backups" },
+            automaticBackupFrequency = backupFrequency,
+            onAutomaticBackupFrequencyChange = { backupFrequency = it },
+            automaticBackupIncludeBooks = automaticIncludeBooks,
+            onAutomaticBackupIncludeBooksChange = { automaticIncludeBooks = it },
         )
     }
 
@@ -66,6 +79,45 @@ class DataScreenTest {
         composeRule.onNodeWithTag("danger-RESET_STATS").performScrollTo().performClick()
 
         assertEquals(DangerAction.RESET_STATS, danger)
+    }
+
+    @Test
+    fun `automatic backups cannot be enabled before choosing a folder`() {
+        setContent()
+        composeRule.onNodeWithTag("automatic-backup-enabled").performScrollTo().performClick()
+        assertFalse(automaticBackupsEnabled)
+
+        composeRule.onNodeWithTag("automatic-backup-folder").performScrollTo().performClick()
+        assertEquals("Reader backups", backupFolderName)
+    }
+
+    @Test
+    fun `automatic backup frequency and book file inclusion can be selected`() {
+        backupFrequency = AutomaticBackupFrequency.DAILY
+        automaticIncludeBooks = false
+        composeRule.setContent {
+            DataScreen(
+                status = "",
+                busy = false,
+                onExport = {},
+                onImport = {},
+                includeBooksInBackup = false,
+                onIncludeBooksInBackupChange = {},
+                onCreateBackup = {},
+                onRestoreBackup = {},
+                onDanger = {},
+                automaticBackupsEnabled = true,
+                automaticBackupFolderName = "Reader backups",
+                automaticBackupFrequency = backupFrequency,
+                onAutomaticBackupFrequencyChange = { backupFrequency = it },
+                automaticBackupIncludeBooks = automaticIncludeBooks,
+                onAutomaticBackupIncludeBooksChange = { automaticIncludeBooks = it },
+            )
+        }
+        composeRule.onNodeWithTag("automatic-backup-frequency-WEEKLY").performScrollTo().performClick()
+        composeRule.onNodeWithTag("automatic-backup-include-books").performScrollTo().performClick()
+        assertEquals(AutomaticBackupFrequency.WEEKLY, backupFrequency)
+        assertTrue(automaticIncludeBooks)
     }
 }
 

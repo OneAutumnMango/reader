@@ -30,7 +30,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.MenuSection
+import dev.reader.app.ui.RadioOptions
 import dev.reader.data.export.ExportScope
+import dev.reader.data.store.AutomaticBackupFrequency
 
 @Composable
 fun DataScreen(
@@ -44,6 +46,14 @@ fun DataScreen(
     onRestoreBackup: () -> Unit,
     onDanger: (DangerAction) -> Unit,
     modifier: Modifier = Modifier,
+    automaticBackupsEnabled: Boolean = false,
+    onAutomaticBackupsEnabledChange: (Boolean) -> Unit = {},
+    automaticBackupFolderName: String? = null,
+    onChooseAutomaticBackupFolder: () -> Unit = {},
+    automaticBackupFrequency: AutomaticBackupFrequency = AutomaticBackupFrequency.DAILY,
+    onAutomaticBackupFrequencyChange: (AutomaticBackupFrequency) -> Unit = {},
+    automaticBackupIncludeBooks: Boolean = false,
+    onAutomaticBackupIncludeBooksChange: (Boolean) -> Unit = {},
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(top = 24.dp, bottom = 24.dp),
@@ -104,9 +114,62 @@ fun DataScreen(
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth().testTag("restore-backup"),
             ) { Text("Apply backup") }
+            Spacer(Modifier.height(16.dp))
+            Text("Automatic backups", style = MaterialTheme.typography.titleSmall)
+            OutlinedButton(
+                onClick = onChooseAutomaticBackupFolder,
+                modifier = Modifier.fillMaxWidth().testTag("automatic-backup-folder"),
+            ) {
+                Text(automaticBackupFolderName?.let { "Backup folder: $it" } ?: "Choose backup folder")
+            }
+            ToggleRow(
+                label = "Back up automatically",
+                checked = automaticBackupsEnabled,
+                enabled = automaticBackupFolderName != null,
+                tag = "automatic-backup-enabled",
+                onCheckedChange = onAutomaticBackupsEnabledChange,
+            )
+            if (automaticBackupsEnabled) {
+                Text("Frequency", style = MaterialTheme.typography.labelLarge)
+                RadioOptions(
+                    options = AutomaticBackupFrequency.entries,
+                    selected = automaticBackupFrequency,
+                    label = { it.label },
+                    tag = { "automatic-backup-frequency-${it.name}" },
+                    onSelect = onAutomaticBackupFrequencyChange,
+                )
+                ToggleRow(
+                    label = "Include book files",
+                    checked = automaticBackupIncludeBooks,
+                    enabled = true,
+                    tag = "automatic-backup-include-books",
+                    onCheckedChange = onAutomaticBackupIncludeBooksChange,
+                )
+                Hint("Keeps the 10 most recent automatic backups in the selected folder.")
+            }
         }
 
         DangerZone(busy, onDanger)
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
+    tag: String,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag(tag).clickable(enabled = enabled) {
+            onCheckedChange(!checked)
+        },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label)
+        Switch(checked = checked, enabled = enabled, onCheckedChange = null)
     }
 }
 

@@ -24,6 +24,17 @@ enum class CollectionKind {
 enum class LibrarySort { TITLE, AUTHOR, LAST_READ, ADDED, PROGRESS }
 
 @Serializable
+enum class AutomaticBackupFrequency(val intervalDays: Long, val label: String) {
+    DAILY(DAILY_BACKUP_INTERVAL_DAYS, "Daily"),
+    WEEKLY(WEEKLY_BACKUP_INTERVAL_DAYS, "Weekly"),
+    MONTHLY(MONTHLY_BACKUP_INTERVAL_DAYS, "Monthly"),
+}
+
+private const val DAILY_BACKUP_INTERVAL_DAYS = 1L
+private const val WEEKLY_BACKUP_INTERVAL_DAYS = 7L
+private const val MONTHLY_BACKUP_INTERVAL_DAYS = 30L
+
+@Serializable
 data class PreferencesFile(
     val version: Int = STORE_VERSION,
     val appTheme: AppTheme = AppTheme(),
@@ -43,4 +54,8 @@ data class PreferencesFile(
     val librarySortDescending: Boolean = true,
     val statsGraphs: List<StatsGraph> = emptyList(),
     val singleCategoryPerBook: Boolean = false,
+    val automaticBackupsEnabled: Boolean = false,
+    val automaticBackupFolderUri: String? = null,
+    val automaticBackupFrequency: AutomaticBackupFrequency = AutomaticBackupFrequency.DAILY,
+    val automaticBackupIncludeBooks: Boolean = false,
 )

@@ -79,6 +79,8 @@ class ReaderStoresTest {
         assertEquals(emptyList(), preferences.statsGraphs)
         assertEquals(emptyMap(), preferences.rootFolderNames)
         assertEquals(false, preferences.singleCategoryPerBook)
+        assertEquals(false, preferences.automaticBackupsEnabled)
+        assertEquals(null, preferences.automaticBackupFolderUri)
     }
 
     @Test
@@ -105,6 +107,10 @@ class ReaderStoresTest {
                 rootFolders = listOf("content://library"),
                 statsGraphs = listOf(firstGraph, secondGraph),
                 singleCategoryPerBook = true,
+                automaticBackupsEnabled = true,
+                automaticBackupFolderUri = "content://tree/backups",
+                automaticBackupFrequency = AutomaticBackupFrequency.WEEKLY,
+                automaticBackupIncludeBooks = true,
             )
         }
         assertEquals(listOf(firstGraph, secondGraph), firstRepository.preferences.first().statsGraphs)
@@ -117,6 +123,10 @@ class ReaderStoresTest {
         assertEquals("Night", afterRestart.activeThemePresetName)
         assertEquals(listOf("content://library"), afterRestart.rootFolders)
         assertEquals(true, afterRestart.singleCategoryPerBook)
+        assertEquals(true, afterRestart.automaticBackupsEnabled)
+        assertEquals("content://tree/backups", afterRestart.automaticBackupFolderUri)
+        assertEquals(AutomaticBackupFrequency.WEEKLY, afterRestart.automaticBackupFrequency)
+        assertEquals(true, afterRestart.automaticBackupIncludeBooks)
 
         val updatedGraph = firstGraph.copy(title = "Reading time by book")
         secondRepository.update { preferences ->

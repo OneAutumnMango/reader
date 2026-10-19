@@ -1,5 +1,6 @@
 package dev.reader.app.ui.data
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -7,6 +8,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,10 +18,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.documentfile.provider.DocumentFile
 import dev.reader.app.data.AppLog
+import dev.reader.app.data.AutomaticBackupScheduler
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.describeImportError
 import dev.reader.data.export.ExportScope
+import dev.reader.data.store.PreferencesFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,12 +36,21 @@ private val ANY_FILE = arrayOf("*/*")
 fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val preferences by graph.settings.preferences.collectAsState(initial = PreferencesFile())
     var status by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var pendingScopes by remember { mutableStateOf(ExportScope.entries.toSet()) }
     var includeBooks by remember { mutableStateOf(false) }
     var confirmRestore by remember { mutableStateOf(false) }
     var danger by remember { mutableStateOf<DangerAction?>(null) }
+
+    LaunchedEffect(
+        preferences.automaticBackupsEnabled,
+        preferences.automaticBackupFolderUri,
+        preferences.automaticBackupFrequency,
+    ) {
+        AutomaticBackupScheduler.update(context, preferences)
+    }
 
     fun run(done: String, block: suspend () -> Unit) {
         busy = true
@@ -95,6 +110,21 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
             graph.refreshMissingCovers()
         }
     }
+    val backupFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            scope.launch { graph.settings.update { it.copy(automaticBackupFolderUri = uri.toString()) } }
+        }
+    }
+    val backupFolderName = preferences.automaticBackupFolderUri?.let { value ->
+        runCatching { DocumentFile.fromTreeUri(context, Uri.parse(value))?.name }.getOrNull()
+            ?.takeIf(String::isNotBlank)
+    }
 
     DataScreen(
         status = status,
@@ -110,6 +140,20 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         onRestoreBackup = { confirmRestore = true },
         onDanger = { danger = it },
         modifier = modifier,
+        automaticBackupsEnabled = preferences.automaticBackupsEnabled,
+        onAutomaticBackupsEnabledChange = { enabled ->
+            scope.launch { graph.settings.update { it.copy(automaticBackupsEnabled = enabled) } }
+        },
+        automaticBackupFolderName = backupFolderName,
+        onChooseAutomaticBackupFolder = { backupFolderLauncher.launch(null) },
+        automaticBackupFrequency = preferences.automaticBackupFrequency,
+        onAutomaticBackupFrequencyChange = { frequency ->
+            scope.launch { graph.settings.update { it.copy(automaticBackupFrequency = frequency) } }
+        },
+        automaticBackupIncludeBooks = preferences.automaticBackupIncludeBooks,
+        onAutomaticBackupIncludeBooksChange = { include ->
+            scope.launch { graph.settings.update { it.copy(automaticBackupIncludeBooks = include) } }
+        },
     )
 
     if (confirmRestore) {

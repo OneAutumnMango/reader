@@ -21,6 +21,7 @@ androidxTest = "1.7.0"
 room = "2.8.2"
 documentfile = "1.1.0"
 coil = "3.3.0"
+workManager = "2.10.5"
 commonmark = "0.26.0"
 jsoup = "1.22.1"
 pdfboxAndroid = "2.0.27.0"
@@ -48,6 +49,7 @@ androidx-documentfile = { module = "androidx.documentfile:documentfile", version
 
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
+work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
 
 # Format parsing.
 commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
