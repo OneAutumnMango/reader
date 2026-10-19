@@ -87,6 +87,17 @@ class LibraryScreenTest {
     }
 
     @Test
+    fun `pre-groups books by category while preserving book order`() {
+        val other = CategoryId("other")
+        val first = book("1", "Alpha", setOf(novels, other))
+        val second = book("2", "Beta", setOf(novels))
+        val grouped = groupBooksByCategory(listOf(first, second), categories + Category(other, "Other"))
+
+        assertEquals(listOf(first, second), grouped[novels])
+        assertEquals(listOf(first), grouped[other])
+    }
+
+    @Test
     fun `book cards keep a consistent edge margin in the grid`() {
         composeRule.setContent {
             LibraryScreen(

@@ -13,6 +13,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -43,9 +44,12 @@ fun LibraryScreen(
 ) {
     // "All" can only be hidden when there's another category to show instead.
     val showAll = showAllCategory || categories.isEmpty()
-    val pages: List<CategoryId?> = (if (showAll) listOf(null) else emptyList()) + categories.map { it.id }
+    val pages = remember(showAll, categories) {
+        (if (showAll) listOf(null) else emptyList()) + categories.map { it.id }
+    }
     val currentIndex = pages.indexOf(selectedCategory).coerceAtLeast(0)
     val pagerState = rememberPagerState(initialPage = currentIndex) { pages.size }
+    val booksByCategory = remember(books, categories) { groupBooksByCategory(books, categories) }
 
     LaunchedEffect(currentIndex) {
         if (pagerState.currentPage != currentIndex) pagerState.animateScrollToPage(currentIndex)
@@ -64,7 +68,7 @@ fun LibraryScreen(
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val category = pages.getOrNull(page)
-            val pageBooks = if (category == null) books else books.filter { category in it.categoryIds }
+            val pageBooks = if (category == null) books else booksByCategory[category].orEmpty()
             LazyVerticalGrid(
                 state = gridStateFor(category) ?: rememberLazyGridState(),
                 columns = GridCells.Adaptive(minSize = layout.gridColumnMinWidthDp.dp),
@@ -84,4 +88,12 @@ fun LibraryScreen(
             }
         }
     }
+}
+
+internal fun groupBooksByCategory(books: List<Book>, categories: List<Category>): Map<CategoryId, List<Book>> {
+    val grouped = categories.associate { it.id to mutableListOf<Book>() }.toMutableMap()
+    books.forEach { book ->
+        book.categoryIds.forEach { categoryId -> grouped[categoryId]?.add(book) }
+    }
+    return grouped.mapValues { (_, booksInCategory) -> booksInCategory.toList() }
 }
