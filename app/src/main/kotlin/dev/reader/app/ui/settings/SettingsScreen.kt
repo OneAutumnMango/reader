@@ -32,14 +32,13 @@ import dev.reader.app.ui.MenuSection
 import dev.reader.data.store.CollectionKind
 
 @Composable
-fun SettingsScreen(
+fun LibrarySourcesScreen(
     status: String,
     rootFolders: List<RootFolderDisplay>,
     onAddBookFile: () -> Unit,
     onAddBookFolder: () -> Unit,
     onAddCollection: (CollectionKind) -> Unit,
     onRemoveRootFolder: (String) -> Unit,
-    onViewLogHistory: () -> Unit,
     modifier: Modifier = Modifier,
     onScanRootFolders: () -> Unit = {},
     scanning: Boolean = false,
@@ -109,13 +108,6 @@ fun SettingsScreen(
                 Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(if (scanning) "Scanning…" else "Scan now")
-            }
-        }
-
-        MenuSection("Logs") {
-            Hint("See everything that's been imported or failed to import.")
-            OutlinedButton(onClick = onViewLogHistory, modifier = Modifier.fillMaxWidth()) {
-                Text("View error/log history")
             }
         }
 

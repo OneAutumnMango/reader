@@ -47,6 +47,7 @@ room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
 
 # Format parsing.
 commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }

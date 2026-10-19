@@ -1,18 +1,16 @@
 package dev.reader.app.ui.settings
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
-import dev.reader.data.store.CollectionKind
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.assertContentEquals
 
 @RunWith(RobolectricTestRunner::class)
 class SettingsScreenTest {
@@ -20,66 +18,36 @@ class SettingsScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private var addedFile = false
-    private var addedFolder = false
-    private var collection: CollectionKind? = null
-    private var removed: String? = null
-    private var scanned = false
-    private var viewedLogs = false
+    private val clickedDestinations = mutableListOf<String>()
 
-    private fun setContent(folders: List<RootFolderDisplay> = emptyList()) = composeRule.setContent {
+    private fun setContent() = composeRule.setContent {
         SettingsScreen(
-            status = "",
-            rootFolders = folders,
-            onAddBookFile = { addedFile = true },
-            onAddBookFolder = { addedFolder = true },
-            onAddCollection = { collection = it },
-            onRemoveRootFolder = { removed = it },
-            onViewLogHistory = { viewedLogs = true },
-            onScanRootFolders = { scanned = true },
+            onAppearanceClick = { clickedDestinations += "appearance" },
+            onLibrarySourcesClick = { clickedDestinations += "sources" },
+            onCategoriesClick = { clickedDestinations += "categories" },
+            onDataClick = { clickedDestinations += "data" },
         )
     }
 
     @Test
-    fun `add book buttons report file and folder`() {
+    fun `settings links invoke their destination callbacks`() {
         setContent()
 
-        composeRule.onNodeWithText("Add book (file)").performClick()
-        composeRule.onNodeWithText("Add book (folder)").performClick()
+        composeRule.onNodeWithText("Appearance and reader").performClick()
+        composeRule.onNodeWithText("Library sources").performClick()
+        composeRule.onNodeWithText("Categories").performClick()
+        composeRule.onNodeWithText("Backup and reset").performClick()
 
-        assertTrue(addedFile)
-        assertTrue(addedFolder)
+        assertContentEquals(listOf("appearance", "sources", "categories", "data"), clickedDestinations)
     }
 
     @Test
-    fun `collections can be added as files or folders`() {
+    fun `settings hub has no source management or log actions`() {
         setContent()
 
-        composeRule.onNodeWithTag("add-collection-FOLDERS").performScrollTo().performClick()
-        assertEquals(CollectionKind.FOLDERS, collection)
-
-        composeRule.onNodeWithTag("add-collection-FILES").performScrollTo().performClick()
-        assertEquals(CollectionKind.FILES, collection)
-    }
-
-    @Test
-    fun `library folders show their kind and can be removed or scanned`() {
-        setContent(listOf(RootFolderDisplay("content://tree/1", "Books", CollectionKind.FILES)))
-
-        composeRule.onNodeWithText("Each file is a book, including in subfolders").assertExists()
-        composeRule.onNodeWithContentDescription("Remove Books").performScrollTo().performClick()
-        composeRule.onNodeWithTag("scan-root-folders").performScrollTo().performClick()
-
-        assertEquals("content://tree/1", removed)
-        assertTrue(scanned)
-    }
-
-    @Test
-    fun `log history button reports the click`() {
-        setContent()
-
-        composeRule.onNodeWithText("View error/log history").performScrollTo().performClick()
-
-        assertTrue(viewedLogs)
+        composeRule.onAllNodesWithTag("add-book-file").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("add-book-folder").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("scan-root-folders").assertCountEquals(0)
+        composeRule.onAllNodesWithText("View error/log history").assertCountEquals(0)
     }
 }

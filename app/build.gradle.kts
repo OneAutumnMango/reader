@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
     implementation(libs.okio)
     implementation(libs.room.runtime)
     implementation(libs.androidx.documentfile)

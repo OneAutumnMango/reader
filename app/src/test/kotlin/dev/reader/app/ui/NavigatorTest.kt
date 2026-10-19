@@ -36,14 +36,16 @@ class NavigatorTest {
     }
 
     @Test
-    fun `back from another drawer root returns to the library`() {
+    fun `back from library sources and logs returns to the library`() {
         val navigator = Navigator()
-        navigator.switchRoot(Destination.Settings)
-        navigator.push(Destination.LogHistory)
+        navigator.switchRoot(Destination.LibrarySources)
+        assertEquals(Destination.LibrarySources, navigator.current)
+        navigator.switchRoot(Destination.LogHistory)
 
         assertTrue(navigator.handlesSystemBack)
         navigator.back()
-        assertEquals(Destination.Settings, navigator.current)
+        assertEquals(Destination.Library, navigator.current)
+        navigator.switchRoot(Destination.LibrarySources)
         navigator.back()
         assertEquals(Destination.Library, navigator.current)
         assertFalse(navigator.handlesSystemBack)

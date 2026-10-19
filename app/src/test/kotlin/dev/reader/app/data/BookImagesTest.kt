@@ -2,6 +2,7 @@ package dev.reader.app.data
 
 import android.graphics.Bitmap
 import coil3.ImageLoader
+import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import dev.reader.core.model.BookFormat
@@ -25,6 +26,35 @@ import kotlin.test.assertIs
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class BookImagesTest {
+
+    @Test
+    fun `epub SVG illustrations decode from extensionless extracted files`() = runBlocking {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32">
+            <rect width="24" height="32" fill="red"/></svg>"""
+        val file = File.createTempFile("vector-illustration", ".epub")
+        try {
+            ZipOutputStream(file.outputStream()).use { zip ->
+                zip.putNextEntry(ZipEntry("OPS/images/illustration.svg"))
+                zip.write(svg.toByteArray())
+                zip.closeEntry()
+            }
+            val context = RuntimeEnvironment.getApplication()
+            val document = BookImages.resolve(
+                context, file, BookFormat.EPUB,
+                RichDocument(listOf(Block.Image("OPS/images/illustration.svg"))),
+            )
+            val image = document.blocks.single() as Block.Image
+            val result = assertIs<SuccessResult>(
+                SingletonImageLoader.get(context).execute(
+                    ImageRequest.Builder(context).data(image.path).size(24, 32).build(),
+                ),
+            )
+            assertEquals(24, result.image.width)
+            assertEquals(32, result.image.height)
+        } finally {
+            file.delete()
+        }
+    }
 
     @Test
     fun `fb2 images load their embedded binary`() {

@@ -2,12 +2,17 @@ package dev.reader.app.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.QueryStats
@@ -15,6 +20,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalDrawerSheet
@@ -33,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
@@ -46,21 +53,13 @@ import dev.reader.app.ui.library.BookInfoRoute
 import dev.reader.app.ui.library.LibraryRoute
 import dev.reader.app.ui.reader.ReaderRoute
 import dev.reader.app.ui.search.SearchRoute
+import dev.reader.app.ui.settings.LibrarySourcesRoute
 import dev.reader.app.ui.settings.LogHistoryRoute
 import dev.reader.app.ui.settings.SettingsRoute
 import dev.reader.app.ui.stats.StatsRoute
 import dev.reader.core.model.BookId
 import dev.reader.core.model.CategoryId
 import kotlinx.coroutines.launch
-
-private val DRAWER_DESTINATIONS = listOf(
-    Destination.Library to ("Library" to Icons.Filled.Menu),
-    Destination.Appearance to ("Appearance" to Icons.Filled.Palette),
-    Destination.Categories to ("Categories" to Icons.Filled.Category),
-    Destination.Stats to ("Stats" to Icons.Filled.QueryStats),
-    Destination.Data to ("Data" to Icons.Filled.Storage),
-    Destination.Settings to ("Settings" to Icons.Filled.Settings),
-)
 
 private val CONTENT_MARGIN = 16.dp
 
@@ -71,8 +70,9 @@ private fun titleFor(destination: Destination): String = when (destination) {
     Destination.Appearance -> "Appearance"
     Destination.Data -> "Data"
     Destination.Settings -> "Settings"
+    Destination.LibrarySources -> "Library sources"
     Destination.Categories -> "Categories"
-    Destination.LogHistory -> "Log history"
+    Destination.LogHistory -> "Logs"
     is Destination.BookDetail -> "Book"
     is Destination.BookInfo -> "Details"
     is Destination.Bookmarks -> "Bookmarks"
@@ -100,23 +100,59 @@ fun ReaderApp(graph: ReaderGraph) {
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    fun selectDestination(destination: Destination) {
+        navigator.switchRoot(destination)
+        scope.launch { drawerState.close() }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet {
-                DRAWER_DESTINATIONS.forEach { (destination, labelAndIcon) ->
-                    val (label, icon) = labelAndIcon
-                    NavigationDrawerItem(
-                        selected = navigator.current == destination,
-                        onClick = {
-                            navigator.switchRoot(destination)
-                            scope.launch { drawerState.close() }
-                        },
-                        icon = { Icon(icon, contentDescription = null) },
-                        label = { Text(label) },
-                    )
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
+                    DrawerSection("Library") {
+                        DrawerItem(Destination.Library, "Library", Icons.Filled.Menu, navigator.current) {
+                            selectDestination(it)
+                        }
+                        DrawerItem(
+                            Destination.LibrarySources,
+                            "Library sources",
+                            Icons.Filled.Folder,
+                            navigator.current,
+                        ) {
+                            selectDestination(it)
+                        }
+                        DrawerItem(Destination.Categories, "Categories", Icons.Filled.Category, navigator.current) {
+                            selectDestination(it)
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    DrawerSection("Reading") {
+                        DrawerItem(Destination.Stats, "Stats", Icons.Filled.QueryStats, navigator.current) {
+                            selectDestination(it)
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    DrawerSection("Application") {
+                        DrawerItem(Destination.Appearance, "Appearance", Icons.Filled.Palette, navigator.current) {
+                            selectDestination(it)
+                        }
+                        DrawerItem(Destination.Data, "Data", Icons.Filled.Storage, navigator.current) {
+                            selectDestination(it)
+                        }
+                        DrawerItem(Destination.Settings, "Settings", Icons.Filled.Settings, navigator.current) {
+                            selectDestination(it)
+                        }
+                        DrawerItem(
+                            Destination.LogHistory,
+                            "Logs",
+                            Icons.AutoMirrored.Filled.Article,
+                            navigator.current,
+                        ) {
+                            selectDestination(it)
+                        }
+                    }
                 }
             }
         },
@@ -174,10 +210,13 @@ fun ReaderApp(graph: ReaderGraph) {
                     Destination.Categories -> CategoriesRoute(graph, content)
                     Destination.Data -> DataRoute(graph, content)
                     Destination.Settings -> SettingsRoute(
-                        graph,
-                        onViewLogHistory = { navigator.push(Destination.LogHistory) },
+                        onAppearanceClick = { navigator.switchRoot(Destination.Appearance) },
+                        onLibrarySourcesClick = { navigator.switchRoot(Destination.LibrarySources) },
+                        onCategoriesClick = { navigator.switchRoot(Destination.Categories) },
+                        onDataClick = { navigator.switchRoot(Destination.Data) },
                         modifier = content,
                     )
+                    Destination.LibrarySources -> LibrarySourcesRoute(graph, content)
                     Destination.LogHistory -> LogHistoryRoute(content)
                     is Destination.BookDetail -> BookDetailRoute(
                         graph,
@@ -211,5 +250,33 @@ private fun ReaderDestinationContent(graph: ReaderGraph, navigator: Navigator) {
         destination.bookId,
         destination.chapterId,
         onOpenMenu = { navigator.pop() },
+    )
+}
+
+@Composable
+private fun DrawerSection(title: String, content: @Composable () -> Unit) {
+    Column {
+        Text(
+            title,
+            style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(start = 28.dp, top = 8.dp, bottom = 4.dp),
+        )
+        content()
+    }
+}
+
+@Composable
+private fun DrawerItem(
+    destination: Destination,
+    label: String,
+    icon: ImageVector,
+    current: Destination,
+    onSelect: (Destination) -> Unit,
+) {
+    NavigationDrawerItem(
+        selected = current == destination,
+        onClick = { onSelect(destination) },
+        icon = { Icon(icon, contentDescription = null) },
+        label = { Text(label) },
     )
 }

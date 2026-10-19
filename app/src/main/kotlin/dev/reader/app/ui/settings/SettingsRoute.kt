@@ -21,7 +21,7 @@ import dev.reader.data.store.PreferencesFile
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsRoute(graph: ReaderGraph, onViewLogHistory: () -> Unit, modifier: Modifier = Modifier) {
+fun LibrarySourcesRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val actions = rememberImportActions(graph)
@@ -63,7 +63,7 @@ fun SettingsRoute(graph: ReaderGraph, onViewLogHistory: () -> Unit, modifier: Mo
         RootFolderDisplay(uri = uriString, displayName = name, kind = preferences.rootFolderKinds[uriString])
     }
 
-    SettingsScreen(
+    LibrarySourcesScreen(
         status = scanStatus.ifBlank { actions.status },
         rootFolders = rootFolders,
         onAddBookFile = actions.addFiles,
@@ -81,7 +81,6 @@ fun SettingsRoute(graph: ReaderGraph, onViewLogHistory: () -> Unit, modifier: Mo
                 }
             }
         },
-        onViewLogHistory = onViewLogHistory,
         modifier = modifier,
     )
 }
