@@ -15,6 +15,11 @@ import dev.reader.data.room.toEvent
 import dev.reader.data.room.toProgress
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
+import java.io.File
+import java.security.MessageDigest
+import java.util.Base64
+
+private const val BYTE_MASK = 0xff
 
 /**
  * Exports/imports app data as one JSON bundle: everything (settings, library metadata, progress,
@@ -28,6 +33,7 @@ class ExportRepository(
         prettyPrint = true
         ignoreUnknownKeys = true
     },
+    private val coverDirectory: File? = null,
 ) {
 
     suspend fun export(scopes: Set<ExportScope> = ExportScope.entries.toSet()): String = encode(bundle(scopes))
@@ -68,8 +74,13 @@ class ExportRepository(
 
     private suspend fun withLibrary(bundle: ExportBundle): ExportBundle {
         val bookEntities = database.books().observeAll().first()
+        val books = bookEntities.map { it.toBook(database.books().categoryIdsFor(it.id)) }
         return bundle.copy(
-            books = bookEntities.map { it.toBook(database.books().categoryIdsFor(it.id)) },
+            books = books,
+            coverAssets = books.mapNotNull { book ->
+                val cover = book.coverPath?.let(::File)?.takeIf { it.isFile } ?: return@mapNotNull null
+                book.id.value to Base64.getEncoder().encodeToString(cover.readBytes())
+            }.toMap(),
             chapters = bookEntities.flatMap { database.chapters().getByBook(it.id) }.map { it.toChapter() },
             categories = database.categories().observeAll().first().map { it.toCategory() },
             bookmarks = bookEntities
@@ -81,10 +92,29 @@ class ExportRepository(
     }
 
     private suspend fun apply(bundle: ExportBundle) {
-        if (ExportScope.LIBRARY in bundle.scopes) applyLibrary(bundle)
+        if (ExportScope.LIBRARY in bundle.scopes) applyLibrary(bundle.withRestoredCovers())
         if (ExportScope.STATS in bundle.scopes) applySessions(bundle.sessions)
         if (ExportScope.SETTINGS in bundle.scopes) bundle.preferences?.let { prefs -> settings.update { prefs } }
     }
+
+    private fun ExportBundle.withRestoredCovers(): ExportBundle {
+        val directory = coverDirectory ?: return this
+        return copy(
+            books = books.map { book ->
+                val encoded = coverAssets[book.id.value] ?: return@map book
+                val bytes = runCatching { Base64.getDecoder().decode(encoded) }.getOrNull() ?: return@map book
+                val cover = File(directory, book.id.value.sha256()).apply {
+                    parentFile?.mkdirs()
+                    writeBytes(bytes)
+                }
+                book.copy(coverPath = cover.path)
+            }
+        )
+    }
+
+    private fun String.sha256(): String = MessageDigest.getInstance("SHA-256")
+        .digest(toByteArray())
+        .joinToString("") { "%02x".format(it.toInt() and BYTE_MASK) }
 
     private suspend fun applyLibrary(bundle: ExportBundle) {
         bundle.categories.forEach { database.categories().upsert(it.toEntity()) }

@@ -78,7 +78,10 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         write(it, "Exported ${scopes.describe()}") { out -> out.write(graph.exporter.export(scopes).toByteArray()) }
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
-        read(it, "Import complete") { input -> graph.exporter.import(input.readBytes().decodeToString()) }
+        read(it, "Import complete") { input ->
+            graph.exporter.import(input.readBytes().decodeToString())
+            graph.refreshMissingCovers()
+        }
     }
     val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) {
         val withBooks = includeBooks
@@ -87,7 +90,10 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         }
     }
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
-        read(it, "Backup applied") { input -> graph.backups.restore(input) }
+        read(it, "Backup applied") { input ->
+            graph.backups.restore(input)
+            graph.refreshMissingCovers()
+        }
     }
 
     DataScreen(

@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -70,11 +71,13 @@ class BackupRepositoryTest {
             parentFile?.mkdirs()
             writeText("Hello")
         }
+        val sourceCover = File(tempDir, "source/My Book.jpg").apply { writeBytes(byteArrayOf(4, 5, 6)) }
         val book = Book(
             id = BookId("book-1"),
             title = "My Book",
             format = BookFormat.TXT,
             sourcePath = source.path,
+            coverPath = sourceCover.path,
             addedAt = Instant.parse("2026-01-01T00:00:00Z"),
         )
         val chapters = listOf(Chapter(ChapterId("ch-1"), book.id, "One", "", 0))
@@ -99,15 +102,25 @@ class BackupRepositoryTest {
     }
 
     @Test
-    fun `a backup without book files keeps the original paths`() = runBlocking {
+    fun `a backup without book files restores cover assets`() = runBlocking {
         val (_, exporter, book) = seededSource()
         val zip = ByteArrayOutputStream().also { BackupRepository(exporter, tempDir).write(it, includeBooks = false) }
+        val entries = ZipInputStream(ByteArrayInputStream(zip.toByteArray())).use { input ->
+            generateSequence { input.nextEntry }.map { it.name }.toList()
+        }
 
         val restoredDb = newDatabase()
-        BackupRepository(ExportRepository(restoredDb, newSettings("dest")), File(tempDir, "restore"))
+        val restoredCoverDirectory = File(tempDir, "durable-covers")
+        BackupRepository(
+            ExportRepository(restoredDb, newSettings("dest"), coverDirectory = restoredCoverDirectory),
+            File(tempDir, "restore"),
+        )
             .restore(ByteArrayInputStream(zip.toByteArray()))
 
-        assertEquals(book.sourcePath, LibraryRepository(restoredDb).observeBooks().first().single().sourcePath)
+        val restored = LibraryRepository(restoredDb).observeBooks().first().single()
+        assertEquals(book.sourcePath, restored.sourcePath)
+        assertEquals(byteArrayOf(4, 5, 6).toList(), File(requireNotNull(restored.coverPath)).readBytes().toList())
+        assertEquals(listOf("backup.json"), entries)
     }
 
     @Test

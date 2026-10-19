@@ -1,6 +1,7 @@
 package dev.reader.app.data
 
 import android.content.Context
+import android.net.Uri
 import androidx.room.Room
 import dev.reader.core.model.Progress
 import dev.reader.core.stats.ReadingSessionEvent
@@ -21,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import okio.FileSystem
 import okio.Path.Companion.toPath
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** The app's one dependency graph: a single Room database and DataStore, shared everywhere. */
@@ -55,7 +57,7 @@ class ReaderGraph(context: Context) {
     val stats = StatsRepository(database)
     val search = SearchRepository(database)
     val settings = SettingsRepository(stores)
-    val exporter = ExportRepository(database, settings)
+    val exporter = ExportRepository(database, settings, coverDirectory = File(appContext.filesDir, "covers"))
     val backups = BackupRepository(exporter, context.applicationContext.filesDir)
     val importer = BookImporter(library)
     val rootFolderScanner = RootFolderScanner(context.applicationContext, settings, library, importer)
@@ -72,7 +74,16 @@ class ReaderGraph(context: Context) {
             runCatching { rootFolderScanner.scanAll() }
                 .onSuccess { AppLog.info("Launch-time library refresh complete", "Startup") }
                 .onFailure { AppLog.error("Launch-time library scan failed", "Startup", it) }
+            runCatching { refreshMissingCovers() }
+                .onFailure { AppLog.error("Missing cover refresh failed", "Startup", it) }
         }
+    }
+
+    suspend fun refreshMissingCovers(): Int = importer.refreshMissingCovers(appContext) { book ->
+        File(book.sourcePath).takeIf { it.isFile && it.canRead() }
+            ?: book.originUri?.let { uri ->
+                runCatching { ContentFileCopier.copyToCache(appContext, Uri.parse(uri)) }.getOrNull()
+            }
     }
 
     fun saveChapterProgress(progress: Progress) {

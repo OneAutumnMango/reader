@@ -14,8 +14,9 @@ private const val BOOKS_DIR = "books"
 private const val COVERS_DIR = "covers"
 
 /**
- * A full backup is a zip of the complete [ExportBundle] plus cover images, and optionally the
- * book files themselves. Restoring replaces all app data and points books at the restored files.
+ * A full backup is a zip of the complete [ExportBundle] and optionally the book files themselves.
+ * Cover images are embedded in the bundle. Restoring replaces all app data and points books at the
+ * restored files.
  */
 class BackupRepository(
     private val exporter: ExportRepository,
@@ -57,7 +58,6 @@ class BackupRepository(
     }
 
     private fun ZipOutputStream.addBook(book: Book, includeFiles: Boolean) {
-        book.coverPath?.let(::File)?.takeIf { it.isFile }?.let { addFile("$COVERS_DIR/${book.id.value}", it) }
         if (includeFiles) bookFiles(book).forEach { addFile("$BOOKS_DIR/${book.id.value}", it) }
     }
 

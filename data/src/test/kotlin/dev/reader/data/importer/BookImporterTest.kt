@@ -2,7 +2,9 @@ package dev.reader.data.importer
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import dev.reader.core.model.Progress
 import dev.reader.data.repo.LibraryRepository
+import dev.reader.data.repo.ProgressRepository
 import dev.reader.data.room.ReaderDatabase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -14,6 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 
 @RunWith(RobolectricTestRunner::class)
 class BookImporterTest {
@@ -118,6 +121,44 @@ class BookImporterTest {
         val coverPath = requireNotNull(book.coverPath)
         assertTrue(File(coverPath).exists())
         assertEquals(listOf<Byte>(1, 2, 3, 4), File(coverPath).readBytes().toList())
+    }
+
+    @Test
+    fun `reimporting a book regenerates a missing cover`() = runBlocking {
+        val file = createCoveredEpub()
+        val first = importer.importFile(file)
+        File(requireNotNull(first.coverPath)).delete()
+
+        val second = importer.importFile(file)
+
+        assertEquals(first.id, second.id)
+        assertTrue(File(requireNotNull(second.coverPath)).isFile)
+    }
+
+    @Test
+    fun `refreshing a restored missing cover leaves book metadata chapters and progress unchanged`() = runBlocking {
+        val library = LibraryRepository(database)
+        val file = createCoveredEpub()
+        val imported = importer.importFile(file)
+        val originalChapter = library.chapters(imported.id).single()
+        val restoredBook = imported.copy(title = "Custom title", author = "Custom author", coverPath = null)
+        library.updateBookDetails(restoredBook)
+        val progress = Progress(restoredBook.id, originalChapter.id, 0.42f, Clock.System.now())
+        ProgressRepository(database).update(progress)
+
+        assertEquals(1, importer.refreshMissingCovers(null))
+
+        val repaired = library.observeBooks().first().single()
+        assertEquals(restoredBook.id, repaired.id)
+        assertEquals(restoredBook.title, repaired.title)
+        assertEquals(restoredBook.author, repaired.author)
+        assertEquals(restoredBook.categoryIds, repaired.categoryIds)
+        val coverPath = requireNotNull(repaired.coverPath)
+        assertTrue(File(coverPath).isFile)
+        assertEquals(originalChapter, library.chapters(repaired.id).single())
+        val storedProgress = ProgressRepository(database).observe(repaired.id).first()
+        assertEquals(progress.position, storedProgress?.position)
+        assertEquals(progress.finished, storedProgress?.finished)
     }
 
     @Test
@@ -228,5 +269,40 @@ class BookImporterTest {
 
         assertEquals(first.id, second.id)
         assertEquals(1, LibraryRepository(database).observeBooks().first().size)
+    }
+
+    private fun createCoveredEpub(): File = File(tempDir, "cover-${System.nanoTime()}.epub").apply {
+        java.util.zip.ZipOutputStream(outputStream()).use { zip ->
+            fun entry(name: String, content: ByteArray) {
+                zip.putNextEntry(java.util.zip.ZipEntry(name))
+                zip.write(content)
+                zip.closeEntry()
+            }
+            entry(
+                "META-INF/container.xml",
+                """
+                <?xml version="1.0"?>
+                <container><rootfiles>
+                    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+                </rootfiles></container>
+                """.trimIndent().toByteArray(),
+            )
+            entry(
+                "OEBPS/content.opf",
+                """
+                <?xml version="1.0"?>
+                <package>
+                    <metadata><title>Covered</title></metadata>
+                    <manifest>
+                        <item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                        <item id="cover" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+                    </manifest>
+                    <spine><itemref idref="ch1"/></spine>
+                </package>
+                """.trimIndent().toByteArray(),
+            )
+            entry("OEBPS/chapter1.xhtml", "<html><body><p>Hi.</p></body></html>".toByteArray())
+            entry("OEBPS/cover.jpg", byteArrayOf(1, 2, 3, 4))
+        }
     }
 }

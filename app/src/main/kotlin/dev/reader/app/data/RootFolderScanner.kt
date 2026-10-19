@@ -43,7 +43,21 @@ class RootFolderScanner(
     }
 
     private suspend fun scanRoot(rootUri: Uri, kind: CollectionKind?): Int {
-        val root = DocumentFile.fromTreeUri(context, rootUri)
+        val root = runCatching { DocumentFile.fromTreeUri(context, rootUri) }.getOrNull()
+        val providerName = runCatching { root?.name }.getOrNull()
+        val uriString = rootUri.toString()
+        if (settings.preferences.first().rootFolderNames[uriString].isNullOrBlank()) {
+            settings.update { preferences ->
+                if (!preferences.rootFolderNames[uriString].isNullOrBlank()) {
+                    preferences
+                } else {
+                    preferences.copy(
+                        rootFolderNames = preferences.rootFolderNames +
+                            (uriString to collectionDisplayName(rootUri, providerName = providerName)),
+                    )
+                }
+            }
+        }
         if (root == null || !root.canRead()) {
             AppLog.warn("Saved library folder is unavailable or unreadable", "LibraryScan")
             return 0

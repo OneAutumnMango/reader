@@ -23,6 +23,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
 import org.junit.After
@@ -30,6 +33,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -95,6 +99,81 @@ class ExportRepositoryTest {
         assertEquals("One", LibraryRepository(freshDb).observeChapters(book.id).first().single().title)
         assertEquals("Sepia", freshSettings.preferences.first().activeThemePresetName)
         freshDb.close()
+    }
+
+    @Test
+    fun `library export restores cover bytes after the original cover is deleted`() = runBlocking {
+        val sourceCoverDirectory = File.createTempFile("source-covers", "").apply {
+            delete()
+            mkdirs()
+        }
+        val restoredCoverDirectory = File.createTempFile("restored-covers", "").apply {
+            delete()
+            mkdirs()
+        }
+        try {
+            val sourceCover = File(sourceCoverDirectory, "cover.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val book = Book(
+                id = BookId("book-with-cover"),
+                title = "Covered Book",
+                format = BookFormat.TXT,
+                sourcePath = "/books/covered-book.txt",
+                coverPath = sourceCover.path,
+                addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+            )
+            LibraryRepository(database).upsertBook(book, emptyList())
+            val bundle = ExportRepository(database, settings, coverDirectory = sourceCoverDirectory).export()
+            sourceCover.delete()
+
+            val restoredDb = newDatabase()
+            ExportRepository(restoredDb, newSettings("cover-import"), coverDirectory = restoredCoverDirectory)
+                .import(bundle)
+
+            val restoredBook = LibraryRepository(restoredDb).observeBooks().first().single()
+            val restoredCover = File(requireNotNull(restoredBook.coverPath))
+            assertEquals(listOf<Byte>(1, 2, 3), restoredCover.readBytes().toList())
+            restoredDb.close()
+        } finally {
+            sourceCoverDirectory.deleteRecursively()
+            restoredCoverDirectory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `settings-only export excludes library cover assets`() = runBlocking {
+        val cover = File.createTempFile("settings-cover", ".jpg").apply { writeBytes(byteArrayOf(7, 8, 9)) }
+        val book = Book(
+            id = BookId("settings-book"),
+            title = "Library Book",
+            format = BookFormat.TXT,
+            sourcePath = "/books/library-book.txt",
+            coverPath = cover.path,
+            addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+        LibraryRepository(database).upsertBook(book, emptyList())
+
+        val exported = exporter.decode(exporter.export(setOf(ExportScope.SETTINGS)))
+
+        cover.delete()
+        assertTrue(exported.coverAssets.isEmpty())
+    }
+
+    @Test
+    fun `library import accepts older bundles without cover assets`() = runBlocking {
+        val book = Book(
+            id = BookId("legacy-book"),
+            title = "Legacy Book",
+            format = BookFormat.TXT,
+            sourcePath = "/books/legacy-book.txt",
+            coverPath = "/old-cache/legacy-cover.jpg",
+            addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+        val currentText = exporter.encode(ExportBundle(scopes = setOf(ExportScope.LIBRARY), books = listOf(book)))
+        val oldText = JsonObject(Json.parseToJsonElement(currentText).jsonObject - "coverAssets").toString()
+
+        exporter.import(oldText)
+
+        assertEquals(listOf(book), LibraryRepository(database).observeBooks().first())
     }
 
     private val session = ReadingSessionEvent(

@@ -31,11 +31,22 @@ class ReaderStoresTest {
     @Test
     fun `preferences survive a restart`() = runTest {
         val first = CoroutineScope(Job() + UnconfinedTestDispatcher(testScheduler))
-        stores(first).preferences.updateData { it.copy(activeThemePresetName = "Sepia") }
+        stores(first).preferences.updateData {
+            it.copy(
+                activeThemePresetName = "Sepia",
+                rootFolders = listOf("content://library/tree/ABCD-1234%3ABooks"),
+                rootFolderNames = mapOf("content://library/tree/ABCD-1234%3ABooks" to "Books"),
+            )
+        }
         first.cancel()
 
         val second = CoroutineScope(Job() + UnconfinedTestDispatcher(testScheduler))
-        assertEquals("Sepia", stores(second).preferences.data.first().activeThemePresetName)
+        val preferences = stores(second).preferences.data.first()
+        assertEquals("Sepia", preferences.activeThemePresetName)
+        assertEquals(
+            mapOf("content://library/tree/ABCD-1234%3ABooks" to "Books"),
+            preferences.rootFolderNames,
+        )
         second.cancel()
     }
 
@@ -64,7 +75,9 @@ class ReaderStoresTest {
         fileSystem.sink(directory / "preferences.json").buffer()
             .use { it.writeUtf8("""{"activeThemePresetName":"Night"}""") }
 
-        assertEquals(emptyList(), stores(backgroundScope).preferences.data.first().statsGraphs)
+        val preferences = stores(backgroundScope).preferences.data.first()
+        assertEquals(emptyList(), preferences.statsGraphs)
+        assertEquals(emptyMap(), preferences.rootFolderNames)
     }
 
     @Test

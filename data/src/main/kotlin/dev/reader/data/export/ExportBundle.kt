@@ -36,4 +36,5 @@ data class ExportBundle(
     val chapterProgress: List<Progress> = emptyList(),
     val sessions: List<ReadingSessionEvent> = emptyList(),
     val preferences: PreferencesFile? = null,
+    val coverAssets: Map<String, String> = emptyMap(),
 )

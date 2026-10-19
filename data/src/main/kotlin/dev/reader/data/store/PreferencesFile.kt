@@ -33,6 +33,8 @@ data class PreferencesFile(
     val rootFolders: List<String> = emptyList(),
     /** Library folder URI -> its [CollectionKind]; folders added before kinds existed import both. */
     val rootFolderKinds: Map<String, CollectionKind> = emptyMap(),
+    /** Stable tree URI -> user-facing collection name, independent of provider metadata. */
+    val rootFolderNames: Map<String, String> = emptyMap(),
     /** Root-folder entry URI -> sourcePath of the book imported from it. */
     val rootEntryBooks: Map<String, String> = emptyMap(),
     val libraryLayout: LibraryLayout = LibraryLayout.MEDIUM,

@@ -22,6 +22,7 @@ import dev.reader.parser.mobi.MobiParser
 import dev.reader.parser.pdf.PdfTextParser
 import dev.reader.parser.rtf.RtfParser
 import dev.reader.parser.text.TxtParser
+import kotlinx.coroutines.flow.first
 import java.io.File
 import java.util.UUID
 import kotlin.time.Clock
@@ -52,7 +53,8 @@ class BookImporter(
             id = bookId,
             title = existing?.title ?: cleanTitle(parsed.title),
             author = parsed.author,
-            coverPath = existing?.coverPath ?: materializeCover(file, format, bookId, parsed.coverPath),
+            coverPath = existing?.coverPath?.takeIf(::isReadableFile)
+                ?: materializeCover(file, format, bookId, parsed.coverPath),
             format = format,
             sourcePath = file.path,
             categoryIds = existing?.categoryIds ?: categoryIds.ifEmpty { library.defaultCategoryIds() },
@@ -69,6 +71,26 @@ class BookImporter(
         }
         library.upsertBook(book, chapters)
         return book
+    }
+
+    /** Rebuilds missing covers without changing book metadata, chapters, or reading progress. */
+    suspend fun refreshMissingCovers(
+        pdfContext: Context?,
+        sourceFile: (Book) -> File? = { File(it.sourcePath) },
+    ): Int {
+        var refreshed = 0
+        library.observeBooks().first().forEach { book ->
+            if (book.coverPath?.let(::isReadableFile) == true || book.format !in COVER_FORMATS) return@forEach
+            runCatching {
+                val source = sourceFile(book)?.takeIf { it.isFile && it.canRead() } ?: return@runCatching
+                val parsed = parse(source, book.format, pdfContext)
+                val coverPath = materializeCover(source, book.format, book.id, parsed.coverPath)
+                    ?: return@runCatching
+                library.updateBookDetails(book.copy(coverPath = coverPath))
+                refreshed++
+            }
+        }
+        return refreshed
     }
 
     /** Re-splits a txt/markdown/pdf [book] on [pattern] (null = its default chapters), skipping [excludedLines]. */
@@ -191,6 +213,10 @@ class BookImporter(
         isExtra = (this as? ParsedChapter.TextChapter)?.isExtra ?: false,
     )
 }
+
+private val COVER_FORMATS = setOf(BookFormat.EPUB, BookFormat.CBZ, BookFormat.CBR, BookFormat.FB2)
+
+private fun isReadableFile(path: String): Boolean = File(path).let { it.isFile && it.canRead() }
 
 private val LEADING_ID_PATTERN = Regex("^[0-9]{3,}[.\\-_\\s]+")
 

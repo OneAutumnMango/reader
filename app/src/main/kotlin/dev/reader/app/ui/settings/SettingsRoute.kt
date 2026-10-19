@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.documentfile.provider.DocumentFile
 import dev.reader.app.data.ReaderGraph
+import dev.reader.app.data.collectionDisplayName
 import dev.reader.app.ui.rememberImportActions
 import dev.reader.data.store.CollectionKind
 import dev.reader.data.store.PreferencesFile
@@ -45,12 +46,15 @@ fun LibrarySourcesRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         if (treeUri == null) return@rememberLauncherForActivityResult
         context.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         val kind = pendingKind
+        val providerName = runCatching { DocumentFile.fromTreeUri(context, treeUri)?.name }.getOrNull()
         scope.launch {
             graph.settings.update {
                 val uri = treeUri.toString()
                 it.copy(
                     rootFolders = (it.rootFolders + uri).distinct(),
                     rootFolderKinds = it.rootFolderKinds + (uri to kind),
+                    rootFolderNames = it.rootFolderNames +
+                        (uri to collectionDisplayName(treeUri, it.rootFolderNames[uri], providerName)),
                 )
             }
             scan { "Added collection, imported $it new item(s)" }
@@ -59,7 +63,8 @@ fun LibrarySourcesRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
 
     val rootFolders = preferences.rootFolders.map { uriString ->
         val uri = Uri.parse(uriString)
-        val name = DocumentFile.fromTreeUri(context, uri)?.name ?: uri.lastPathSegment ?: uriString
+        val providerName = runCatching { DocumentFile.fromTreeUri(context, uri)?.name }.getOrNull()
+        val name = collectionDisplayName(uri, preferences.rootFolderNames[uriString], providerName)
         RootFolderDisplay(uri = uriString, displayName = name, kind = preferences.rootFolderKinds[uriString])
     }
 
@@ -77,7 +82,11 @@ fun LibrarySourcesRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         onRemoveRootFolder = { uri ->
             scope.launch {
                 graph.settings.update {
-                    it.copy(rootFolders = it.rootFolders - uri, rootFolderKinds = it.rootFolderKinds - uri)
+                    it.copy(
+                        rootFolders = it.rootFolders - uri,
+                        rootFolderKinds = it.rootFolderKinds - uri,
+                        rootFolderNames = it.rootFolderNames - uri,
+                    )
                 }
             }
         },
