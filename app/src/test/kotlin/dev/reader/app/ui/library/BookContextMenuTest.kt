@@ -1,6 +1,11 @@
 package dev.reader.app.ui.library
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -178,5 +183,39 @@ class BookContextMenuTest {
 
         assertTrue(clicked)
         assertTrue(dismissed)
+    }
+
+    @Test
+    fun `detect chapters appears for supported formats and invokes its callback`() {
+        val htmlBook = book.copy(format = BookFormat.HTML)
+        var detected = false
+        var showHtml by mutableStateOf(true)
+        composeRule.setContent {
+            val selectedBook = if (showHtml) htmlBook else book
+            val detectChapters: (() -> Unit)? = if (selectedBook.supportsChapterDetection()) {
+                {
+                    detected = true
+                    showHtml = false
+                }
+            } else {
+                null
+            }
+            BookContextMenu(
+                book = selectedBook,
+                categories = categories,
+                onChangeCategories = {},
+                onRename = {},
+                onChangeCover = {},
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = {},
+                onDetectChapters = detectChapters,
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-detect-chapters").performClick()
+        assertTrue(detected)
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithTag("book-menu-detect-chapters").assertCountEquals(0)
     }
 }

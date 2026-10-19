@@ -4,6 +4,9 @@ import dev.reader.core.richtext.Block
 import dev.reader.parser.ParsedChapter
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.nio.charset.Charset
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.io.path.createTempFile
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -81,5 +84,33 @@ class Fb2ParserTest {
     fun `extracts the cover's base64 bytes`() {
         val bytes = Fb2Parser.extractCover(buildFb2(), "cover.jpg")
         assertEquals("hello", bytes?.let { String(it) })
+    }
+
+    @Test
+    fun `reads zipped fb2 chapters and cover using the declared charset`() {
+        val file = createTempFile(suffix = ".fb2.zip").toFile()
+        try {
+            val xml = """
+                <?xml version="1.0" encoding="ISO-8859-1"?>
+                <FictionBook><description><title-info><book-title>Café</book-title></title-info></description>
+                <body><section><title><p>Chapter</p></title><p>Olá</p></section></body>
+                <binary id="cover">aGVsbG8=</binary></FictionBook>
+            """.trimIndent()
+            ZipOutputStream(file.outputStream()).use { zip ->
+                zip.putNextEntry(ZipEntry("book/story.fb2"))
+                zip.write(xml.toByteArray(Charset.forName("ISO-8859-1")))
+                zip.closeEntry()
+            }
+
+            val book = Fb2Parser.parse(file)
+            val chapter = book.chapters.single() as ParsedChapter.TextChapter
+            assertEquals("Café", book.title)
+            val paragraph = chapter.document.blocks.filterIsInstance<Block.Paragraph>().single()
+            assertEquals("Olá", paragraph.spans.single().text)
+            assertEquals(chapter, Fb2Parser.parseChapter(file, 0))
+            assertEquals("hello", Fb2Parser.extractCover(file, "cover")?.let { String(it) })
+        } finally {
+            file.delete()
+        }
     }
 }

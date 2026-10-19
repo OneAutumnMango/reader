@@ -92,7 +92,7 @@ class RootFolderScanner(
                 originUri = entry.uri.toString(),
             )
         }
-        BookFormat.fromExtension(entry.name.orEmpty().substringAfterLast('.', "")) ?: return null
+        BookFormat.fromFileName(entry.name.orEmpty()) ?: return null
         val file = ContentFileCopier.copyDocumentToCache(context, entry)
         if (file == null) {
             AppLog.warn("Couldn't read a supported library-folder entry", "LibraryScan")
@@ -111,7 +111,7 @@ internal fun collectBookFiles(folder: DocumentFile, depth: Int = 0): List<Docume
         val name = entry.name.orEmpty()
         when {
             entry.isDirectory && !name.startsWith(".") -> collectBookFiles(entry, depth + 1)
-            entry.isFile && BookFormat.fromExtension(name.substringAfterLast('.', "")) != null -> listOf(entry)
+            entry.isFile && BookFormat.fromFileName(name) != null -> listOf(entry)
             else -> emptyList()
         }
     }

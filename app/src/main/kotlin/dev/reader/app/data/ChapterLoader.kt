@@ -8,16 +8,11 @@ import dev.reader.core.reader.PdfRenderMode
 import dev.reader.core.richtext.RichDocument
 import dev.reader.parser.ParsedBook
 import dev.reader.parser.ParsedChapter
+import dev.reader.parser.TextBookParser
 import dev.reader.parser.comic.ComicArchiveParser
-import dev.reader.parser.docx.DocxParser
 import dev.reader.parser.epub.EpubParser
 import dev.reader.parser.fb2.Fb2Parser
-import dev.reader.parser.html.HtmlParser
-import dev.reader.parser.markdown.MarkdownParser
-import dev.reader.parser.mobi.MobiParser
 import dev.reader.parser.pdf.PdfTextParser
-import dev.reader.parser.rtf.RtfParser
-import dev.reader.parser.text.TxtParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -32,11 +27,16 @@ object ChapterLoader {
             AppLog.debug("Loading ${book.format} chapter ${chapter.orderIndex + 1}", LOG_TAG)
             val result = runCatching {
                 val sourceFile = File(if (book.isLightNovel) chapter.sourcePath else book.sourcePath)
-                when (book.format) {
-                    BookFormat.CBZ, BookFormat.CBR -> loadComic(sourceFile, book.format)
-                    BookFormat.PDF -> loadPdf(context, sourceFile, book, chapter.orderIndex)
+                val format = if (book.isLightNovel) {
+                    BookFormat.fromFileName(sourceFile.name) ?: book.format
+                } else {
+                    book.format
+                }
+                when (format) {
+                    BookFormat.CBZ, BookFormat.CBR -> loadComic(sourceFile, format)
+                    BookFormat.PDF -> loadPdf(context, sourceFile, book.copy(format = format), chapter.orderIndex)
                     else -> loadText(sourceFile, book, chapter.orderIndex)?.let {
-                        ChapterContent.Text(BookImages.resolve(context, sourceFile, book.format, it.document))
+                        ChapterContent.Text(BookImages.resolve(context, sourceFile, format, it.document))
                     }
                 }
             }
@@ -82,26 +82,38 @@ object ChapterLoader {
 
     private fun loadText(file: File, book: Book, orderIndex: Int): ChapterContent.Text? {
         val isLightNovel = book.isLightNovel
+        val format = if (isLightNovel) {
+            BookFormat.fromFileName(file.name) ?: book.format
+        } else {
+            book.format
+        }
         val chapterIndex = if (isLightNovel) 0 else orderIndex
-        when (book.format) {
-            BookFormat.EPUB -> return EpubParser.parseChapter(file, chapterIndex)
-                ?.let { ChapterContent.Text(it.document) }
-            BookFormat.FB2 -> return Fb2Parser.parseChapter(file, chapterIndex)
-                ?.let { ChapterContent.Text(it.document) }
+        when (format) {
+            BookFormat.EPUB -> if (!isLightNovel) {
+                return EpubParser.parseChapter(file, chapterIndex)?.let { ChapterContent.Text(it.document) }
+            }
+            BookFormat.FB2 -> if (!isLightNovel) {
+                return Fb2Parser.parseChapter(file, chapterIndex)?.let { ChapterContent.Text(it.document) }
+            }
             else -> Unit
         }
-        val parsed = parseWholeBook(file, book)
-        val chapter = parsed.chapters.getOrNull(chapterIndex)
-        return (chapter as? ParsedChapter.TextChapter)?.let { ChapterContent.Text(it.document) }
+        val parsed = parseWholeBook(file, book.copy(format = format))
+        val chapters = parsed.chapters.filterIsInstance<ParsedChapter.TextChapter>()
+        val document = if (isLightNovel) {
+            RichDocument(chapters.flatMap { it.document.blocks })
+        } else {
+            chapters.getOrNull(chapterIndex)?.document ?: return null
+        }
+        return ChapterContent.Text(document)
     }
 
     private fun parseWholeBook(file: File, book: Book) = when (book.format) {
-        BookFormat.TXT -> TxtParser.parse(file, book.patternFor(), book.excludedLinesFor())
-        BookFormat.MARKDOWN -> MarkdownParser.parse(file, book.patternFor(), book.excludedLinesFor())
-        BookFormat.HTML -> HtmlParser.parse(file)
-        BookFormat.MOBI -> MobiParser.parse(file)
-        BookFormat.RTF -> RtfParser.parse(file)
-        BookFormat.DOCX -> DocxParser.parse(file)
+        BookFormat.EPUB -> EpubParser.parse(file)
+        BookFormat.FB2 -> Fb2Parser.parse(file)
+        BookFormat.TXT, BookFormat.MARKDOWN, BookFormat.HTML, BookFormat.MOBI, BookFormat.RTF, BookFormat.DOCX,
+        BookFormat.ODT,
+        ->
+            TextBookParser.parse(file, book.format, book.patternFor(), book.excludedLinesFor())
         else -> error("${book.format} has no text loader")
     }
 

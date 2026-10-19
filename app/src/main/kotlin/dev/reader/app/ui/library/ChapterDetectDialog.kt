@@ -45,6 +45,7 @@ import dev.reader.app.data.AppLog
 import dev.reader.app.data.ReaderGraph
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
+import dev.reader.parser.TextBookParser
 import dev.reader.parser.pdf.PdfTextParser
 import dev.reader.parser.text.ChapterBreak
 import dev.reader.parser.text.ChapterSplitter
@@ -60,18 +61,31 @@ enum class ChapterDetectMode { AUTO, STARTS_WITH, REGEX, PICK_LINES }
 
 /** Whether "Detect chapters" makes sense for [book]. */
 fun Book.supportsChapterDetection(): Boolean =
-    !isLightNovel && (format == BookFormat.TXT || format == BookFormat.MARKDOWN || format == BookFormat.PDF)
+    !isLightNovel && format in setOf(
+        BookFormat.TXT,
+        BookFormat.MARKDOWN,
+        BookFormat.HTML,
+        BookFormat.PDF,
+        BookFormat.MOBI,
+        BookFormat.RTF,
+        BookFormat.DOCX,
+        BookFormat.ODT,
+    )
 
 /** Loads [book]'s text and re-splits it with whatever pattern the user confirms. */
 @Composable
 fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val text by produceState<String?>(null, book.sourcePath) {
+    val text by produceState<String?>(null, book.sourcePath, book.format) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val file = File(book.sourcePath)
-                if (book.format == BookFormat.PDF) PdfTextParser(context).text(file) else file.readText()
+                if (book.format == BookFormat.PDF) {
+                    PdfTextParser(context).text(file)
+                } else {
+                    TextBookParser.detectionText(file, book.format)
+                }
             }
                 .onFailure { AppLog.error("Couldn't read book for chapter detection", "ChapterDetection", it) }
                 .getOrDefault("")
@@ -97,7 +111,7 @@ fun ChapterDetectHost(graph: ReaderGraph, book: Book, onDismiss: () -> Unit) {
 }
 
 /**
- * Lets the user pick how a txt/markdown book is split: auto-detected headings, lines starting with
+ * Lets the user pick how a supported text book is split: auto-detected headings, lines starting with
  * some text (e.g. `# ` or `Chapter`), or a regex — previewing every break before applying, and
  * letting them manually drop any detected break they don't actually want to be a chapter.
  * [onApply]'s pattern is null for "no chapters, keep it as one".

@@ -17,6 +17,8 @@ class RootFolderScannerTest {
         try {
             fun touch(path: String) = File(root, path).apply { parentFile?.mkdirs() }.writeText("x")
             touch("top.epub")
+            touch("Novel.fb2.zip")
+            touch("Palm document.prc")
             touch("Series/Book 1.txt")
             touch("Series/Volume 2/Book 2.pdf")
             touch("Series/cover.jpg")
@@ -25,7 +27,10 @@ class RootFolderScannerTest {
 
             val found = collectBookFiles(DocumentFile.fromFile(root)).mapNotNull { it.name }.sorted()
 
-            assertEquals(listOf("Book 1.txt", "Book 2.pdf", "top.epub"), found)
+            assertEquals(
+                listOf("Book 1.txt", "Book 2.pdf", "Novel.fb2.zip", "Palm document.prc", "top.epub"),
+                found,
+            )
         } finally {
             root.deleteRecursively()
         }

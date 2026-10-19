@@ -6,6 +6,8 @@ import dev.reader.core.model.Progress
 import dev.reader.data.repo.LibraryRepository
 import dev.reader.data.repo.ProgressRepository
 import dev.reader.data.room.ReaderDatabase
+import dev.reader.parser.TextBookParser
+import dev.reader.parser.text.ChapterSplitter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -246,6 +248,43 @@ class BookImporterTest {
     }
 
     @Test
+    fun `rich text formats use canonical lines for chapter detection and persist custom splits`() = runBlocking {
+        val files = listOf(
+            File(tempDir, "html-book.html").apply {
+                writeText(
+                    """
+                    <html><body><p>Chapter 1</p><p>One.</p><p>Chapter 2</p><p>Two.</p></body></html>
+                    """.trimIndent(),
+                )
+            },
+            File(tempDir, "rtf-book.rtf").apply {
+                writeText(
+                    "{\\rtf1\\ansi Chapter 1\\par\\par One.\\par\\par " +
+                        "Chapter 2\\par\\par Two.}",
+                )
+            },
+            createDocx("docx-book.docx"),
+        )
+        val library = LibraryRepository(database)
+
+        files.forEach { file ->
+            val imported = importer.importFile(file)
+            val detectionText = TextBookParser.detectionText(file, imported.format)
+            assertEquals(
+                listOf("Chapter 1", "Chapter 2"),
+                ChapterSplitter.breaks(detectionText, "^Chapter").map { it.title },
+            )
+
+            val split = importer.applyChapterPattern(imported, "^Chapter")
+            assertEquals(listOf("Chapter 1", "Chapter 2"), library.chapters(split.id).map { it.title })
+            assertEquals(
+                listOf("Chapter 1", "Chapter 2"),
+                library.chapters(importer.importFile(file).id).map { it.title },
+            )
+        }
+    }
+
+    @Test
     fun `new books land in the default category`() = runBlocking {
         val library = LibraryRepository(database)
         val manga = dev.reader.core.model.Category(dev.reader.core.model.CategoryId("manga"), "Manga")
@@ -303,6 +342,25 @@ class BookImporterTest {
             )
             entry("OEBPS/chapter1.xhtml", "<html><body><p>Hi.</p></body></html>".toByteArray())
             entry("OEBPS/cover.jpg", byteArrayOf(1, 2, 3, 4))
+        }
+    }
+
+    private fun createDocx(name: String): File = File(tempDir, name).apply {
+        java.util.zip.ZipOutputStream(outputStream()).use { zip ->
+            zip.putNextEntry(java.util.zip.ZipEntry("word/document.xml"))
+            zip.write(
+                """
+                <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                    <w:body>
+                        <w:p><w:r><w:t>Chapter 1</w:t></w:r></w:p>
+                        <w:p><w:r><w:t>One.</w:t></w:r></w:p>
+                        <w:p><w:r><w:t>Chapter 2</w:t></w:r></w:p>
+                        <w:p><w:r><w:t>Two.</w:t></w:r></w:p>
+                    </w:body>
+                </w:document>
+                """.trimIndent().toByteArray(),
+            )
+            zip.closeEntry()
         }
     }
 }

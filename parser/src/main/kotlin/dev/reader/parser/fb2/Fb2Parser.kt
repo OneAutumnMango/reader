@@ -9,24 +9,46 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
 import java.io.File
+import java.io.InputStream
 import java.util.Base64
+import java.util.zip.ZipFile
 
 /** FictionBook 2 reader: each top-level `<section>` in the main `<body>` becomes a chapter. */
 object Fb2Parser {
 
-    fun parse(file: File): ParsedBook = parse(file.readText(), file.nameWithoutExtension)
+    fun parse(file: File): ParsedBook = withFb2Stream(file) { input ->
+        val fallbackTitle = file.nameWithoutExtension.let { name ->
+            if (name.endsWith(FB2_EXTENSION, true)) name.dropLast(FB2_EXTENSION.length) else name
+        }
+        parse(input, fallbackTitle)
+    }
 
     fun parseChapter(file: File, orderIndex: Int): ParsedChapter.TextChapter? =
         parse(file).chapters.getOrNull(orderIndex) as? ParsedChapter.TextChapter
 
     fun extractCover(file: File, binaryId: String): ByteArray? = runCatching {
-        val doc = Jsoup.parse(file.readText(), "", Parser.xmlParser())
-        val binary = doc.select("binary[id=$binaryId]").firstOrNull() ?: return null
-        Base64.getMimeDecoder().decode(binary.text().trim())
+        withFb2Stream(file) { input ->
+            val doc = Jsoup.parse(input, null, "", Parser.xmlParser())
+            val binary = doc.select("binary[id=$binaryId]").firstOrNull() ?: return@withFb2Stream null
+            Base64.getMimeDecoder().decode(binary.text().trim())
+        }
     }.getOrNull()
 
-    private fun parse(xml: String, fallbackTitle: String): ParsedBook {
-        val doc = Jsoup.parse(xml, "", Parser.xmlParser())
+    private fun <T> withFb2Stream(file: File, action: (InputStream) -> T): T {
+        val signature = file.inputStream().use { it.readNBytes(ZIP_SIGNATURE.length) }
+        val isZip = signature.contentEquals(ZIP_SIGNATURE.encodeToByteArray())
+        if (!isZip) return file.inputStream().use(action)
+
+        return ZipFile(file).use { zip ->
+            val entry = zip.entries().asSequence()
+                .firstOrNull { !it.isDirectory && it.name.endsWith(FB2_EXTENSION, true) }
+                ?: error("Not a valid FB2 archive: missing .fb2 entry")
+            zip.getInputStream(entry).use(action)
+        }
+    }
+
+    private fun parse(input: InputStream, fallbackTitle: String): ParsedBook {
+        val doc = Jsoup.parse(input, null, "", Parser.xmlParser())
         val titleInfo = doc.selectFirst("description > title-info")
         val bookTitle: String? = titleInfo?.selectFirst("book-title")?.text()?.trim()
         val title = bookTitle.orEmpty().ifBlank { fallbackTitle }
@@ -69,4 +91,7 @@ object Fb2Parser {
         }
         return parseHtmlToRichDocument(content.html())
     }
+
+    private const val FB2_EXTENSION = ".fb2"
+    private const val ZIP_SIGNATURE = "PK"
 }

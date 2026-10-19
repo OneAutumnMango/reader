@@ -7,13 +7,19 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
+import dev.reader.core.model.Book
+import dev.reader.core.model.BookFormat
+import dev.reader.core.model.BookId
 import dev.reader.parser.text.ChapterSplitter
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Clock
 
 @RunWith(RobolectricTestRunner::class)
 class ChapterDetectDialogTest {
@@ -24,6 +30,26 @@ class ChapterDetectDialogTest {
     private val text = "Chapter 1\n\nOne.\n\nChapter 2\n\nTwo.\n\n~ Interlude\n\nThree."
     private var applied: String? = "unset"
     private var appliedExcluded: Set<Int> = setOf(-1)
+
+    @Test
+    fun `chapter detection is available only for standalone supported text formats`() {
+        val supported = setOf(
+            BookFormat.TXT,
+            BookFormat.MARKDOWN,
+            BookFormat.HTML,
+            BookFormat.PDF,
+            BookFormat.MOBI,
+            BookFormat.RTF,
+            BookFormat.DOCX,
+            BookFormat.ODT,
+        )
+
+        supported.forEach { assertTrue(book(it).supportsChapterDetection()) }
+        listOf(BookFormat.EPUB, BookFormat.FB2, BookFormat.CBZ, BookFormat.CBR).forEach {
+            assertFalse(book(it).supportsChapterDetection())
+        }
+        assertFalse(book(BookFormat.HTML, isLightNovel = true).supportsChapterDetection())
+    }
 
     private fun setContent(
         currentExcludedLines: Set<Int> = emptySet(),
@@ -41,6 +67,15 @@ class ChapterDetectDialogTest {
             currentExcludedLines = currentExcludedLines,
         )
     }
+
+    private fun book(format: BookFormat, isLightNovel: Boolean = false) = Book(
+        id = BookId("detect-$format-$isLightNovel"),
+        title = "Book",
+        format = format,
+        sourcePath = "/book.${format.name.lowercase()}",
+        isLightNovel = isLightNovel,
+        addedAt = Clock.System.now(),
+    )
 
     @Test
     fun `auto-detect previews the chapters it found and applies its pattern`() {
