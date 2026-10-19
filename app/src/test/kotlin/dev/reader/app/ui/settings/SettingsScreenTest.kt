@@ -23,8 +23,8 @@ class SettingsScreenTest {
     private fun setContent() = composeRule.setContent {
         SettingsScreen(
             onAppearanceClick = { clickedDestinations += "appearance" },
-            onLibrarySourcesClick = { clickedDestinations += "sources" },
-            onCategoriesClick = { clickedDestinations += "categories" },
+            onReaderClick = { clickedDestinations += "reader" },
+            onLibraryClick = { clickedDestinations += "library" },
             onDataClick = { clickedDestinations += "data" },
         )
     }
@@ -33,12 +33,12 @@ class SettingsScreenTest {
     fun `settings links invoke their destination callbacks`() {
         setContent()
 
-        composeRule.onNodeWithText("Appearance and reader").performClick()
-        composeRule.onNodeWithText("Library sources").performClick()
-        composeRule.onNodeWithText("Categories").performClick()
+        composeRule.onNodeWithText("App appearance").performClick()
+        composeRule.onNodeWithText("Reader settings").performClick()
+        composeRule.onNodeWithText("Library settings").performClick()
         composeRule.onNodeWithText("Backup and reset").performClick()
 
-        assertContentEquals(listOf("appearance", "sources", "categories", "data"), clickedDestinations)
+        assertContentEquals(listOf("appearance", "reader", "library", "data"), clickedDestinations)
     }
 
     @Test

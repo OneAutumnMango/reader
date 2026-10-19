@@ -12,8 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.HorizontalDivider
@@ -29,8 +28,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SettingsScreen(
     onAppearanceClick: () -> Unit,
-    onLibrarySourcesClick: () -> Unit,
-    onCategoriesClick: () -> Unit,
+    onReaderClick: () -> Unit,
+    onLibraryClick: () -> Unit,
     onDataClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -38,13 +37,16 @@ fun SettingsScreen(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(top = 16.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SettingsSection("Preferences") {
-            SettingsLink("Appearance and reader", Icons.Filled.Palette, onAppearanceClick)
+        SettingsSection("Appearance") {
+            SettingsLink("App appearance", Icons.Filled.Palette, onAppearanceClick)
+        }
+        HorizontalDivider()
+        SettingsSection("Reader") {
+            SettingsLink("Reader settings", Icons.AutoMirrored.Filled.LibraryBooks, onReaderClick)
         }
         HorizontalDivider()
         SettingsSection("Library") {
-            SettingsLink("Library sources", Icons.Filled.Folder, onLibrarySourcesClick)
-            SettingsLink("Categories", Icons.Filled.Category, onCategoriesClick)
+            SettingsLink("Library settings", Icons.AutoMirrored.Filled.LibraryBooks, onLibraryClick)
         }
         HorizontalDivider()
         SettingsSection("Data") {

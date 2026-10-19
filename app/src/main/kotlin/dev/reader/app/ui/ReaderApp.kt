@@ -11,8 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.QueryStats
@@ -44,8 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.appearance.AppearanceRoute
+import dev.reader.app.ui.appearance.ReaderSettingsRoute
 import dev.reader.app.ui.bookmarks.BookmarksRoute
-import dev.reader.app.ui.categories.CategoriesRoute
 import dev.reader.app.ui.data.DataRoute
 import dev.reader.app.ui.library.BookDetailRoute
 import dev.reader.app.ui.library.BookDetailState
@@ -53,7 +52,7 @@ import dev.reader.app.ui.library.BookInfoRoute
 import dev.reader.app.ui.library.LibraryRoute
 import dev.reader.app.ui.reader.ReaderRoute
 import dev.reader.app.ui.search.SearchRoute
-import dev.reader.app.ui.settings.LibrarySourcesRoute
+import dev.reader.app.ui.settings.LibrarySettingsRoute
 import dev.reader.app.ui.settings.LogHistoryRoute
 import dev.reader.app.ui.settings.SettingsRoute
 import dev.reader.app.ui.stats.StatsRoute
@@ -68,10 +67,10 @@ private fun titleFor(destination: Destination): String = when (destination) {
     Destination.Search -> "Search"
     Destination.Stats -> "Stats"
     Destination.Appearance -> "Appearance"
+    Destination.ReaderSettings -> "Reader"
+    Destination.LibrarySettings -> "Library"
     Destination.Data -> "Data"
     Destination.Settings -> "Settings"
-    Destination.LibrarySources -> "Library sources"
-    Destination.Categories -> "Categories"
     Destination.LogHistory -> "Logs"
     is Destination.BookDetail -> "Book"
     is Destination.BookInfo -> "Details"
@@ -116,26 +115,31 @@ fun ReaderApp(graph: ReaderGraph) {
                             selectDestination(it)
                         }
                         DrawerItem(
-                            Destination.LibrarySources,
-                            "Library sources",
-                            Icons.Filled.Folder,
+                            Destination.LibrarySettings,
+                            "Library settings",
+                            Icons.Filled.Settings,
                             navigator.current,
                         ) {
-                            selectDestination(it)
-                        }
-                        DrawerItem(Destination.Categories, "Categories", Icons.Filled.Category, navigator.current) {
                             selectDestination(it)
                         }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     DrawerSection("Reading") {
+                        DrawerItem(
+                            Destination.ReaderSettings,
+                            "Reader settings",
+                            Icons.AutoMirrored.Filled.LibraryBooks,
+                            navigator.current,
+                        ) {
+                            selectDestination(it)
+                        }
                         DrawerItem(Destination.Stats, "Stats", Icons.Filled.QueryStats, navigator.current) {
                             selectDestination(it)
                         }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     DrawerSection("Application") {
-                        DrawerItem(Destination.Appearance, "Appearance", Icons.Filled.Palette, navigator.current) {
+                        DrawerItem(Destination.Appearance, "App appearance", Icons.Filled.Palette, navigator.current) {
                             selectDestination(it)
                         }
                         DrawerItem(Destination.Data, "Data", Icons.Filled.Storage, navigator.current) {
@@ -207,16 +211,16 @@ fun ReaderApp(graph: ReaderGraph) {
                     )
                     Destination.Stats -> StatsRoute(graph, content)
                     Destination.Appearance -> AppearanceRoute(graph, content)
-                    Destination.Categories -> CategoriesRoute(graph, content)
+                    Destination.ReaderSettings -> ReaderSettingsRoute(graph, content)
+                    Destination.LibrarySettings -> LibrarySettingsRoute(graph, content)
                     Destination.Data -> DataRoute(graph, content)
                     Destination.Settings -> SettingsRoute(
                         onAppearanceClick = { navigator.switchRoot(Destination.Appearance) },
-                        onLibrarySourcesClick = { navigator.switchRoot(Destination.LibrarySources) },
-                        onCategoriesClick = { navigator.switchRoot(Destination.Categories) },
+                        onReaderClick = { navigator.switchRoot(Destination.ReaderSettings) },
+                        onLibraryClick = { navigator.switchRoot(Destination.LibrarySettings) },
                         onDataClick = { navigator.switchRoot(Destination.Data) },
                         modifier = content,
                     )
-                    Destination.LibrarySources -> LibrarySourcesRoute(graph, content)
                     Destination.LogHistory -> LogHistoryRoute(content)
                     is Destination.BookDetail -> BookDetailRoute(
                         graph,

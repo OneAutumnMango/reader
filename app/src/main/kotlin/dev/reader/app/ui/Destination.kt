@@ -8,10 +8,10 @@ sealed interface Destination {
     data object Search : Destination
     data object Stats : Destination
     data object Appearance : Destination
+    data object ReaderSettings : Destination
+    data object LibrarySettings : Destination
     data object Data : Destination
     data object Settings : Destination
-    data object LibrarySources : Destination
-    data object Categories : Destination
     data object LogHistory : Destination
     data class BookDetail(val bookId: BookId) : Destination
     data class BookInfo(val bookId: BookId) : Destination

@@ -6,15 +6,15 @@ import androidx.compose.ui.Modifier
 @Composable
 fun SettingsRoute(
     onAppearanceClick: () -> Unit,
-    onLibrarySourcesClick: () -> Unit,
-    onCategoriesClick: () -> Unit,
+    onReaderClick: () -> Unit,
+    onLibraryClick: () -> Unit,
     onDataClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SettingsScreen(
         onAppearanceClick = onAppearanceClick,
-        onLibrarySourcesClick = onLibrarySourcesClick,
-        onCategoriesClick = onCategoriesClick,
+        onReaderClick = onReaderClick,
+        onLibraryClick = onLibraryClick,
         onDataClick = onDataClick,
         modifier = modifier,
     )
