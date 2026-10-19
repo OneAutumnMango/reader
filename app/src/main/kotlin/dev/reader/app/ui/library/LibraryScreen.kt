@@ -73,7 +73,7 @@ fun LibraryScreen(
             LazyVerticalGrid(
                 state = gridStateFor(category) ?: rememberLazyGridState(),
                 columns = GridCells.Adaptive(minSize = layout.gridColumnMinWidthDp.dp),
-                contentPadding = PaddingValues(4.dp),
+                contentPadding = PaddingValues(6.dp),
                 modifier = Modifier.fillMaxSize().testTag("library-grid"),
             ) {
                 items(pageBooks, key = { it.id.value }) { book ->
@@ -84,7 +84,7 @@ fun LibraryScreen(
                         onClick = { onBookClick(book) },
                         onLongClick = { onBookLongClick(book) },
                         selected = book.id in selectedBookIds,
-                        modifier = Modifier.padding(4.dp),
+                        modifier = Modifier.padding(2.dp),
                     )
                 }
             }
