@@ -20,6 +20,8 @@ data class Span(
     /** CSS colour override; null means "use the reader theme's text colour". */
     val color: Long? = null,
     val highlighted: Boolean = false,
+    /** Non-null when this span belongs to a saved highlight or note bookmark. */
+    val bookmarkId: String? = null,
 )
 
 fun RichDocument.wordCount(): Int = blocks.sumOf { it.wordCount() }

@@ -41,7 +41,7 @@ fun BookCard(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .testTag("book-card-${book.id.value}"),
     ) {
-        Column(modifier = Modifier.padding(4.dp)) {
+        Column(modifier = Modifier.padding(2.dp)) {
             Box(modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO)) {
                 BookCover(book, modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO))
                 when {

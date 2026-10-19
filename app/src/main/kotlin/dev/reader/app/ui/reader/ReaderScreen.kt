@@ -36,6 +36,7 @@ fun ReaderScreen(
     highlight: Regex? = null,
     jump: BlockJump? = null,
     onSelectionAction: (SelectionAction, String) -> Unit = { _, _ -> },
+    onBookmarkTap: ((String) -> Unit)? = null,
 ) {
     KeepScreenAwakeEffect(settings.keepScreenAwake)
     val selectionToolbar = remember { ReaderSelectionToolbar() }
@@ -74,6 +75,7 @@ fun ReaderScreen(
                             onPageChanged,
                             highlight,
                             jump,
+                            onBookmarkTap,
                         )
                         else -> PagedReader(
                             document,
@@ -84,6 +86,7 @@ fun ReaderScreen(
                             onPageChanged,
                             highlight,
                             jump,
+                            onBookmarkTap,
                         )
                     }
                 }

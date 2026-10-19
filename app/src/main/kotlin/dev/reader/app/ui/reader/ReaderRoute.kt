@@ -2,11 +2,15 @@ package dev.reader.app.ui.reader
 
 import android.os.SystemClock
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -370,6 +376,12 @@ private fun ChapterPage(
         }
     }
 
+    var tappedBookmark by remember(chapter.id) { mutableStateOf<Bookmark?>(null) }
+
+    fun onBookmarkTap(bookmarkId: String) {
+        tappedBookmark = bookmarks.firstOrNull { it.id.value == bookmarkId }
+    }
+
     when {
         loaded is ChapterContent.Text && startFraction != null -> ReaderScreen(
             document = remember(loaded.document, bookmarks, chapter.id) {
@@ -384,6 +396,7 @@ private fun ChapterPage(
             highlight = highlight,
             jump = jump,
             onSelectionAction = ::onSelectionAction,
+            onBookmarkTap = ::onBookmarkTap,
         )
         loaded is ChapterContent.Comic && startFraction != null -> ComicReaderScreen(
             file = loaded.file,
@@ -433,6 +446,44 @@ private fun ChapterPage(
             },
             dismissButton = {
                 TextButton(onClick = { noteSelection = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    tappedBookmark?.let { bookmark ->
+        val isNote = bookmark.note.startsWith("[Note]\n")
+        val quote = when {
+            isNote -> bookmark.note.removePrefix("[Note]\n").substringBefore("\n\n").trim()
+            bookmark.note.startsWith("[Highlight]\n") -> bookmark.note.removePrefix("[Highlight]\n").trim()
+            else -> bookmark.note
+        }
+        val noteContent = if (isNote) bookmark.note.substringAfter("\n\n", "").trim() else ""
+        AlertDialog(
+            onDismissRequest = { tappedBookmark = null },
+            title = { Text(if (isNote) "Note" else "Highlight") },
+            text = {
+                Column {
+                    Text(
+                        quote,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontStyle = FontStyle.Italic,
+                    )
+                    if (noteContent.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(noteContent)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch { graph.bookmarks.remove(bookmark) }
+                        tappedBookmark = null
+                    },
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { tappedBookmark = null }) { Text("Close") }
             },
         )
     }

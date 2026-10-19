@@ -12,10 +12,13 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -109,6 +112,7 @@ fun CategoryPickerForBooks(
     initial: Set<CategoryId>,
     onConfirm: (Set<CategoryId>) -> Unit,
     onDismiss: () -> Unit,
+    singleCategoryPerBook: Boolean = false,
 ) {
     var picked by remember { mutableStateOf(initial) }
     AlertDialog(
@@ -116,21 +120,43 @@ fun CategoryPickerForBooks(
         title = { Text("Change category") },
         text = {
             Column {
+                if (singleCategoryPerBook) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { onConfirm(emptySet()) }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = picked.isEmpty(), onClick = null)
+                        Text("No category", modifier = Modifier.padding(start = 8.dp).weight(1f))
+                    }
+                    HorizontalDivider()
+                }
                 categories.forEach { category ->
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = category.id in picked,
-                            onCheckedChange = { checked ->
-                                picked = if (checked) picked + category.id else picked - category.id
-                            },
-                        )
-                        Text(category.name)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (singleCategoryPerBook) {
+                                onConfirm(if (category.id in picked) emptySet() else setOf(category.id))
+                            } else {
+                                picked = if (category.id in picked) picked - category.id else picked + category.id
+                            }
+                        }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (singleCategoryPerBook) {
+                            RadioButton(selected = category.id in picked, onClick = null)
+                        } else {
+                            Checkbox(checked = category.id in picked, onCheckedChange = null)
+                        }
+                        Text(category.name, modifier = Modifier.padding(start = 8.dp).weight(1f))
                     }
                     HorizontalDivider()
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(picked) }) { Text("Save") } },
+        confirmButton = {
+            if (!singleCategoryPerBook) {
+                TextButton(onClick = { onConfirm(picked) }) { Text("Save") }
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

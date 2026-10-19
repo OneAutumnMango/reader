@@ -154,7 +154,7 @@ class BookContextMenuTest {
         }
         composeRule.onNodeWithTag("book-menu-change-category").performClick()
         composeRule.onNodeWithText("Comics").performClick()
-        composeRule.onNodeWithText("Save").performClick()
+        // In single-category mode, clicking immediately confirms — no Save button.
         assertEquals(setOf(comics), selected)
     }
 

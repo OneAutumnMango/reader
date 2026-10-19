@@ -35,6 +35,7 @@ fun ContinuousReader(
     onPositionChanged: (index: Int, total: Int) -> Unit = { _, _ -> },
     highlight: Regex? = null,
     jump: BlockJump? = null,
+    onBookmarkTap: ((String) -> Unit)? = null,
 ) {
     val initialIndex = (initialPositionFraction * document.blocks.size)
         .toInt()
@@ -67,7 +68,7 @@ fun ContinuousReader(
             contentPadding = PaddingValues(top = READER_TOP_SPACING, bottom = READER_BOTTOM_SPACING),
             verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp),
         ) {
-            items(document.blocks) { block -> ReaderBlock(block, theme, settings.useBookStyling, highlight) }
+            items(document.blocks) { block -> ReaderBlock(block, theme, settings.useBookStyling, highlight, onBookmarkTap) }
         }
     }
 
@@ -79,22 +80,25 @@ fun ContinuousReader(
 }
 
 @Composable
-private fun ReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean, highlight: Regex?) {
+private fun ReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean, highlight: Regex?, onBookmarkTap: ((String) -> Unit)?) {
     when (block) {
-        is Block.Paragraph -> Text(
+        is Block.Paragraph -> BookmarkAwareText(
             text = block.spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling).highlighted(highlight),
             style = theme.bodyTextStyle(block.textAlign, useBookStyling),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            onBookmarkTap = onBookmarkTap,
         )
-        is Block.Heading -> Text(
+        is Block.Heading -> BookmarkAwareText(
             text = block.spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling).highlighted(highlight),
             style = theme.headingTextStyle(block.level, block.textAlign, useBookStyling),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            onBookmarkTap = onBookmarkTap,
         )
-        is Block.ListItem -> Text(
+        is Block.ListItem -> BookmarkAwareText(
             text = block.spans.toAnnotatedString(theme.wordSpacingSp, useBookStyling).highlighted(highlight),
             style = theme.bodyTextStyle(useBookStyling = useBookStyling),
             modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp),
+            onBookmarkTap = onBookmarkTap,
         )
         is Block.Image -> ReaderImage(
             block,

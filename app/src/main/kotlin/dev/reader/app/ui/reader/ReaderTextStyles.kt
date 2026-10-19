@@ -104,7 +104,9 @@ fun List<Span>.toAnnotatedString(
                 textDecoration = if (span.underline) TextDecoration.Underline else null,
             ),
         ) {
+            val start = length
             append(span.text)
+            span.bookmarkId?.let { id -> addStringAnnotation("bookmark", id, start, length) }
         }
     }
     if (wordSpacingSp != 0f) {

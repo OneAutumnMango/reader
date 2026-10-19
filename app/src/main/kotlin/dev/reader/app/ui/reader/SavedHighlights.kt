@@ -18,22 +18,29 @@ internal fun RichDocument.withSavedHighlights(bookmarks: List<Bookmark>): RichDo
     val texts = spansByBlock.map { spans -> spans.joinToString("") { it.text } }
     val starts = texts.runningFold(0) { offset, text -> offset + text.length + 1 }
     val text = texts.joinToString("\n")
-    val ranges = bookmarks.mapNotNull { bookmark ->
-        val quote = bookmark.note.takeIf { it.startsWith("[Highlight]\n") }
-            ?.removePrefix("[Highlight]\n")?.trim().orEmpty()
-        if (quote.isEmpty()) return@mapNotNull null
+    val rangesWithId = bookmarks.mapNotNull { bookmark ->
+        val quote = when {
+            bookmark.note.startsWith("[Highlight]\n") -> bookmark.note.removePrefix("[Highlight]\n").trim()
+            bookmark.note.startsWith("[Note]\n") ->
+                bookmark.note.removePrefix("[Note]\n").substringBefore("\n\n").trim()
+            else -> null
+        }
+        if (quote.isNullOrEmpty()) return@mapNotNull null
         val pattern = quote.split(Regex("\\s+")).joinToString("\\s+") { Regex.escape(it) }.toRegex()
-        pattern.findAll(text).minByOrNull { match ->
+        val range = pattern.findAll(text).minByOrNull { match ->
             val blockIndex = starts.indexOfLast { it <= match.range.first }.coerceAtMost(blocks.lastIndex)
             abs(blockIndex.toFloat() / blocks.size.coerceAtLeast(1) - bookmark.position)
-        }?.range
+        }?.range ?: return@mapNotNull null
+        range to bookmark.id.value
     }
-    if (ranges.isEmpty()) return this
+    if (rangesWithId.isEmpty()) return this
+    val ranges = rangesWithId.map { it.first }
+    val rangeToId = rangesWithId.toMap()
     return copy(
         blocks = blocks.mapIndexed { index, block ->
             var offset = starts[index]
             val spans = spansByBlock[index].flatMap { span ->
-                val highlighted = span.withHighlightRanges(offset, ranges)
+                val highlighted = span.withHighlightRanges(offset, ranges, rangeToId)
                 offset += span.text.length
                 highlighted
             }
@@ -47,15 +54,17 @@ internal fun RichDocument.withSavedHighlights(bookmarks: List<Bookmark>): RichDo
     )
 }
 
-private fun Span.withHighlightRanges(offset: Int, ranges: List<IntRange>): List<Span> {
+private fun Span.withHighlightRanges(offset: Int, ranges: List<IntRange>, rangeToId: Map<IntRange, String>): List<Span> {
     val highlightBoundaries = ranges.flatMap { range ->
         listOf((range.first - offset).coerceIn(0, text.length), (range.last + 1 - offset).coerceIn(0, text.length))
     }
     val boundaries = (listOf(0, text.length) + highlightBoundaries).distinct().sorted()
     return boundaries.zipWithNext { start, end ->
+        val activeRange = ranges.firstOrNull { offset + start in it }
         copy(
             text = text.substring(start, end),
-            highlighted = highlighted || ranges.any { offset + start in it },
+            highlighted = highlighted || activeRange != null,
+            bookmarkId = bookmarkId ?: activeRange?.let { rangeToId[it] },
         )
     }
 }

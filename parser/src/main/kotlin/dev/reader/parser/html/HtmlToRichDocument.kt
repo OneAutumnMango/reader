@@ -66,10 +66,13 @@ private fun Element.imageBlock() = Block.Image(
     attr("alt"),
 )
 
-private fun Element.isSvgFallbackImage(): Boolean =
-    tagName() == "img" && parents().any { ancestor ->
-        ancestor.tagName() == "svg" && ancestor.selectFirst("image") != null
-    }
+private fun Element.isSvgFallbackImage(): Boolean {
+    if (tagName() != "img") return false
+    // Inside an SVG that also has an <image> element
+    if (parents().any { ancestor -> ancestor.tagName() == "svg" && ancestor.selectFirst("image") != null }) return true
+    // Immediately after an SVG that contains <image> — the common EPUB fallback pattern
+    return previousElementSibling()?.let { it.tagName() == "svg" && it.selectFirst("image") != null } == true
+}
 
 private fun appendTextBlocks(
     element: Element,

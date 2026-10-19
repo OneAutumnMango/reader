@@ -203,6 +203,7 @@ fun LibraryRoute(
                 CategoryPickerForBooks(
                     categories = categories,
                     initial = commonCategories,
+                    singleCategoryPerBook = preferences?.singleCategoryPerBook == true,
                     onConfirm = { ids ->
                         scope.launch {
                             val selectedCategories = if (preferences?.singleCategoryPerBook == true) {

@@ -42,6 +42,7 @@ fun PagedReader(
     onPageChanged: (index: Int, pageCount: Int) -> Unit = { _, _ -> },
     highlight: Regex? = null,
     jump: BlockJump? = null,
+    onBookmarkTap: ((String) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val density = LocalDensity.current
@@ -93,7 +94,7 @@ fun PagedReader(
             ) {
                 val content: @Composable () -> Unit = {
                     Column(verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp)) {
-                        pages.getOrNull(index)?.forEach { PagedReaderBlock(it.value, theme, useBookStyling, highlight) }
+                        pages.getOrNull(index)?.forEach { PagedReaderBlock(it.value, theme, useBookStyling, highlight, onBookmarkTap) }
                     }
                 }
                 if (settings.selectableText) SelectionContainer { content() } else content()
@@ -177,14 +178,15 @@ private fun Block.styleOf(theme: ReaderTheme, useBookStyling: Boolean) = when (t
 }
 
 @Composable
-private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean, highlight: Regex?) {
+private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean, highlight: Regex?, onBookmarkTap: ((String) -> Unit)?) {
     if (block is Block.Image) {
         ReaderImage(block, Modifier.fillMaxSize())
     } else {
-        Text(
+        BookmarkAwareText(
             text = block.annotated(theme, useBookStyling).highlighted(highlight),
             style = block.styleOf(theme, useBookStyling),
             modifier = Modifier.fillMaxWidth(),
+            onBookmarkTap = onBookmarkTap,
         )
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -146,41 +147,51 @@ private fun CategoryPickerDialog(
         text = {
             Column {
                 if (singleCategoryPerBook) {
-                    CategoryChoice("No category", selected.isEmpty(), "category-picker-none") {
-                        onConfirm(emptySet())
-                    }
+                    CategoryChoice(
+                        label = "No category",
+                        checked = picked.isEmpty(),
+                        tag = "category-picker-none",
+                        single = true,
+                    ) { onConfirm(emptySet()) }
                 }
                 categories.forEach { category ->
                     CategoryChoice(
-                        category.name,
-                        category.id in picked,
-                        "category-picker-${category.id.value}",
+                        label = category.name,
+                        checked = category.id in picked,
+                        tag = "category-picker-${category.id.value}",
+                        single = singleCategoryPerBook,
                     ) {
-                        picked = if (singleCategoryPerBook) {
-                            if (category.id in picked) emptySet() else setOf(category.id)
-                        } else if (category.id in picked) {
-                            picked - category.id
+                        if (singleCategoryPerBook) {
+                            onConfirm(if (category.id in picked) emptySet() else setOf(category.id))
                         } else {
-                            picked + category.id
+                            picked = if (category.id in picked) picked - category.id else picked + category.id
                         }
                     }
                     HorizontalDivider()
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(picked) }) { Text("Save") } },
+        confirmButton = {
+            if (!singleCategoryPerBook) {
+                TextButton(onClick = { onConfirm(picked) }) { Text("Save") }
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
 @Composable
-private fun CategoryChoice(label: String, checked: Boolean, tag: String, onClick: () -> Unit) {
+private fun CategoryChoice(label: String, checked: Boolean, tag: String, single: Boolean = false, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().testTag(tag).clickable(onClick = onClick).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(checked = checked, onCheckedChange = null)
-        Text(label, modifier = Modifier.padding(start = 8.dp))
+        if (single) {
+            RadioButton(selected = checked, onClick = null)
+        } else {
+            Checkbox(checked = checked, onCheckedChange = null)
+        }
+        Text(label, modifier = Modifier.padding(start = 8.dp).weight(1f))
     }
 }
 
