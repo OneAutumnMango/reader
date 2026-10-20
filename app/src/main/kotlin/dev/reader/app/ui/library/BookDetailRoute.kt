@@ -50,6 +50,7 @@ fun BookDetailRoute(
     val currentChapter = chapters.find { it.id == progress?.chapterId }
     var showMenu by remember { mutableStateOf(false) }
     var showChapterDetect by remember { mutableStateOf(false) }
+    var showCoverSearch by remember { mutableStateOf(false) }
 
     val coverPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -108,12 +109,29 @@ fun BookDetailRoute(
                 scope.launch { graph.library.updateBookDetails(book.copy(title = newTitle)) }
             },
             onChangeCover = { coverPickerLauncher.launch(arrayOf("image/*")) },
+            onFindCoverOnline = { showCoverSearch = true },
             onMarkAllRead = { scope.launch { graph.markBookRead(book.id) } },
             onMarkAllUnread = { scope.launch { graph.markBookUnread(book.id) } },
             onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
             onDismiss = { showMenu = false },
             onShowDetails = onOpenDetails,
             onDetectChapters = if (book.supportsChapterDetection()) ({ showChapterDetect = true }) else null,
+        )
+    }
+
+    if (showCoverSearch) {
+        CoverSearchDialog(
+            title = book.title,
+            author = book.author,
+            service = graph.coverSearch,
+            onCoverBytesChosen = { bytes ->
+                scope.launch {
+                    val file = graph.coverSearch.saveToCache(context, bytes)
+                    graph.library.updateBookDetails(book.copy(coverPath = file.path))
+                }
+                showCoverSearch = false
+            },
+            onDismiss = { showCoverSearch = false },
         )
     }
 

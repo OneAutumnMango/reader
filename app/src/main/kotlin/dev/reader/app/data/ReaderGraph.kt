@@ -60,6 +60,7 @@ class ReaderGraph(context: Context) {
     val exporter = ExportRepository(database, settings, coverDirectory = File(appContext.filesDir, "covers"))
     val backups = BackupRepository(exporter, context.applicationContext.filesDir)
     val importer = BookImporter(library)
+    val coverSearch = CoverSearchService()
     val rootFolderScanner = RootFolderScanner(context.applicationContext, settings, library, importer)
 
     private val launchScanStarted = AtomicBoolean(false)

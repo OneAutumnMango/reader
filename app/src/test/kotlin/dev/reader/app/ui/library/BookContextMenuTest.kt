@@ -208,6 +208,49 @@ class BookContextMenuTest {
     }
 
     @Test
+    fun `find cover online appears only without a cover, and invokes its callback`() {
+        var clicked = false
+        var dismissed = false
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = {},
+                onRename = {},
+                onChangeCover = {},
+                onFindCoverOnline = { clicked = true },
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = { dismissed = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-find-cover-online").performClick()
+
+        assertTrue(clicked)
+        assertTrue(dismissed)
+    }
+
+    @Test
+    fun `find cover online is hidden once a book already has a cover`() {
+        composeRule.setContent {
+            BookContextMenu(
+                book = book.copy(coverPath = "/covers/my-book.jpg"),
+                categories = categories,
+                onChangeCategories = {},
+                onRename = {},
+                onChangeCover = {},
+                onFindCoverOnline = { error("should not be shown") },
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = {},
+            )
+        }
+
+        composeRule.onAllNodesWithTag("book-menu-find-cover-online").assertCountEquals(0)
+    }
+
+    @Test
     fun `detect chapters appears for supported formats and invokes its callback`() {
         val htmlBook = book.copy(format = BookFormat.HTML)
         var detected = false

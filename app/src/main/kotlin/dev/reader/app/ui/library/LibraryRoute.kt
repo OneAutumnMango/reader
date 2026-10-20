@@ -71,6 +71,7 @@ fun LibraryRoute(
     BackHandler(enabled = selecting) { selectedBooks = emptySet() }
     var chapterDetectBook by remember { mutableStateOf<Book?>(null) }
     var coverTargetBook by remember { mutableStateOf<Book?>(null) }
+    var coverSearchBook by remember { mutableStateOf<Book?>(null) }
     var showCategoryPickerForSelection by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -178,6 +179,7 @@ fun LibraryRoute(
                         coverTargetBook = book
                         coverPickerLauncher.launch(arrayOf("image/*"))
                     },
+                    onFindCoverOnline = { coverSearchBook = book },
                     onMarkAllRead = { scope.launch { graph.markBookRead(book.id) } },
                     onMarkAllUnread = { scope.launch { graph.markBookUnread(book.id) } },
                     onRemove = { scope.launch { graph.library.deleteBook(book.id) } },
@@ -187,6 +189,22 @@ fun LibraryRoute(
                     onDetectChapters = if (book.supportsChapterDetection()) ({ chapterDetectBook = book }) else null,
                 )
             }
+        }
+
+        coverSearchBook?.let { book ->
+            CoverSearchDialog(
+                title = book.title,
+                author = book.author,
+                service = graph.coverSearch,
+                onCoverBytesChosen = { bytes ->
+                    scope.launch {
+                        val file = graph.coverSearch.saveToCache(context, bytes)
+                        graph.library.updateBookDetails(book.copy(coverPath = file.path))
+                    }
+                    coverSearchBook = null
+                },
+                onDismiss = { coverSearchBook = null },
+            )
         }
 
         chapterDetectBook?.let { book ->

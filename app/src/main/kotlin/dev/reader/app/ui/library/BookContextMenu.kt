@@ -34,6 +34,7 @@ fun BookContextMenu(
     onChangeCategories: (Set<CategoryId>) -> Unit,
     onRename: (String) -> Unit,
     onChangeCover: () -> Unit,
+    onFindCoverOnline: (() -> Unit)? = null,
     onMarkAllRead: () -> Unit,
     onMarkAllUnread: () -> Unit = {},
     onRemove: () -> Unit,
@@ -91,6 +92,12 @@ fun BookContextMenu(
                 MenuRow("Change cover", Modifier.testTag("book-menu-change-cover")) {
                     onChangeCover()
                     onDismiss()
+                }
+                if (book.coverPath == null && onFindCoverOnline != null) {
+                    MenuRow("Find cover online", Modifier.testTag("book-menu-find-cover-online")) {
+                        onFindCoverOnline()
+                        onDismiss()
+                    }
                 }
                 MenuRow("Change category", Modifier.testTag("book-menu-change-category")) {
                     showCategoryPicker = true
