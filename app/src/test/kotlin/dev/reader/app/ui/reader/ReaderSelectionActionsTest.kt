@@ -75,6 +75,26 @@ class ReaderSelectionActionsTest {
     }
 
     @Test
+    fun `saved highlight picks the precisely anchored occurrence even when an earlier one is nearby`() {
+        // A long chapter with "word" at offset 100 and again at offset 115, 15 chars apart — well
+        // within the 2% (20-char) window an earlier "prefer at-or-after" heuristic used to widen
+        // its search by. A precise anchor at the second occurrence must still win, not the first.
+        val text = "x".repeat(100) + "word" + "x".repeat(11) + "word" + "x".repeat(881)
+        val targetOffset = 115
+        val document = RichDocument(listOf(Block.Paragraph(listOf(Span(text)))))
+        assertEquals(1000, document.toDocumentText().text.length)
+        val position = targetOffset.toFloat() / document.toDocumentText().text.length
+        val bookmark = Bookmark(
+            BookmarkId("highlight"), BookId("book"), ChapterId("chapter"), position,
+            "[Highlight]\nword", Instant.fromEpochSeconds(0),
+        )
+        val highlighted = document.withSavedHighlights(listOf(bookmark))
+        val spans = (highlighted.blocks[0] as Block.Paragraph).spans
+        val highlightStart = spans.takeWhile { !it.highlighted }.sumOf { it.text.length }
+        assertEquals(targetOffset, highlightStart)
+    }
+
+    @Test
     fun `selection action waits for an asynchronous copy`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

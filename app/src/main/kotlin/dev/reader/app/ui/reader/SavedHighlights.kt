@@ -6,8 +6,6 @@ import dev.reader.core.richtext.RichDocument
 import dev.reader.core.richtext.Span
 import kotlin.math.abs
 
-private const val POSITION_TOLERANCE = 0.02f
-
 internal fun RichDocument.withSavedHighlights(bookmarks: List<Bookmark>): RichDocument {
     val spansByBlock = blocks.map { block ->
         when (block) {
@@ -31,14 +29,13 @@ internal fun RichDocument.withSavedHighlights(bookmarks: List<Bookmark>): RichDo
         val pattern = quote.split(Regex("\\s+")).joinToString("\\s+") { Regex.escape(it) }.toRegex()
         val matches = pattern.findAll(text).toList()
         // bookmark.position is a fraction of the way through the document's text, pinpointed to
-        // the exact selected character where possible (see resolveAnchorFraction) and falling
-        // back to a coarser viewport-based estimate otherwise. Prefer the nearest match at or
-        // after that position over one that merely looks closer by raw distance (which
-        // systematically favored earlier occurrences the viewport had already scrolled past).
-        val range = matches.filter { docText.fractionOf(it.range.first) >= bookmark.position - POSITION_TOLERANCE }
-            .minByOrNull { docText.fractionOf(it.range.first) }
+        // the exact selected character where possible (see BlockAnchorRegistry) and falling back
+        // to a coarser viewport-based estimate otherwise. Either way, the right occurrence is
+        // whichever is actually closest to that position — a "prefer at-or-after" bias here (an
+        // earlier attempt) used a tolerance wide enough that, on a long chapter, it would pick an
+        // earlier occurrence of a common word over a precisely anchored later one.
+        val range = matches.minByOrNull { abs(docText.fractionOf(it.range.first) - bookmark.position) }
             ?.range
-            ?: matches.minByOrNull { abs(docText.fractionOf(it.range.first) - bookmark.position) }?.range
             ?: return@mapNotNull null
         range to bookmark.id.value
     }
