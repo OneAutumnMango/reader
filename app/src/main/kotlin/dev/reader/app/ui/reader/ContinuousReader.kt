@@ -13,7 +13,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -28,16 +27,6 @@ import dev.reader.core.theme.ReaderTheme
 private val READER_TOP_SPACING = 48.dp
 private val READER_BOTTOM_SPACING = 24.dp
 private val READER_IMAGE_HEIGHT = 320.dp
-
-/** A mutable running average, read and written from the draw phase where `remember`'s own state can't be. */
-private class FloatHolder {
-    private var value = 0f
-    fun smooth(sample: Float): Float {
-        if (sample <= 0f) return value
-        value = if (value <= 0f) sample else value * 0.9f + sample * 0.1f
-        return value
-    }
-}
 
 @Composable
 fun ContinuousReader(
@@ -63,12 +52,6 @@ fun ContinuousReader(
         jump?.let { listState.scrollToItem(it.block.coerceIn(0, (document.blocks.size - 1).coerceAtLeast(0))) }
     }
 
-    // Only the currently visible items' heights are known, and that small sample swings a lot
-    // block to block (a heading next to a tall paragraph vs. three short ones), which made the
-    // scroll indicator's thumb visibly grow and shrink while scrolling. Smooth it with a simple
-    // running average instead of trusting each frame's raw sample.
-    val smoothedItemHeight = remember { FloatHolder() }
-
     val content: @Composable () -> Unit = {
         LazyColumn(
             state = listState,
@@ -76,8 +59,7 @@ fun ContinuousReader(
                 val layout = listState.layoutInfo
                 val viewport = (layout.viewportEndOffset - layout.viewportStartOffset).coerceAtLeast(1)
                 val items = layout.visibleItemsInfo
-                val rawAverageHeight = items.map { it.size + layout.mainAxisItemSpacing }.average().toFloat()
-                val averageHeight = smoothedItemHeight.smooth(rawAverageHeight)
+                val averageHeight = items.map { it.size + layout.mainAxisItemSpacing }.average().toFloat()
                 val estimatedHeight = averageHeight * layout.totalItemsCount
                 val visible = if (estimatedHeight > 0f) (viewport / estimatedHeight).coerceAtMost(1f) else 1f
                 val estimatedOffset = listState.firstVisibleItemIndex * averageHeight +

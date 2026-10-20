@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 private const val THUMB_ALPHA = 0.55f
+private val THUMB_HEIGHT = 32.dp
 
 internal fun Modifier.readerScrollIndicator(
     color: Color,
@@ -20,8 +21,7 @@ internal fun Modifier.readerScrollIndicator(
     val width = 3.dp.toPx()
     val inset = 3.dp.toPx()
     val trackHeight = (size.height - inset * 2).coerceAtLeast(0f)
-    val minimumHeight = 18.dp.toPx().coerceAtMost(trackHeight)
-    val thumbHeight = (trackHeight * visibleFraction).coerceIn(minimumHeight, trackHeight)
+    val thumbHeight = THUMB_HEIGHT.toPx().coerceAtMost(trackHeight)
     drawRoundRect(
         color = color.copy(alpha = THUMB_ALPHA),
         topLeft = Offset(size.width - width - inset, inset + (trackHeight - thumbHeight) * position.coerceIn(0f, 1f)),
