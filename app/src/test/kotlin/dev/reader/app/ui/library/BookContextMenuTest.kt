@@ -208,8 +208,9 @@ class BookContextMenuTest {
     }
 
     @Test
-    fun `find cover online appears only without a cover, and invokes its callback`() {
-        var clicked = false
+    fun `change cover offers a device-or-online choice when online search is supported`() {
+        var fromDevice = false
+        var online = false
         var dismissed = false
         composeRule.setContent {
             BookContextMenu(
@@ -217,37 +218,43 @@ class BookContextMenuTest {
                 categories = categories,
                 onChangeCategories = {},
                 onRename = {},
-                onChangeCover = {},
-                onFindCoverOnline = { clicked = true },
+                onChangeCover = { fromDevice = true },
+                onFindCoverOnline = { online = true },
                 onMarkAllRead = {},
                 onRemove = {},
                 onDismiss = { dismissed = true },
             )
         }
 
-        composeRule.onNodeWithTag("book-menu-find-cover-online").performClick()
+        composeRule.onNodeWithTag("book-menu-change-cover").performClick()
+        composeRule.onNodeWithTag("book-menu-cover-online").performClick()
 
-        assertTrue(clicked)
+        assertTrue(online)
+        assertTrue(!fromDevice)
         assertTrue(dismissed)
     }
 
     @Test
-    fun `find cover online is hidden once a book already has a cover`() {
+    fun `change cover source picker's device option still works`() {
+        var fromDevice = false
         composeRule.setContent {
             BookContextMenu(
-                book = book.copy(coverPath = "/covers/my-book.jpg"),
+                book = book,
                 categories = categories,
                 onChangeCategories = {},
                 onRename = {},
-                onChangeCover = {},
-                onFindCoverOnline = { error("should not be shown") },
+                onChangeCover = { fromDevice = true },
+                onFindCoverOnline = {},
                 onMarkAllRead = {},
                 onRemove = {},
                 onDismiss = {},
             )
         }
 
-        composeRule.onAllNodesWithTag("book-menu-find-cover-online").assertCountEquals(0)
+        composeRule.onNodeWithTag("book-menu-change-cover").performClick()
+        composeRule.onNodeWithTag("book-menu-cover-from-device").performClick()
+
+        assertTrue(fromDevice)
     }
 
     @Test

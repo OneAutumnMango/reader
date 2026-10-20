@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -85,7 +86,11 @@ fun CoverSearchDialog(
                         modifier = Modifier.fillMaxWidth().padding(24.dp),
                         contentAlignment = Alignment.Center,
                     ) { CircularProgressIndicator() }
-                    candidates.isNullOrEmpty() -> Text("No matches found.")
+                    candidates.isNullOrEmpty() -> Text(
+                        "No matches found. This source only covers books it has an entry for — " +
+                            "try searching or pasting a link below instead.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     else -> LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(candidates.orEmpty()) { candidate ->
                             CoverCandidateThumbnail(candidate, service, onClick = { apply(candidate.fullUrl) })
@@ -100,6 +105,7 @@ fun CoverSearchDialog(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
+                Spacer(modifier = Modifier.height(8.dp))
                 TextButton(
                     onClick = {
                         val query = Uri.encode(listOf(title, author, "book cover").filter { it.isNotBlank() }.joinToString(" "))

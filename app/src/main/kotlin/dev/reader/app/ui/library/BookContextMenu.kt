@@ -46,6 +46,7 @@ fun BookContextMenu(
 ) {
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
+    var showCoverSourcePicker by remember { mutableStateOf(false) }
 
     if (showCategoryPicker) {
         CategoryPickerDialog(
@@ -75,6 +76,23 @@ fun BookContextMenu(
         return
     }
 
+    if (showCoverSourcePicker) {
+        CoverSourcePickerDialog(
+            onChooseFromDevice = {
+                showCoverSourcePicker = false
+                onChangeCover()
+                onDismiss()
+            },
+            onSearchOnline = {
+                showCoverSourcePicker = false
+                onFindCoverOnline?.invoke()
+                onDismiss()
+            },
+            onDismiss = { showCoverSourcePicker = false },
+        )
+        return
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(book.title) },
@@ -90,12 +108,10 @@ fun BookContextMenu(
                     showRenameDialog = true
                 }
                 MenuRow("Change cover", Modifier.testTag("book-menu-change-cover")) {
-                    onChangeCover()
-                    onDismiss()
-                }
-                if (book.coverPath == null && onFindCoverOnline != null) {
-                    MenuRow("Find cover online", Modifier.testTag("book-menu-find-cover-online")) {
-                        onFindCoverOnline()
+                    if (onFindCoverOnline != null) {
+                        showCoverSourcePicker = true
+                    } else {
+                        onChangeCover()
                         onDismiss()
                     }
                 }
@@ -200,6 +216,22 @@ private fun CategoryChoice(label: String, checked: Boolean, tag: String, single:
         }
         Text(label, modifier = Modifier.padding(start = 8.dp).weight(1f))
     }
+}
+
+@Composable
+private fun CoverSourcePickerDialog(onChooseFromDevice: () -> Unit, onSearchOnline: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change cover") },
+        text = {
+            Column {
+                MenuRow("Choose from device", Modifier.testTag("book-menu-cover-from-device"), onChooseFromDevice)
+                MenuRow("Search online", Modifier.testTag("book-menu-cover-online"), onSearchOnline)
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
