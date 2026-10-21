@@ -112,6 +112,9 @@ fun ReaderRoute(
     val pagerState = rememberPagerState(initialPage = initialPage) { chapters.size }
     val currentChapter = chapters.getOrNull(pagerState.currentPage) ?: chapters[initialPage]
     val theme = prefs.activeReaderTheme
+    // The raw, edited preset (both day and night colors intact), as opposed to [theme] above
+    // which has already had the active mode's colors flattened in for rendering.
+    val editedTheme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
     val pdfRenderMode = if (book.format == BookFormat.PDF) book.pdfRenderMode ?: PdfRenderMode.FIXED_PAGE else null
     val pageBased = book.format == BookFormat.CBZ || book.format == BookFormat.CBR ||
         pdfRenderMode == PdfRenderMode.FIXED_PAGE
@@ -144,7 +147,7 @@ fun ReaderRoute(
             val position = positions[pagerState.currentPage] ?: (0 to 0)
             ReaderMenuOverlay(
                 progressLabel = readerProgressLabel(readingMode, position.first, position.second, pageBased),
-                theme = theme,
+                theme = editedTheme,
                 onThemeChange = { updated ->
                     scope.launch {
                         graph.settings.update { p ->

@@ -9,7 +9,10 @@ enum class Justification {
     END,
 }
 
-/** A saveable, loadable set of reader typography and spacing options. */
+/**
+ * A saveable, loadable set of reader typography and spacing options. Only the colors differ
+ * between day and night reading — font, sizes, spacing and justification are the same either way.
+ */
 @Serializable
 data class ReaderTheme(
     val name: String,
@@ -17,6 +20,9 @@ data class ReaderTheme(
     val fontSizeSp: Float = 18f,
     val textColor: Long = 0xFF000000,
     val backgroundColor: Long = 0xFFFFFFFF,
+    /** Used instead of [textColor]/[backgroundColor] when night mode is toggled on. Defaults to AMOLED black. */
+    val nightTextColor: Long = 0xFFFFFFFF,
+    val nightBackgroundColor: Long = 0xFF000000,
     val lineSpacing: Float = 1.4f,
     val wordSpacingSp: Float = 0f,
     val letterSpacingSp: Float = 0f,
@@ -30,13 +36,7 @@ data class ReaderTheme(
             textColor = 0xFF5B4636,
             backgroundColor = 0xFFF4ECD8,
         )
-        /** AMOLED-friendly: true black background, so OLED screens turn those pixels off. */
-        val Night = ReaderTheme(
-            name = "Night",
-            textColor = 0xFFFFFFFF,
-            backgroundColor = 0xFF000000,
-        )
 
-        val builtIns = listOf(Default, Sepia, Night)
+        val builtIns = listOf(Default, Sepia)
     }
 }

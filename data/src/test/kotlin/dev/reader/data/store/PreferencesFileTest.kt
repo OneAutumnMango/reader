@@ -7,39 +7,36 @@ import kotlin.test.assertEquals
 class PreferencesFileTest {
 
     @Test
-    fun `resolves the day preset by default`() {
+    fun `resolves the active preset's day colors by default`() {
         val prefs = PreferencesFile()
 
         assertEquals(ReaderTheme.Default, prefs.activeReaderTheme)
     }
 
     @Test
-    fun `resolves the night preset once night theme is enabled`() {
-        val prefs = PreferencesFile(nightThemeEnabled = true)
-
-        assertEquals(ReaderTheme.Night, prefs.activeReaderTheme)
-    }
-
-    @Test
-    fun `day and night can point at independently customized presets`() {
-        val customDay = ReaderTheme.Default.copy(name = "My Day", fontSizeSp = 22f)
-        val customNight = ReaderTheme.Night.copy(name = "My Night", fontSizeSp = 16f)
-        val prefs = PreferencesFile(
-            themePresets = listOf(customDay, customNight),
-            activeThemePresetName = customDay.name,
-            nightThemePresetName = customNight.name,
+    fun `swaps in the active preset's night colors once night theme is enabled, unchanged otherwise`() {
+        val preset = ReaderTheme.Default.copy(
+            fontSizeSp = 22f,
+            textColor = 0xFF111111,
+            backgroundColor = 0xFFEEEEEE,
+            nightTextColor = 0xFF00FF00,
+            nightBackgroundColor = 0xFF330033,
         )
+        val prefs = PreferencesFile(themePresets = listOf(preset), nightThemeEnabled = true)
 
-        assertEquals(customDay, prefs.activeReaderTheme)
-        assertEquals(customNight, prefs.copy(nightThemeEnabled = true).activeReaderTheme)
+        val resolved = prefs.activeReaderTheme
+
+        assertEquals(0xFF00FF00, resolved.textColor)
+        assertEquals(0xFF330033, resolved.backgroundColor)
+        // Everything else (font, size, spacing) stays the same regardless of day/night.
+        assertEquals(22f, resolved.fontSizeSp)
     }
 
     @Test
-    fun `falls back to Default when the pointed-at preset no longer exists`() {
+    fun `falls back to Default when the active preset no longer exists`() {
         val prefs = PreferencesFile(
-            themePresets = listOf(ReaderTheme.Default),
-            nightThemePresetName = "Deleted preset",
-            nightThemeEnabled = true,
+            themePresets = listOf(ReaderTheme.Sepia),
+            activeThemePresetName = "Deleted preset",
         )
 
         assertEquals(ReaderTheme.Default, prefs.activeReaderTheme)

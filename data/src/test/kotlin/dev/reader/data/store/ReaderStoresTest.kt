@@ -54,7 +54,7 @@ class ReaderStoresTest {
     fun `defaults apply until changed`() = runTest {
         val preferences = stores(backgroundScope).preferences.data.first()
         assertEquals(AppThemeMode.SYSTEM, preferences.appTheme.mode)
-        assertEquals(3, preferences.themePresets.size)
+        assertEquals(2, preferences.themePresets.size)
     }
 
     @Test

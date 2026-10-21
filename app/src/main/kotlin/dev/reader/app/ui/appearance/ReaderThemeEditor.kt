@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,15 +68,37 @@ fun ReaderThemeEditor(
         }
 
         MenuSubheader("Colours")
+        Text(
+            "Day",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Text colour", modifier = Modifier.weight(1f))
             ColorSwatch(theme.textColor, selected = false, onClick = {})
-            PickColorButton(theme.textColor, "Text colour") { onChange(theme.copy(textColor = it)) }
+            PickColorButton(theme.textColor, "Day text colour") { onChange(theme.copy(textColor = it)) }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Background colour", modifier = Modifier.weight(1f))
             ColorSwatch(theme.backgroundColor, selected = false, onClick = {})
-            PickColorButton(theme.backgroundColor, "Background colour") { onChange(theme.copy(backgroundColor = it)) }
+            PickColorButton(theme.backgroundColor, "Day background colour") { onChange(theme.copy(backgroundColor = it)) }
+        }
+        Text(
+            "Night",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Text colour", modifier = Modifier.weight(1f))
+            ColorSwatch(theme.nightTextColor, selected = false, onClick = {})
+            PickColorButton(theme.nightTextColor, "Night text colour") { onChange(theme.copy(nightTextColor = it)) }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Background colour", modifier = Modifier.weight(1f))
+            ColorSwatch(theme.nightBackgroundColor, selected = false, onClick = {})
+            PickColorButton(theme.nightBackgroundColor, "Night background colour") {
+                onChange(theme.copy(nightBackgroundColor = it))
+            }
         }
 
         MenuSubheader("Size and spacing")
