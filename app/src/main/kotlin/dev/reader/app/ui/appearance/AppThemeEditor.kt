@@ -1,14 +1,19 @@
 package dev.reader.app.ui.appearance
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,6 +37,8 @@ import dev.reader.app.ui.RadioOptions
 import dev.reader.core.theme.AppPaletteOverrides
 import dev.reader.core.theme.AppTheme
 import dev.reader.core.theme.AppThemeMode
+import dev.reader.core.theme.SavedCustomTheme
+import java.util.UUID
 
 private val SEED_PRESETS = listOf(
     0xFF6750A4L,
@@ -77,8 +84,16 @@ private fun ColorScheme.effective(role: ColorRole): Color = when (role) {
 private fun Color.toColorLong(): Long = toArgb().toLong() and 0xFFFFFFFFL
 
 @Composable
-fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modifier = Modifier) {
+fun AppThemeEditor(
+    theme: AppTheme,
+    customThemes: List<SavedCustomTheme>,
+    onChange: (AppTheme) -> Unit,
+    onAddCustomTheme: (SavedCustomTheme) -> Unit,
+    onRemoveCustomTheme: (id: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var showCustomDialog by remember { mutableStateOf(false) }
+    var showRemoveMenuFor by remember { mutableStateOf<String?>(null) }
     val systemDark = isSystemInDarkTheme()
 
     Column(modifier = modifier) {
@@ -87,6 +102,7 @@ fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modi
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            AddCustomThemeCard(onClick = { showCustomDialog = true })
             SEED_PRESETS.forEach { seed ->
                 ThemePresetCard(
                     seedColor = seed,
@@ -96,7 +112,30 @@ fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modi
                     onClick = { onChange(theme.copy(seedColor = seed, overrides = AppPaletteOverrides())) },
                 )
             }
-            AddCustomThemeCard(onClick = { showCustomDialog = true })
+            customThemes.forEach { saved ->
+                Box {
+                    ThemePresetCard(
+                        seedColor = saved.seedColor,
+                        mode = theme.mode,
+                        systemInDarkTheme = systemDark,
+                        selected = theme.seedColor == saved.seedColor && theme.overrides == saved.overrides,
+                        onClick = { onChange(theme.copy(seedColor = saved.seedColor, overrides = saved.overrides)) },
+                        contentDescription = "Custom theme",
+                        testTag = "saved-theme-${saved.id}",
+                        onLongClick = { showRemoveMenuFor = saved.id },
+                    )
+                    DropdownMenu(expanded = showRemoveMenuFor == saved.id, onDismissRequest = { showRemoveMenuFor = null }) {
+                        DropdownMenuItem(
+                            text = { Text("Remove") },
+                            onClick = {
+                                onRemoveCustomTheme(saved.id)
+                                showRemoveMenuFor = null
+                            },
+                            modifier = Modifier.testTag("saved-theme-remove-${saved.id}"),
+                        )
+                    }
+                }
+            }
         }
 
         MenuSubheader("Theme mode")
@@ -110,7 +149,7 @@ fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modi
     }
 
     if (showCustomDialog) {
-        CustomThemeDialog(theme, systemDark, onChange, onDismiss = { showCustomDialog = false })
+        CustomThemeDialog(theme, systemDark, onChange, onAddCustomTheme, onDismiss = { showCustomDialog = false })
     }
 }
 
@@ -119,6 +158,7 @@ private fun CustomThemeDialog(
     theme: AppTheme,
     systemInDarkTheme: Boolean,
     onChange: (AppTheme) -> Unit,
+    onAddCustomTheme: (SavedCustomTheme) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val scheme = remember(theme.seedColor, theme.mode, systemInDarkTheme, theme.overrides) {
@@ -129,7 +169,10 @@ private fun CustomThemeDialog(
         onDismissRequest = onDismiss,
         title = { Text("Custom theme") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 ThemeColorRow(
                     label = "Seed colour",
                     color = theme.seedColor,
@@ -147,7 +190,12 @@ private fun CustomThemeDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = {
+            TextButton(onClick = {
+                onAddCustomTheme(SavedCustomTheme(id = UUID.randomUUID().toString(), seedColor = theme.seedColor, overrides = theme.overrides))
+                onDismiss()
+            }) { Text("Done") }
+        },
     )
 }
 
@@ -161,7 +209,10 @@ private fun ThemeColorRow(
 ) {
     var picking by remember { mutableStateOf(false) }
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier.clickable { picking = true },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         ColorSwatch(
             color,
             selected = false,
@@ -182,7 +233,7 @@ private fun ThemeColorRow(
             label = label,
             onDismiss = { picking = false },
             onPicked = {
-                onPick(it)
+                if (it != color) onPick(it)
                 picking = false
             },
         )
