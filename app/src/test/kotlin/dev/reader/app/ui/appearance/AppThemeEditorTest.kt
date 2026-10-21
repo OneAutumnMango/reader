@@ -124,6 +124,15 @@ class AppThemeEditorTest {
     }
 
     @Test
+    fun `the custom dialog reflects the theme it is given, not its own writes`() {
+        composeRule.setContent { AppThemeEditor(AppTheme(), onChange = {}) }
+        composeRule.onNodeWithTag("add-custom-theme").performClick()
+        composeRule.onNodeWithTag("theme-color-Accent").performClick()
+        composeRule.onNodeWithText("Set").performClick()
+        composeRule.onNodeWithTag("theme-color-reset-Accent").assertDoesNotExist()
+    }
+
+    @Test
     fun `the reset icon is absent until a role is overridden`() {
         composeRule.setContent { AppThemeEditor(AppTheme(), onChange = {}) }
 
