@@ -1,8 +1,10 @@
 package dev.reader.app.ui.appearance
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.reader.core.theme.AppThemeMode
 
@@ -90,6 +97,7 @@ fun ThemePreviewTile(
 }
 
 /** A selectable preset card: a [ThemePreviewTile] in a bordered frame, tagged by its seed colour. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ThemePresetCard(
     seedColor: Long,
@@ -98,6 +106,9 @@ fun ThemePresetCard(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    contentDescription: String = "Theme preview",
+    testTag: String = "seed-swatch-${"%08X".format(seedColor)}",
+    onLongClick: (() -> Unit)? = null,
 ) {
     Box(
         modifier = modifier
@@ -111,8 +122,13 @@ fun ThemePresetCard(
                 },
                 shape = PRESET_SHAPE,
             )
-            .clickable(onClick = onClick)
-            .testTag("seed-swatch-${"%08X".format(seedColor)}"),
+            .semantics {
+                role = Role.RadioButton
+                this.selected = selected
+                this.contentDescription = contentDescription
+            }
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .testTag(testTag),
     ) {
         ThemePreviewTile(seedColor = seedColor, mode = mode, systemInDarkTheme = systemInDarkTheme)
     }
