@@ -154,6 +154,8 @@ class AppThemeEditorTest {
         }
         composeRule.onNodeWithTag("add-custom-theme").performClick()
         composeRule.onNodeWithTag("theme-color-Accent").performClick()
+        composeRule.onNodeWithTag("color-picker-hex").performTextClearance()
+        composeRule.onNodeWithTag("color-picker-hex").performTextInput("#FF112233")
         composeRule.onNodeWithText("Set").performClick()
         composeRule.onNodeWithTag("theme-color-reset-Accent").assertDoesNotExist()
     }
