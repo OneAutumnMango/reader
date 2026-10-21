@@ -111,7 +111,7 @@ fun ReaderRoute(
     val initialPage = remember(bookId) { chapters.indexOfFirst { it.id == chapterId }.coerceAtLeast(0) }
     val pagerState = rememberPagerState(initialPage = initialPage) { chapters.size }
     val currentChapter = chapters.getOrNull(pagerState.currentPage) ?: chapters[initialPage]
-    val theme = prefs.themePresets.find { it.name == prefs.activeThemePresetName } ?: ReaderTheme.Default
+    val theme = prefs.activeReaderTheme
     val pdfRenderMode = if (book.format == BookFormat.PDF) book.pdfRenderMode ?: PdfRenderMode.FIXED_PAGE else null
     val pageBased = book.format == BookFormat.CBZ || book.format == BookFormat.CBR ||
         pdfRenderMode == PdfRenderMode.FIXED_PAGE
@@ -152,6 +152,10 @@ fun ReaderRoute(
                             p.copy(themePresets = merged)
                         }
                     }
+                },
+                isNightTheme = prefs.nightThemeEnabled,
+                onToggleNightTheme = {
+                    scope.launch { graph.settings.update { it.copy(nightThemeEnabled = !it.nightThemeEnabled) } }
                 },
                 settings = prefs.readerSettings,
                 onSettingsChange = { updated ->

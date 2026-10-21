@@ -21,8 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -121,6 +123,8 @@ fun ReaderMenuOverlay(
     onPdfRenderModeChange: (PdfRenderMode) -> Unit = {},
     onSearch: (() -> Unit)? = null,
     searchPanel: (@Composable () -> Unit)? = null,
+    isNightTheme: Boolean = false,
+    onToggleNightTheme: (() -> Unit)? = null,
 ) {
     val currentOnExpandedChange by rememberUpdatedState(onExpandedChange)
     var fullScreen by remember { mutableStateOf(false) }
@@ -219,6 +223,17 @@ fun ReaderMenuOverlay(
                         if (onSearch != null) {
                             IconButton(onClick = onSearch, modifier = Modifier.testTag("reader-menu-search")) {
                                 Icon(Icons.Filled.Search, contentDescription = "Search")
+                            }
+                        }
+                        if (onToggleNightTheme != null) {
+                            IconButton(
+                                onClick = onToggleNightTheme,
+                                modifier = Modifier.testTag("reader-menu-night-toggle"),
+                            ) {
+                                Icon(
+                                    if (isNightTheme) Icons.Filled.DarkMode else Icons.Filled.LightMode,
+                                    contentDescription = if (isNightTheme) "Switch to day theme" else "Switch to night theme",
+                                )
                             }
                         }
                         IconButton(

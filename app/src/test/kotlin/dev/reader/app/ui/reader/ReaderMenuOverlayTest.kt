@@ -64,6 +64,49 @@ class ReaderMenuOverlayTest {
     }
 
     @Test
+    fun `night toggle is hidden without a callback, shown and wired once one's provided`() {
+        composeRule.setContent {
+            ReaderMenuOverlay(
+                progressLabel = "Page 1 of 10",
+                theme = ReaderTheme.Default,
+                onThemeChange = {},
+                settings = ReaderSettings(),
+                onSettingsChange = {},
+                onBack = {},
+                expanded = false,
+                onExpandedChange = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-menu-night-toggle").assertDoesNotExist()
+    }
+
+    @Test
+    fun `night toggle invokes its callback and reflects the current mode`() {
+        var isNight = false
+        var toggled = false
+        composeRule.setContent {
+            ReaderMenuOverlay(
+                progressLabel = "Page 1 of 10",
+                theme = ReaderTheme.Default,
+                onThemeChange = {},
+                settings = ReaderSettings(),
+                onSettingsChange = {},
+                onBack = {},
+                expanded = false,
+                onExpandedChange = {},
+                isNightTheme = isNight,
+                onToggleNightTheme = { toggled = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-menu-night-toggle").assertExists()
+        composeRule.onNodeWithTag("reader-menu-night-toggle").performClick()
+
+        assertTrue(toggled)
+    }
+
+    @Test
     fun `expanded menu offers a PDF display selector`() {
         var mode = PdfRenderMode.FIXED_PAGE
         composeRule.setContent {

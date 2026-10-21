@@ -40,7 +40,11 @@ data class PreferencesFile(
     val appTheme: AppTheme = AppTheme(),
     val readerSettings: ReaderSettings = ReaderSettings(),
     val themePresets: List<ReaderTheme> = ReaderTheme.builtIns,
+    /** Which preset is used for day/light reading. */
     val activeThemePresetName: String = ReaderTheme.Default.name,
+    /** Which preset is used for night reading, toggled independently via [nightThemeEnabled]. */
+    val nightThemePresetName: String = ReaderTheme.Night.name,
+    val nightThemeEnabled: Boolean = false,
     val rootFolders: List<String> = emptyList(),
     /** Library folder URI -> its [CollectionKind]; folders added before kinds existed import both. */
     val rootFolderKinds: Map<String, CollectionKind> = emptyMap(),
@@ -58,4 +62,11 @@ data class PreferencesFile(
     val automaticBackupFolderUri: String? = null,
     val automaticBackupFrequency: AutomaticBackupFrequency = AutomaticBackupFrequency.DAILY,
     val automaticBackupIncludeBooks: Boolean = false,
-)
+) {
+    /** The preset currently in effect for reading: the night one when [nightThemeEnabled], else day. */
+    val activeReaderTheme: ReaderTheme
+        get() {
+            val name = if (nightThemeEnabled) nightThemePresetName else activeThemePresetName
+            return themePresets.find { it.name == name } ?: ReaderTheme.Default
+        }
+}

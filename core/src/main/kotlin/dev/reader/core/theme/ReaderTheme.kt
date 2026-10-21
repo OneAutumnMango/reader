@@ -30,10 +30,11 @@ data class ReaderTheme(
             textColor = 0xFF5B4636,
             backgroundColor = 0xFFF4ECD8,
         )
+        /** AMOLED-friendly: true black background, so OLED screens turn those pixels off. */
         val Night = ReaderTheme(
             name = "Night",
-            textColor = 0xFFC8C8C8,
-            backgroundColor = 0xFF121212,
+            textColor = 0xFFFFFFFF,
+            backgroundColor = 0xFF000000,
         )
 
         val builtIns = listOf(Default, Sepia, Night)
