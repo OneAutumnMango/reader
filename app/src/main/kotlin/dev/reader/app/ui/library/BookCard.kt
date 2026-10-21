@@ -1,33 +1,43 @@
 package dev.reader.app.ui.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.reader.core.model.Book
 
-private val COVER_SHAPE = RoundedCornerShape(8.dp)
+internal val LIBRARY_CARD_CORNER_RADIUS: Dp = 12.dp
+private val COVER_SHAPE = RoundedCornerShape(LIBRARY_CARD_CORNER_RADIUS)
 
 /** A Shosetsu-style library card: cover, title and a progress bar when the book is in progress. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -39,13 +49,22 @@ fun BookCard(
     modifier: Modifier = Modifier,
     finished: Boolean = false,
     selected: Boolean = false,
+    showAuthor: Boolean = true,
     onLongClick: () -> Unit = {},
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Column(
         modifier = modifier.fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            .shadow(elevation = if (pressed) 4.dp else 0.dp, shape = COVER_SHAPE)
             .clip(COVER_SHAPE)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, COVER_SHAPE)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .testTag("book-card-${book.id.value}"),
     ) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO)) {
@@ -76,6 +95,17 @@ fun BookCard(
                 )
             }
         }
+        if (progress != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress.coerceIn(0f, 1f), 0f..1f) }
+                    .testTag("book-progress-bar"),
+            )
+        }
         Column(modifier = Modifier.padding(4.dp)) {
             Text(
                 book.title,
@@ -83,16 +113,13 @@ fun BookCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (book.author.isNotBlank()) {
+            if (showAuthor && book.author.isNotBlank()) {
                 Text(
                     book.author,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            if (progress != null) {
-                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
             }
         }
     }

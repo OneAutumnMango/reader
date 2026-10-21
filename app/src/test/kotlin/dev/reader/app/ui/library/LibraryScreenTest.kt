@@ -18,6 +18,7 @@ import dev.reader.core.model.BookFormat
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
+import dev.reader.core.theme.LibraryLayout
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -115,7 +116,34 @@ class LibraryScreenTest {
         }
 
         val card = composeRule.onNodeWithTag("book-card-1").getUnclippedBoundsInRoot()
-        assertEquals(8.dp, card.left)
+        assertEquals(12.dp, card.left)
+    }
+
+    @Test
+    fun `small layout lays out four columns per row`() {
+        val books = (1..5).map { book(it.toString(), "Book $it") }
+        composeRule.setContent {
+            LibraryScreen(
+                books,
+                emptyList(),
+                null,
+                progressFor = { null },
+                onCategorySelected = {},
+                onBookClick = {},
+                onBookLongClick = {},
+                onSearchClick = {},
+                onAddCategory = {},
+                layout = LibraryLayout.SMALL,
+                modifier = Modifier.size(360.dp, 640.dp),
+            )
+        }
+
+        val firstTop = composeRule.onNodeWithTag("book-card-1").getUnclippedBoundsInRoot().top
+        val fourthTop = composeRule.onNodeWithTag("book-card-4").getUnclippedBoundsInRoot().top
+        val fifthTop = composeRule.onNodeWithTag("book-card-5").getUnclippedBoundsInRoot().top
+
+        assertEquals(firstTop, fourthTop)
+        assertTrue(fifthTop > firstTop)
     }
 
     @Test
@@ -210,5 +238,35 @@ class LibraryScreenTest {
         composeRule.onAllNodesWithText("All").assertCountEquals(0)
         composeRule.onAllNodesWithText("Beta").assertCountEquals(0)
         assertEquals(novels, selected)
+    }
+
+    @Test
+    fun `medium layout hides the author`() {
+        val withAuthor = book("1", "Alpha").copy(author = "Some Author")
+        composeRule.setContent {
+            LibraryScreen(
+                listOf(withAuthor), categories, null,
+                progressFor = { null }, onCategorySelected = {}, onBookClick = {},
+                onBookLongClick = {}, onSearchClick = {}, onAddCategory = {},
+                layout = LibraryLayout.MEDIUM,
+            )
+        }
+
+        composeRule.onAllNodesWithText("Some Author").assertCountEquals(0)
+    }
+
+    @Test
+    fun `large layout shows the author`() {
+        val withAuthor = book("1", "Alpha").copy(author = "Some Author")
+        composeRule.setContent {
+            LibraryScreen(
+                listOf(withAuthor), categories, null,
+                progressFor = { null }, onCategorySelected = {}, onBookClick = {},
+                onBookLongClick = {}, onSearchClick = {}, onAddCategory = {},
+                layout = LibraryLayout.LARGE,
+            )
+        }
+
+        composeRule.onNodeWithText("Some Author").assertExists()
     }
 }

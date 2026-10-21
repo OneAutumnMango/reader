@@ -20,3 +20,9 @@ scripts/env.sh
 
 # OS
 .DS_Store
+
+# Git worktrees
+.worktrees/
+
+# Local planning notes (specs/plans) — not part of repo history
+docs/

@@ -6,19 +6,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -83,7 +78,7 @@ fun BookSelectionBar(
             Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
                 Tooltip("Change category") {
                     IconButton(onClick = onChangeCategory, modifier = Modifier.testTag("book-selection-category")) {
-                        Icon(Icons.Filled.Category, contentDescription = "Change category")
+                        Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Change category")
                     }
                 }
                 Tooltip("Mark as read") {
@@ -121,34 +116,26 @@ fun CategoryPickerForBooks(
         text = {
             Column {
                 if (singleCategoryPerBook) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { onConfirm(emptySet()) }.padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = picked.isEmpty(), onClick = null)
-                        Text("No category", modifier = Modifier.padding(start = 8.dp).weight(1f))
-                    }
-                    HorizontalDivider()
+                    CategoryChoiceRow(
+                        label = "No category",
+                        checked = picked.isEmpty(),
+                        tag = "bulk-category-picker-none",
+                        single = true,
+                    ) { onConfirm(emptySet()) }
                 }
                 categories.forEach { category ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            if (singleCategoryPerBook) {
-                                onConfirm(if (category.id in picked) emptySet() else setOf(category.id))
-                            } else {
-                                picked = if (category.id in picked) picked - category.id else picked + category.id
-                            }
-                        }.padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    CategoryChoiceRow(
+                        label = category.name,
+                        checked = category.id in picked,
+                        tag = "bulk-category-picker-${category.id.value}",
+                        single = singleCategoryPerBook,
                     ) {
                         if (singleCategoryPerBook) {
-                            RadioButton(selected = category.id in picked, onClick = null)
+                            onConfirm(if (category.id in picked) emptySet() else setOf(category.id))
                         } else {
-                            Checkbox(checked = category.id in picked, onCheckedChange = null)
+                            picked = if (category.id in picked) picked - category.id else picked + category.id
                         }
-                        Text(category.name, modifier = Modifier.padding(start = 8.dp).weight(1f))
                     }
-                    HorizontalDivider()
                 }
             }
         },

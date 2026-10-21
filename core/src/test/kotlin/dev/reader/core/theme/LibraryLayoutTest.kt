@@ -1,13 +1,14 @@
 package dev.reader.core.theme
 
 import kotlin.test.Test
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 class LibraryLayoutTest {
 
     @Test
-    fun `larger layouts have wider grid columns`() {
-        assertTrue(LibraryLayout.SMALL.gridColumnMinWidthDp < LibraryLayout.MEDIUM.gridColumnMinWidthDp)
-        assertTrue(LibraryLayout.MEDIUM.gridColumnMinWidthDp < LibraryLayout.LARGE.gridColumnMinWidthDp)
+    fun `columns is fixed per layout`() {
+        assertEquals(4, LibraryLayout.SMALL.columns)
+        assertEquals(3, LibraryLayout.MEDIUM.columns)
+        assertEquals(2, LibraryLayout.LARGE.columns)
     }
 }

@@ -5,12 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.core.model.Book
@@ -115,7 +116,11 @@ fun BookContextMenu(
                         onDismiss()
                     }
                 }
-                MenuRow("Change category", Modifier.testTag("book-menu-change-category")) {
+                MenuRow(
+                    "Change category",
+                    Modifier.testTag("book-menu-change-category"),
+                    leadingIcon = Icons.AutoMirrored.Filled.Label,
+                ) {
                     showCategoryPicker = true
                 }
                 if (onDetectChapters != null) {
@@ -143,15 +148,24 @@ fun BookContextMenu(
 }
 
 @Composable
-private fun MenuRow(label: String, modifier: Modifier, onClick: () -> Unit) {
-    Text(
-        label,
+private fun MenuRow(label: String, modifier: Modifier, leadingIcon: ImageVector? = null, onClick: () -> Unit) {
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = 12.dp),
-        style = MaterialTheme.typography.bodyLarge,
-    )
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leadingIcon != null) {
+            Icon(
+                leadingIcon,
+                contentDescription = null,
+                modifier = Modifier.padding(end = 12.dp)
+                    .testTag("book-menu-change-category-icon"),
+            )
+        }
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 @Composable
@@ -170,7 +184,7 @@ private fun CategoryPickerDialog(
         text = {
             Column {
                 if (singleCategoryPerBook) {
-                    CategoryChoice(
+                    CategoryChoiceRow(
                         label = "No category",
                         checked = picked.isEmpty(),
                         tag = "category-picker-none",
@@ -178,7 +192,7 @@ private fun CategoryPickerDialog(
                     ) { onConfirm(emptySet()) }
                 }
                 categories.forEach { category ->
-                    CategoryChoice(
+                    CategoryChoiceRow(
                         label = category.name,
                         checked = category.id in picked,
                         tag = "category-picker-${category.id.value}",
@@ -190,7 +204,6 @@ private fun CategoryPickerDialog(
                             picked = if (category.id in picked) picked - category.id else picked + category.id
                         }
                     }
-                    HorizontalDivider()
                 }
             }
         },
@@ -204,29 +217,22 @@ private fun CategoryPickerDialog(
 }
 
 @Composable
-private fun CategoryChoice(label: String, checked: Boolean, tag: String, single: Boolean = false, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().testTag(tag).clickable(onClick = onClick).padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (single) {
-            RadioButton(selected = checked, onClick = null)
-        } else {
-            Checkbox(checked = checked, onCheckedChange = null)
-        }
-        Text(label, modifier = Modifier.padding(start = 8.dp).weight(1f))
-    }
-}
-
-@Composable
 private fun CoverSourcePickerDialog(onChooseFromDevice: () -> Unit, onSearchOnline: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Change cover") },
         text = {
             Column {
-                MenuRow("Choose from device", Modifier.testTag("book-menu-cover-from-device"), onChooseFromDevice)
-                MenuRow("Search online", Modifier.testTag("book-menu-cover-online"), onSearchOnline)
+                MenuRow(
+                    "Choose from device",
+                    Modifier.testTag("book-menu-cover-from-device"),
+                    onClick = onChooseFromDevice,
+                )
+                MenuRow(
+                    "Search online",
+                    Modifier.testTag("book-menu-cover-online"),
+                    onClick = onSearchOnline,
+                )
             }
         },
         confirmButton = {},

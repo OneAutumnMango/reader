@@ -10,10 +10,10 @@ enum class LibraryLayout {
     LARGE,
     ;
 
-    val gridColumnMinWidthDp: Int
+    val columns: Int
         get() = when (this) {
-            SMALL -> 90
-            MEDIUM -> 120
-            LARGE -> 160
+            SMALL -> 4
+            MEDIUM -> 3
+            LARGE -> 2
         }
 }

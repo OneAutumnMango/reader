@@ -290,4 +290,22 @@ class BookContextMenuTest {
         composeRule.waitForIdle()
         composeRule.onAllNodesWithTag("book-menu-detect-chapters").assertCountEquals(0)
     }
+
+    @Test
+    fun `change category row shows the label icon`() {
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = {},
+                onRename = {},
+                onChangeCover = {},
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-change-category-icon", useUnmergedTree = true).assertExists()
+    }
 }

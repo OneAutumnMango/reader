@@ -1,5 +1,6 @@
 package dev.reader.app.ui.library
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -72,8 +73,10 @@ fun LibraryScreen(
             val pageBooks = if (category == null) books else booksByCategory[category].orEmpty()
             LazyVerticalGrid(
                 state = gridStateFor(category) ?: rememberLazyGridState(),
-                columns = GridCells.Adaptive(minSize = layout.gridColumnMinWidthDp.dp),
-                contentPadding = PaddingValues(6.dp),
+                columns = GridCells.Fixed(layout.columns),
+                contentPadding = PaddingValues(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize().testTag("library-grid"),
             ) {
                 items(pageBooks, key = { it.id.value }) { book ->
@@ -84,7 +87,7 @@ fun LibraryScreen(
                         onClick = { onBookClick(book) },
                         onLongClick = { onBookLongClick(book) },
                         selected = book.id in selectedBookIds,
-                        modifier = Modifier.padding(2.dp),
+                        showAuthor = layout == LibraryLayout.LARGE,
                     )
                 }
             }

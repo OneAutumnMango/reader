@@ -5,7 +5,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
@@ -54,7 +53,21 @@ class CategoryTabsTest {
             CategoryTabs(categories, null, onSelect = {}, onAddCategory = { added = it })
         }
 
-        composeRule.onNodeWithContentDescription("Add category").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("Add category").performClick()
+        composeRule.onNodeWithTag("category_name_field").performTextInput("Favorites")
+        composeRule.onNodeWithText("Add").performClick()
+
+        assertEquals("Favorites", added)
+    }
+
+    @Test
+    fun `add button still works when there are no categories`() {
+        var added: String? = null
+        composeRule.setContent {
+            CategoryTabs(emptyList(), null, onSelect = {}, onAddCategory = { added = it })
+        }
+
+        composeRule.onNodeWithContentDescription("Add category").performClick()
         composeRule.onNodeWithTag("category_name_field").performTextInput("Favorites")
         composeRule.onNodeWithText("Add").performClick()
 
