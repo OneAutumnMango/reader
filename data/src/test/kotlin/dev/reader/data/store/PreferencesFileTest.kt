@@ -1,8 +1,17 @@
 package dev.reader.data.store
 
+import dev.reader.core.theme.AppPaletteOverrides
 import dev.reader.core.theme.ReaderTheme
+import dev.reader.core.theme.SavedCustomTheme
+import kotlinx.serialization.json.Json
 import org.junit.Test
 import kotlin.test.assertEquals
+
+/** Mirrors [ReaderStores]'s own JSON config, so round-trip tests here match real persisted behavior. */
+private val STORE_JSON = Json {
+    encodeDefaults = true
+    ignoreUnknownKeys = true
+}
 
 class PreferencesFileTest {
 
@@ -40,5 +49,29 @@ class PreferencesFileTest {
         )
 
         assertEquals(ReaderTheme.Default, prefs.activeReaderTheme)
+    }
+
+    @Test
+    fun `customAppThemes is empty by default`() {
+        assertEquals(emptyList(), PreferencesFile().customAppThemes)
+    }
+
+    @Test
+    fun `a non-empty customAppThemes list round-trips through serialization`() {
+        val prefs = PreferencesFile(
+            customAppThemes = listOf(
+                SavedCustomTheme(id = "abc", seedColor = 0xFF6750A4L),
+                SavedCustomTheme(
+                    id = "def",
+                    seedColor = 0xFF2E7D32L,
+                    overrides = AppPaletteOverrides(accent = 0xFFFFEB3BL),
+                ),
+            ),
+        )
+
+        val encoded = STORE_JSON.encodeToString(PreferencesFile.serializer(), prefs)
+        val decoded = STORE_JSON.decodeFromString(PreferencesFile.serializer(), encoded)
+
+        assertEquals(prefs.customAppThemes, decoded.customAppThemes)
     }
 }

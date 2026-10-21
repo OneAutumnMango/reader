@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DropdownMenu
@@ -19,8 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,7 +81,9 @@ private fun ColorScheme.effective(role: ColorRole): Color = when (role) {
     ColorRole.ACCENT -> primary
 }
 
-private fun Color.toColorLong(): Long = toArgb().toLong() and 0xFFFFFFFFL
+private const val ARGB_MASK = 0xFFFFFFFFL
+
+private fun Color.toColorLong(): Long = toArgb().toLong() and ARGB_MASK
 
 @Composable
 fun AppThemeEditor(
@@ -120,11 +122,15 @@ fun AppThemeEditor(
                         systemInDarkTheme = systemDark,
                         selected = theme.seedColor == saved.seedColor && theme.overrides == saved.overrides,
                         onClick = { onChange(theme.copy(seedColor = saved.seedColor, overrides = saved.overrides)) },
+                        overrides = saved.overrides,
                         contentDescription = "Custom theme",
                         testTag = "saved-theme-${saved.id}",
                         onLongClick = { showRemoveMenuFor = saved.id },
                     )
-                    DropdownMenu(expanded = showRemoveMenuFor == saved.id, onDismissRequest = { showRemoveMenuFor = null }) {
+                    DropdownMenu(
+                        expanded = showRemoveMenuFor == saved.id,
+                        onDismissRequest = { showRemoveMenuFor = null },
+                    ) {
                         DropdownMenuItem(
                             text = { Text("Remove") },
                             onClick = {
@@ -192,7 +198,13 @@ private fun CustomThemeDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onAddCustomTheme(SavedCustomTheme(id = UUID.randomUUID().toString(), seedColor = theme.seedColor, overrides = theme.overrides))
+                onAddCustomTheme(
+                    SavedCustomTheme(
+                        id = UUID.randomUUID().toString(),
+                        seedColor = theme.seedColor,
+                        overrides = theme.overrides,
+                    ),
+                )
                 onDismiss()
             }) { Text("Done") }
         },

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import dev.reader.core.theme.AppPaletteOverrides
 import dev.reader.core.theme.AppThemeMode
 import org.junit.Rule
 import org.junit.Test
@@ -73,7 +74,13 @@ class ThemePresetCardTest {
     @Test
     fun `a card with no onLongClick does not crash on long-press`() {
         composeRule.setContent {
-            ThemePresetCard(seedColor = 0xFF2E7D32L, mode = AppThemeMode.LIGHT, systemInDarkTheme = false, selected = false, onClick = {})
+            ThemePresetCard(
+                seedColor = 0xFF2E7D32L,
+                mode = AppThemeMode.LIGHT,
+                systemInDarkTheme = false,
+                selected = false,
+                onClick = {},
+            )
         }
 
         composeRule.onNodeWithTag("seed-swatch-FF2E7D32").performTouchInput {
@@ -99,5 +106,27 @@ class ThemePresetCardTest {
 
         composeRule.onNodeWithTag("saved-theme-abc").assertExists()
         composeRule.onAllNodesWithTag("seed-swatch-FF2E7D32").assertCountEquals(0)
+    }
+
+    @Test
+    fun `different overrides on the same seed colour produce different previews`() {
+        val seed = 0xFF2E7D32L
+        val overridesA = AppPaletteOverrides(background = 0xFFFFF4E0L)
+        val overridesB = AppPaletteOverrides(background = 0xFF001122L)
+
+        val schemeA = AppPaletteFactory.colorScheme(
+            seed,
+            AppThemeMode.LIGHT,
+            systemInDarkTheme = false,
+            overrides = overridesA,
+        )
+        val schemeB = AppPaletteFactory.colorScheme(
+            seed,
+            AppThemeMode.LIGHT,
+            systemInDarkTheme = false,
+            overrides = overridesB,
+        )
+
+        assertTrue(schemeA.background != schemeB.background)
     }
 }

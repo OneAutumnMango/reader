@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.reader.core.theme.AppPaletteOverrides
 import dev.reader.core.theme.AppThemeMode
 
 private val PRESET_WIDTH = 72.dp
@@ -46,10 +47,11 @@ fun ThemePreviewTile(
     seedColor: Long,
     mode: AppThemeMode,
     systemInDarkTheme: Boolean,
+    overrides: AppPaletteOverrides = AppPaletteOverrides(),
     modifier: Modifier = Modifier,
 ) {
-    val scheme = remember(seedColor, mode, systemInDarkTheme) {
-        AppPaletteFactory.colorScheme(seedColor, mode, systemInDarkTheme)
+    val scheme = remember(seedColor, mode, systemInDarkTheme, overrides) {
+        AppPaletteFactory.colorScheme(seedColor, mode, systemInDarkTheme, overrides)
     }
     Column(
         modifier = modifier
@@ -105,6 +107,7 @@ fun ThemePresetCard(
     systemInDarkTheme: Boolean,
     selected: Boolean,
     onClick: () -> Unit,
+    overrides: AppPaletteOverrides = AppPaletteOverrides(),
     modifier: Modifier = Modifier,
     contentDescription: String = "Theme preview",
     testTag: String = "seed-swatch-${"%08X".format(seedColor)}",
@@ -130,7 +133,12 @@ fun ThemePresetCard(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .testTag(testTag),
     ) {
-        ThemePreviewTile(seedColor = seedColor, mode = mode, systemInDarkTheme = systemInDarkTheme)
+        ThemePreviewTile(
+            seedColor = seedColor,
+            mode = mode,
+            systemInDarkTheme = systemInDarkTheme,
+            overrides = overrides,
+        )
     }
 }
 

@@ -36,7 +36,13 @@ class AppThemeEditorTest {
     fun `picking a seed swatch updates the theme`() {
         var theme by mutableStateOf(AppTheme())
         composeRule.setContent {
-            AppThemeEditor(theme, customThemes = emptyList(), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                theme,
+                customThemes = emptyList(),
+                onChange = { theme = it },
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("seed-swatch-FF2E7D32").performClick()
@@ -48,7 +54,13 @@ class AppThemeEditorTest {
     fun `selecting a mode updates the theme`() {
         var theme by mutableStateOf(AppTheme())
         composeRule.setContent {
-            AppThemeEditor(theme, customThemes = emptyList(), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                theme,
+                customThemes = emptyList(),
+                onChange = { theme = it },
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("app-theme-mode-DARK").performClick()
@@ -60,7 +72,13 @@ class AppThemeEditorTest {
     fun `picking a preset clears any existing overrides`() {
         var theme by mutableStateOf(AppTheme(overrides = AppPaletteOverrides(accent = 0xFF123456L)))
         composeRule.setContent {
-            AppThemeEditor(theme, customThemes = emptyList(), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                theme,
+                customThemes = emptyList(),
+                onChange = { theme = it },
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("seed-swatch-FF1565C0").performClick()
@@ -72,7 +90,13 @@ class AppThemeEditorTest {
     @Test
     fun `all six presets are offered`() {
         composeRule.setContent {
-            AppThemeEditor(AppTheme(), customThemes = emptyList(), onChange = {}, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                AppTheme(),
+                customThemes = emptyList(),
+                onChange = {},
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         listOf("FF6750A4", "FF2E7D32", "FF1565C0", "FFB71C1C", "FFEF6C00", "FF00796B").forEach { hex ->
@@ -83,7 +107,13 @@ class AppThemeEditorTest {
     @Test
     fun `tapping the add card opens the custom theme dialog`() {
         composeRule.setContent {
-            AppThemeEditor(AppTheme(), customThemes = emptyList(), onChange = {}, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                AppTheme(),
+                customThemes = emptyList(),
+                onChange = {},
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("add-custom-theme").performClick()
@@ -95,7 +125,13 @@ class AppThemeEditorTest {
     fun `the seed colour row opens the picker and changes the theme`() {
         var theme by mutableStateOf(AppTheme())
         composeRule.setContent {
-            AppThemeEditor(theme, customThemes = emptyList(), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                theme,
+                customThemes = emptyList(),
+                onChange = { theme = it },
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("add-custom-theme").performClick()
@@ -111,7 +147,13 @@ class AppThemeEditorTest {
     fun `overriding and resetting a role updates the theme`() {
         var theme by mutableStateOf(AppTheme())
         composeRule.setContent {
-            AppThemeEditor(theme, customThemes = emptyList(), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                theme,
+                customThemes = emptyList(),
+                onChange = { theme = it },
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("add-custom-theme").performClick()
@@ -131,7 +173,13 @@ class AppThemeEditorTest {
     fun `setting an override then changing mode keeps both changes`() {
         var theme by mutableStateOf(AppTheme())
         composeRule.setContent {
-            AppThemeEditor(theme, customThemes = emptyList(), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                theme,
+                customThemes = emptyList(),
+                onChange = { theme = it },
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("add-custom-theme").performClick()
@@ -150,7 +198,13 @@ class AppThemeEditorTest {
     @Test
     fun `the custom dialog reflects the theme it is given, not its own writes`() {
         composeRule.setContent {
-            AppThemeEditor(AppTheme(), customThemes = emptyList(), onChange = {}, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                AppTheme(),
+                customThemes = emptyList(),
+                onChange = {},
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
         composeRule.onNodeWithTag("add-custom-theme").performClick()
         composeRule.onNodeWithTag("theme-color-Accent").performClick()
@@ -163,7 +217,13 @@ class AppThemeEditorTest {
     @Test
     fun `the reset icon is absent until a role is overridden`() {
         composeRule.setContent {
-            AppThemeEditor(AppTheme(), customThemes = emptyList(), onChange = {}, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                AppTheme(),
+                customThemes = emptyList(),
+                onChange = {},
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("add-custom-theme").performClick()
@@ -174,7 +234,13 @@ class AppThemeEditorTest {
     @Test
     fun `the add card appears before the built-in and saved presets`() {
         composeRule.setContent {
-            AppThemeEditor(AppTheme(), customThemes = emptyList(), onChange = {}, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                AppTheme(),
+                customThemes = emptyList(),
+                onChange = {},
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         val addLeft = composeRule.onNodeWithTag("add-custom-theme").getUnclippedBoundsInRoot().left
@@ -206,14 +272,28 @@ class AppThemeEditorTest {
 
         assertEquals(1, customThemes.size)
         assertEquals(0xFF445566L, customThemes[0].overrides.accent)
+
+        val newId = customThemes.single().id
+        composeRule.onNodeWithTag("saved-theme-$newId").assertExists()
+        composeRule.onNodeWithTag("saved-theme-$newId").performClick()
     }
 
     @Test
     fun `tapping a saved tile applies its seed and overrides`() {
-        val saved = SavedCustomTheme(id = "abc", seedColor = 0xFF445566L, overrides = AppPaletteOverrides(accent = 0xFF112233L))
+        val saved = SavedCustomTheme(
+            id = "abc",
+            seedColor = 0xFF445566L,
+            overrides = AppPaletteOverrides(accent = 0xFF112233L),
+        )
         var theme by mutableStateOf(AppTheme())
         composeRule.setContent {
-            AppThemeEditor(theme, customThemes = listOf(saved), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                theme,
+                customThemes = listOf(saved),
+                onChange = { theme = it },
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("saved-theme-abc").performClick()
@@ -248,8 +328,12 @@ class AppThemeEditorTest {
 
     @Test
     fun `removing the currently-active saved theme does not change the live theme`() {
-        val saved = SavedCustomTheme(id = "abc", seedColor = 0xFF445566L)
-        var theme by mutableStateOf(AppTheme(seedColor = saved.seedColor))
+        val saved = SavedCustomTheme(
+            id = "abc",
+            seedColor = 0xFF445566L,
+            overrides = AppPaletteOverrides(accent = 0xFF112233L),
+        )
+        var theme by mutableStateOf(AppTheme(seedColor = saved.seedColor, overrides = saved.overrides))
         var customThemes by mutableStateOf(listOf(saved))
         composeRule.setContent {
             AppThemeEditor(
@@ -269,6 +353,7 @@ class AppThemeEditorTest {
         composeRule.onNodeWithTag("saved-theme-remove-abc").performClick()
 
         assertEquals(saved.seedColor, theme.seedColor)
+        assertEquals(saved.overrides, theme.overrides)
         assertTrue(customThemes.isEmpty())
     }
 
@@ -276,11 +361,29 @@ class AppThemeEditorTest {
     fun `two saved themes sharing a seed colour each get an independent tile`() {
         val first = SavedCustomTheme(id = "one", seedColor = 0xFF2E7D32L)
         val second = SavedCustomTheme(id = "two", seedColor = 0xFF2E7D32L)
+        var customThemes by mutableStateOf(listOf(first, second))
         composeRule.setContent {
-            AppThemeEditor(AppTheme(), customThemes = listOf(first, second), onChange = {}, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                AppTheme(),
+                customThemes = customThemes,
+                onChange = {},
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = { id -> customThemes = customThemes.filterNot { it.id == id } },
+            )
         }
 
         composeRule.onNodeWithTag("saved-theme-one").assertExists()
+        composeRule.onNodeWithTag("saved-theme-two").assertExists()
+
+        composeRule.onNodeWithTag("saved-theme-one").performTouchInput {
+            down(center)
+            advanceEventTime(600L)
+            up()
+        }
+        composeRule.onNodeWithTag("saved-theme-remove-one").performClick()
+
+        assertEquals(listOf(second), customThemes)
+        composeRule.onNodeWithTag("saved-theme-one").assertDoesNotExist()
         composeRule.onNodeWithTag("saved-theme-two").assertExists()
     }
 
@@ -288,7 +391,13 @@ class AppThemeEditorTest {
     fun `pressing Set without changing the colour does not create an override`() {
         var theme by mutableStateOf(AppTheme())
         composeRule.setContent {
-            AppThemeEditor(theme, customThemes = emptyList(), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                theme,
+                customThemes = emptyList(),
+                onChange = { theme = it },
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("add-custom-theme").performClick()
@@ -301,7 +410,13 @@ class AppThemeEditorTest {
     @Test
     fun `tapping the label text also opens the picker`() {
         composeRule.setContent {
-            AppThemeEditor(AppTheme(), customThemes = emptyList(), onChange = {}, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+            AppThemeEditor(
+                AppTheme(),
+                customThemes = emptyList(),
+                onChange = {},
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = {},
+            )
         }
 
         composeRule.onNodeWithTag("add-custom-theme").performClick()

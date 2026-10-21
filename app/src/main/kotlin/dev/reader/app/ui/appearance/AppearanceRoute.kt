@@ -37,7 +37,9 @@ fun AppearanceRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
                 customThemes = preferences.customAppThemes,
                 onChange = { theme -> update { it.copy(appTheme = theme) } },
                 onAddCustomTheme = { saved -> update { it.copy(customAppThemes = it.customAppThemes + saved) } },
-                onRemoveCustomTheme = { id -> update { it.copy(customAppThemes = it.customAppThemes.filterNot { saved -> saved.id == id }) } },
+                onRemoveCustomTheme = { id ->
+                    update { it.copy(customAppThemes = it.customAppThemes.filterNot { saved -> saved.id == id }) }
+                },
             )
         }
     }
