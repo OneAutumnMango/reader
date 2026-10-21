@@ -147,6 +147,8 @@ private fun HexField(current: Long, onParsed: (Long) -> Unit) {
         },
         label = { Text("Hex") },
         singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("color-picker-hex"),
     )
 }
