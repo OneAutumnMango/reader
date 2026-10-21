@@ -1,5 +1,8 @@
 package dev.reader.app.ui.appearance
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -25,7 +28,7 @@ class AppThemeEditorTest {
 
     @Test
     fun `picking a seed swatch updates the theme`() {
-        var theme = AppTheme()
+        var theme by mutableStateOf(AppTheme())
         composeRule.setContent { AppThemeEditor(theme, onChange = { theme = it }) }
 
         composeRule.onNodeWithTag("seed-swatch-FF2E7D32").performClick()
@@ -35,7 +38,7 @@ class AppThemeEditorTest {
 
     @Test
     fun `selecting a mode updates the theme`() {
-        var theme = AppTheme()
+        var theme by mutableStateOf(AppTheme())
         composeRule.setContent { AppThemeEditor(theme, onChange = { theme = it }) }
 
         composeRule.onNodeWithTag("app-theme-mode-DARK").performClick()
@@ -45,7 +48,7 @@ class AppThemeEditorTest {
 
     @Test
     fun `picking a preset clears any existing overrides`() {
-        var theme = AppTheme(overrides = AppPaletteOverrides(accent = 0xFF123456L))
+        var theme by mutableStateOf(AppTheme(overrides = AppPaletteOverrides(accent = 0xFF123456L)))
         composeRule.setContent { AppThemeEditor(theme, onChange = { theme = it }) }
 
         composeRule.onNodeWithTag("seed-swatch-FF1565C0").performClick()
@@ -74,7 +77,7 @@ class AppThemeEditorTest {
 
     @Test
     fun `the seed colour row opens the picker and round-trips its value`() {
-        var theme = AppTheme()
+        var theme by mutableStateOf(AppTheme())
         val initialSeed = theme.seedColor
         composeRule.setContent { AppThemeEditor(theme, onChange = { theme = it }) }
 
@@ -90,7 +93,7 @@ class AppThemeEditorTest {
 
     @Test
     fun `overriding and resetting a role updates the theme`() {
-        var theme = AppTheme()
+        var theme by mutableStateOf(AppTheme())
         composeRule.setContent { AppThemeEditor(theme, onChange = { theme = it }) }
 
         composeRule.onNodeWithTag("add-custom-theme").performClick()
@@ -102,6 +105,22 @@ class AppThemeEditorTest {
         composeRule.onNodeWithTag("theme-color-reset-Accent").performClick()
 
         assertNull(theme.overrides.accent)
+    }
+
+    @Test
+    fun `setting an override then changing mode keeps both changes`() {
+        var theme by mutableStateOf(AppTheme())
+        composeRule.setContent { AppThemeEditor(theme, onChange = { theme = it }) }
+
+        composeRule.onNodeWithTag("add-custom-theme").performClick()
+        composeRule.onNodeWithTag("theme-color-Accent").performClick()
+        composeRule.onNodeWithText("Set").performClick()
+        composeRule.onNodeWithText("Done").performClick()
+
+        composeRule.onNodeWithTag("app-theme-mode-DARK").performClick()
+
+        assertEquals(AppThemeMode.DARK, theme.mode)
+        assertNotNull(theme.overrides.accent)
     }
 
     @Test

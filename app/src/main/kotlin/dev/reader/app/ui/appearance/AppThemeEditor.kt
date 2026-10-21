@@ -17,7 +17,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,16 +78,6 @@ private fun Color.toColorLong(): Long = toArgb().toLong() and 0xFFFFFFFFL
 
 @Composable
 fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modifier = Modifier) {
-    // Mirrors `theme` in a tracked MutableState so that changes applied from within this editor
-    // (e.g. from the always-open CustomThemeDialog) are reflected immediately even if the caller's
-    // own recomposition doesn't feed a fresh `theme` value straight back down on the same frame.
-    var localTheme by remember { mutableStateOf(theme) }
-    LaunchedEffect(theme) { localTheme = theme }
-    val apply: (AppTheme) -> Unit = {
-        localTheme = it
-        onChange(it)
-    }
-
     var showCustomDialog by remember { mutableStateOf(false) }
     val systemDark = isSystemInDarkTheme()
 
@@ -101,10 +90,10 @@ fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modi
             SEED_PRESETS.forEach { seed ->
                 ThemePresetCard(
                     seedColor = seed,
-                    mode = localTheme.mode,
+                    mode = theme.mode,
                     systemInDarkTheme = systemDark,
-                    selected = localTheme.seedColor == seed && localTheme.overrides == AppPaletteOverrides(),
-                    onClick = { apply(localTheme.copy(seedColor = seed, overrides = AppPaletteOverrides())) },
+                    selected = theme.seedColor == seed && theme.overrides == AppPaletteOverrides(),
+                    onClick = { onChange(theme.copy(seedColor = seed, overrides = AppPaletteOverrides())) },
                 )
             }
             AddCustomThemeCard(onClick = { showCustomDialog = true })
@@ -121,7 +110,7 @@ fun AppThemeEditor(theme: AppTheme, onChange: (AppTheme) -> Unit, modifier: Modi
     }
 
     if (showCustomDialog) {
-        CustomThemeDialog(localTheme, systemDark, apply, onDismiss = { showCustomDialog = false })
+        CustomThemeDialog(theme, systemDark, onChange, onDismiss = { showCustomDialog = false })
     }
 }
 
