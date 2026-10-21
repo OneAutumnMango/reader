@@ -96,7 +96,7 @@ private fun Hsv.toArgb(alpha: Int): Long =
     AndroidColor.HSVToColor(alpha, floatArrayOf(hue, saturation, value)).toLong() and ARGB_MASK
 
 @Composable
-private fun ColorPickerDialog(initial: Long, label: String, onDismiss: () -> Unit, onPicked: (Long) -> Unit) {
+internal fun ColorPickerDialog(initial: Long, label: String, onDismiss: () -> Unit, onPicked: (Long) -> Unit) {
     val alpha = remember(initial) { ((initial ushr 24) and 0xFF).toInt() }
     var hsv by remember(initial) { mutableStateOf(initial.toHsv()) }
     val picked = hsv.toArgb(alpha)
