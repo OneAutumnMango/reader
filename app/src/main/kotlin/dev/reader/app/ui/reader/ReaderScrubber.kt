@@ -73,7 +73,7 @@ fun ReaderScrubber(fraction: Float, onScrub: (Float) -> Unit, modifier: Modifier
                 .width(THUMB_WIDTH)
                 .height(THUMB_HEIGHT)
                 .clip(RoundedCornerShape(50))
-                .background(MaterialTheme.colorScheme.primary),
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
         )
     }
 }
