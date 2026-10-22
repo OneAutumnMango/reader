@@ -31,6 +31,11 @@ class LibraryCategoryPersistenceTest {
         emit(categoryList)
     }
 
+    private fun slowShowAllCategoryFlow() = flow {
+        delay(50)
+        emit(false)
+    }
+
     @Test
     fun `collecting categories inside a toggled subtree resets the selected category on remount`() {
         var show by mutableStateOf(true)
@@ -112,6 +117,87 @@ class LibraryCategoryPersistenceTest {
 
         // The categories flow lives outside the toggled subtree, so it was never torn down and already
         // holds the real list by the time the screen remounts: no empty-frame window, no reset.
+        composeRule.onNodeWithText("Novels").assertIsSelected()
+    }
+
+    @Test
+    fun `collecting showAllCategory inside a toggled subtree re-shows the hidden All tab on remount`() {
+        var show by mutableStateOf(true)
+        composeRule.mainClock.autoAdvance = false
+
+        composeRule.setContent {
+            if (show) {
+                val liveShowAllCategory by slowShowAllCategoryFlow().collectAsState(initial = true)
+                LibraryScreen(
+                    books = emptyList(),
+                    categories = categoryList,
+                    selectedCategory = novels,
+                    progressFor = { null },
+                    onCategorySelected = {},
+                    onBookClick = {},
+                    onBookLongClick = {},
+                    onSearchClick = {},
+                    onAddCategory = {},
+                    showAllCategory = liveShowAllCategory,
+                )
+            }
+        }
+
+        composeRule.mainClock.advanceTimeBy(1_000) // let the first mount's flow fully deliver (-> false)
+        composeRule.onNodeWithText("All").assertDoesNotExist()
+        composeRule.onNodeWithText("Novels").assertIsSelected()
+
+        show = false
+        Snapshot.sendApplyNotifications()
+        composeRule.mainClock.advanceTimeBy(16)
+        show = true
+        Snapshot.sendApplyNotifications()
+        composeRule.mainClock.advanceTimeBy(16) // one frame after remount: the new flow hasn't delivered yet
+
+        // The fresh mount's showAllCategory reads its `initial = true` fallback again (mirroring this
+        // task's production fallback, `preferences?.showAllCategory ?: true`), so `pages` briefly
+        // regains the "All" entry the user explicitly hid — the same class of regression as the
+        // categories race above, just via a different page-index input.
+        composeRule.onNodeWithText("All").assertExists()
+    }
+
+    @Test
+    fun `collecting showAllCategory outside a toggled subtree survives remount without re-showing All`() {
+        var show by mutableStateOf(true)
+        composeRule.mainClock.autoAdvance = false
+
+        composeRule.setContent {
+            val liveShowAllCategory by slowShowAllCategoryFlow().collectAsState(initial = true)
+            if (show) {
+                LibraryScreen(
+                    books = emptyList(),
+                    categories = categoryList,
+                    selectedCategory = novels,
+                    progressFor = { null },
+                    onCategorySelected = {},
+                    onBookClick = {},
+                    onBookLongClick = {},
+                    onSearchClick = {},
+                    onAddCategory = {},
+                    showAllCategory = liveShowAllCategory,
+                )
+            }
+        }
+
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.onNodeWithText("All").assertDoesNotExist()
+        composeRule.onNodeWithText("Novels").assertIsSelected()
+
+        show = false
+        Snapshot.sendApplyNotifications()
+        composeRule.mainClock.advanceTimeBy(16)
+        show = true
+        Snapshot.sendApplyNotifications()
+        composeRule.mainClock.advanceTimeBy(16)
+
+        // showAllCategory lives outside the toggled subtree, so it was never torn down and already
+        // holds the real (false) value by the time the screen remounts: no empty-frame window, no reset.
+        composeRule.onNodeWithText("All").assertDoesNotExist()
         composeRule.onNodeWithText("Novels").assertIsSelected()
     }
 }

@@ -89,6 +89,8 @@ fun ReaderApp(graph: ReaderGraph) {
     val topBar = remember { TopBarState() }
     var libraryCategory by remember { mutableStateOf<CategoryId?>(null) }
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
+    val libraryPreferences by graph.settings.preferences.collectAsState(initial = null)
+    val showAllCategory = libraryPreferences?.showAllCategory ?: true
 
     LaunchedEffect(Unit) { graph.scanRootFoldersOnLaunch() }
 
@@ -202,6 +204,7 @@ fun ReaderApp(graph: ReaderGraph) {
                         onOpenDetails = { navigator.push(Destination.BookInfo(it.id)) },
                         onSearchClick = { navigator.push(Destination.Search) },
                         categories = categories,
+                        showAllCategory = showAllCategory,
                         gridStateFor = { libraryGridStates.getOrPut(it) { LazyGridState() } },
                         selectedCategory = libraryCategory,
                         onCategorySelected = { libraryCategory = it },

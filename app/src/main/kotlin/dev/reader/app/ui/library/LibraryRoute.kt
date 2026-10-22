@@ -52,6 +52,7 @@ fun LibraryRoute(
     onSearchClick: () -> Unit,
     onOpenDetails: (Book) -> Unit = {},
     categories: List<Category> = emptyList(),
+    showAllCategory: Boolean = true,
     gridStateFor: (CategoryId?) -> LazyGridState? = { null },
     selectedCategory: CategoryId? = null,
     onCategorySelected: (CategoryId?) -> Unit = {},
@@ -151,7 +152,7 @@ fun LibraryRoute(
                     }
                 },
                 layout = preferences?.libraryLayout ?: LibraryLayout.MEDIUM,
-                showAllCategory = preferences?.showAllCategory ?: true,
+                showAllCategory = showAllCategory,
                 gridStateFor = gridStateFor,
             )
         }
