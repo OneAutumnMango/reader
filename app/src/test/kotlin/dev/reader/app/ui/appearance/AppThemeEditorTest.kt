@@ -41,6 +41,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -59,6 +60,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -77,6 +79,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -95,6 +98,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -112,6 +116,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -130,6 +135,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -152,6 +158,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -178,6 +185,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -203,6 +211,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -222,6 +231,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -239,6 +249,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -259,6 +270,7 @@ class AppThemeEditorTest {
                 customThemes = customThemes,
                 onChange = { theme = it },
                 onAddCustomTheme = { customThemes = customThemes + it },
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = { id -> customThemes = customThemes.filterNot { it.id == id } },
             )
         }
@@ -292,6 +304,7 @@ class AppThemeEditorTest {
                 customThemes = listOf(saved),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -312,6 +325,7 @@ class AppThemeEditorTest {
                 customThemes = customThemes,
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = { id -> customThemes = customThemes.filterNot { it.id == id } },
             )
         }
@@ -341,6 +355,7 @@ class AppThemeEditorTest {
                 customThemes = customThemes,
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = { id -> customThemes = customThemes.filterNot { it.id == id } },
             )
         }
@@ -368,6 +383,7 @@ class AppThemeEditorTest {
                 customThemes = customThemes,
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = { id -> customThemes = customThemes.filterNot { it.id == id } },
             )
         }
@@ -396,6 +412,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -415,6 +432,7 @@ class AppThemeEditorTest {
                 customThemes = emptyList(),
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -434,6 +452,7 @@ class AppThemeEditorTest {
                 customThemes = listOf(saved),
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -460,6 +479,7 @@ class AppThemeEditorTest {
                 customThemes = listOf(saved),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -485,6 +505,7 @@ class AppThemeEditorTest {
                 customThemes = listOf(saved),
                 onChange = { theme = it },
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = {},
             )
         }
@@ -544,6 +565,7 @@ class AppThemeEditorTest {
                 customThemes = customThemes,
                 onChange = {},
                 onAddCustomTheme = {},
+                onUpdateCustomTheme = {},
                 onRemoveCustomTheme = { id -> customThemes = customThemes.filterNot { it.id == id } },
             )
         }

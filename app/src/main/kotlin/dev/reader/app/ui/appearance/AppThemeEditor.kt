@@ -91,7 +91,7 @@ fun AppThemeEditor(
     customThemes: List<SavedCustomTheme>,
     onChange: (AppTheme) -> Unit,
     onAddCustomTheme: (SavedCustomTheme) -> Unit,
-    onUpdateCustomTheme: (SavedCustomTheme) -> Unit = {},
+    onUpdateCustomTheme: (SavedCustomTheme) -> Unit,
     onRemoveCustomTheme: (id: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
