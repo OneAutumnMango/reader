@@ -1,5 +1,6 @@
 package dev.reader.app.ui.reader
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
@@ -44,6 +45,10 @@ fun ReaderScrubber(fraction: Float, onScrub: (Float) -> Unit, modifier: Modifier
     // detectDragGestures lambdas would keep calling whatever onScrub closure existed at that
     // first launch, even after ReaderRoute recomposes with a new one (e.g. a different page).
     val currentOnScrub by rememberUpdatedState(onScrub)
+    // Reported position moves in whole-block steps (see scrubberFraction), which would otherwise
+    // make the thumb visibly hop between positions instead of gliding; animate toward it instead.
+    // A drag in progress already tracks the finger directly below, so it skips this entirely.
+    val animatedFraction by animateFloatAsState(targetValue = fraction, label = "reader-scrubber-position")
 
     BoxWithConstraints(
         modifier = modifier
@@ -63,7 +68,7 @@ fun ReaderScrubber(fraction: Float, onScrub: (Float) -> Unit, modifier: Modifier
                 )
             },
     ) {
-        val displayedFraction = if (isDragging) dragFraction else fraction
+        val displayedFraction = if (isDragging) dragFraction else animatedFraction
         val offsetY = (maxHeight - THUMB_HEIGHT) * displayedFraction
 
         Box(

@@ -87,6 +87,19 @@ class ReaderScrubberTest {
 
         assertTrue(draggedTop > 50f) // thumb stayed near the drag point, not snapped to fraction=0
     }
+
+    @Test
+    fun `without dragging, the displayed position animates toward a changed fraction prop`() {
+        var fraction by mutableStateOf(0f)
+        composeRule.setContent {
+            ReaderScrubber(fraction = fraction, onScrub = { }, modifier = Modifier.size(24.dp, 200.dp))
+        }
+        fraction = 1f
+        composeRule.waitForIdle()
+        val thumbTop = composeRule.onNodeWithTag("reader-scrubber-thumb")
+            .fetchSemanticsNode().layoutInfo.coordinates.positionInRoot().y
+        assertTrue(thumbTop > 100f) // settled near the bottom, not stuck at the top
+    }
 }
 
 class ReaderScrubberHelpersTest {
