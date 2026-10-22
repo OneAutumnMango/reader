@@ -8,8 +8,8 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import dev.reader.core.model.CategoryId
 import dev.reader.core.model.Category
+import dev.reader.core.model.CategoryId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import org.junit.Rule

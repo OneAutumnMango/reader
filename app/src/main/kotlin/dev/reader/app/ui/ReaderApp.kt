@@ -58,7 +58,6 @@ import dev.reader.app.ui.settings.LogHistoryRoute
 import dev.reader.app.ui.settings.SettingsRoute
 import dev.reader.app.ui.stats.StatsRoute
 import dev.reader.core.model.BookId
-import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
 import kotlinx.coroutines.launch
 
