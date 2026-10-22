@@ -94,9 +94,18 @@ class ReaderScrubberHelpersTest {
     @Test
     fun `scrubberVisible requires the bar up, not expanded, and continuous-scroll mode`() {
         assertTrue(scrubberVisible(showMenu = true, menuExpanded = false, readingMode = ReadingMode.CONTINUOUS_SCROLL))
-        assertEquals(false, scrubberVisible(showMenu = false, menuExpanded = false, readingMode = ReadingMode.CONTINUOUS_SCROLL))
-        assertEquals(false, scrubberVisible(showMenu = true, menuExpanded = true, readingMode = ReadingMode.CONTINUOUS_SCROLL))
-        assertEquals(false, scrubberVisible(showMenu = true, menuExpanded = false, readingMode = ReadingMode.PAGED_VERTICAL))
+        assertEquals(
+            false,
+            scrubberVisible(showMenu = false, menuExpanded = false, readingMode = ReadingMode.CONTINUOUS_SCROLL),
+        )
+        assertEquals(
+            false,
+            scrubberVisible(showMenu = true, menuExpanded = true, readingMode = ReadingMode.CONTINUOUS_SCROLL),
+        )
+        assertEquals(
+            false,
+            scrubberVisible(showMenu = true, menuExpanded = false, readingMode = ReadingMode.PAGED_VERTICAL),
+        )
     }
 
     @Test

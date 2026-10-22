@@ -104,7 +104,9 @@ fun ReaderRoute(
     var menuExpanded by remember(bookId) { mutableStateOf(false) }
     // Per chapter page, so the label is right the moment a chapter is swiped in.
     val positions = remember(bookId) { mutableStateMapOf<Int, Pair<Int, Int>>() }
-    var scrubJump by remember(bookId) { mutableStateOf<BlockJump?>(null) }
+    // Keyed by the page it was generated for, so a stale scrub from a chapter the user has since
+    // swiped away from never gets fed as another chapter's jump (see jump expression below).
+    var scrubJump by remember(bookId) { mutableStateOf<Pair<Int, BlockJump>?>(null) }
     var scrubJumps by remember(bookId) { mutableIntStateOf(0) }
 
     if (book == null || chapters.isEmpty() || prefs == null) {
@@ -144,7 +146,7 @@ fun ReaderRoute(
                 onToggleMenu = { showMenu = !showMenu },
                 onPositionChanged = { index, total -> positions[page] = index to total },
                 highlight = search.highlight,
-                jump = search.jumpFor(page) ?: scrubJump.takeIf { page == pagerState.currentPage },
+                jump = search.jumpFor(page) ?: scrubJump?.takeIf { it.first == page }?.second,
             )
         }
 
@@ -210,7 +212,7 @@ fun ReaderRoute(
                 onScrub = { newFraction ->
                     val total = position?.second ?: return@ReaderScrubber
                     scrubJumps++
-                    scrubJump = nextScrubJump(newFraction, total, scrubJumps)
+                    scrubJump = pagerState.currentPage to nextScrubJump(newFraction, total, scrubJumps)
                 },
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(0.7f).padding(end = 8.dp),
             )

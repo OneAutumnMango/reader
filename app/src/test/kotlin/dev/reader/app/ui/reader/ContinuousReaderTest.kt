@@ -112,7 +112,8 @@ class ContinuousReaderTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Paragraph 60").assertDoesNotExist() // scrolled to 40, not past it
 
-        jump = BlockJump(block = 40, id = 2) // same block, new id — must scroll again (e.g. after a user action moved away)
+        // Same block, new id — must scroll again (e.g. after a user action moved away).
+        jump = BlockJump(block = 40, id = 2)
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Paragraph 41").assertIsDisplayed()
     }
