@@ -32,6 +32,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,6 +88,9 @@ fun ReaderApp(graph: ReaderGraph) {
     val bookDetailStates = remember { mutableMapOf<BookId, BookDetailState>() }
     val topBar = remember { TopBarState() }
     var libraryCategory by remember { mutableStateOf<CategoryId?>(null) }
+    val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
+    val libraryPreferences by graph.settings.preferences.collectAsState(initial = null)
+    val showAllCategory = libraryPreferences?.showAllCategory ?: true
 
     LaunchedEffect(Unit) { graph.scanRootFoldersOnLaunch() }
 
@@ -199,6 +203,8 @@ fun ReaderApp(graph: ReaderGraph) {
                         onOpenBook = { navigator.push(Destination.BookDetail(it.id)) },
                         onOpenDetails = { navigator.push(Destination.BookInfo(it.id)) },
                         onSearchClick = { navigator.push(Destination.Search) },
+                        categories = categories,
+                        showAllCategory = showAllCategory,
                         gridStateFor = { libraryGridStates.getOrPut(it) { LazyGridState() } },
                         selectedCategory = libraryCategory,
                         onCategorySelected = { libraryCategory = it },

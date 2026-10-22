@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.MenuSection
-import dev.reader.core.theme.AppTheme
 import dev.reader.data.store.PreferencesFile
 import kotlinx.coroutines.launch
 
@@ -33,7 +32,24 @@ fun AppearanceRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         MenuSection("App theme") {
-            AppThemeEditor(preferences.appTheme, onChange = { theme: AppTheme -> update { it.copy(appTheme = theme) } })
+            AppThemeEditor(
+                theme = preferences.appTheme,
+                customThemes = preferences.customAppThemes,
+                onChange = { theme -> update { it.copy(appTheme = theme) } },
+                onAddCustomTheme = { saved -> update { it.copy(customAppThemes = it.customAppThemes + saved) } },
+                onUpdateCustomTheme = { updated ->
+                    update {
+                        it.copy(
+                            customAppThemes = it.customAppThemes.map { saved ->
+                                if (saved.id == updated.id) updated else saved
+                            },
+                        )
+                    }
+                },
+                onRemoveCustomTheme = { id ->
+                    update { it.copy(customAppThemes = it.customAppThemes.filterNot { saved -> saved.id == id }) }
+                },
+            )
         }
     }
 }

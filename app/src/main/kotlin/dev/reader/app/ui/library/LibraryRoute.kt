@@ -51,6 +51,8 @@ fun LibraryRoute(
     onOpenBook: (Book) -> Unit,
     onSearchClick: () -> Unit,
     onOpenDetails: (Book) -> Unit = {},
+    categories: List<Category> = emptyList(),
+    showAllCategory: Boolean = true,
     gridStateFor: (CategoryId?) -> LazyGridState? = { null },
     selectedCategory: CategoryId? = null,
     onCategorySelected: (CategoryId?) -> Unit = {},
@@ -59,7 +61,6 @@ fun LibraryRoute(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
-    val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
     val preferences by graph.settings.preferences.collectAsState(initial = null)
     val progressByBook by graph.progress.observeAll().collectAsState(initial = emptyMap())
     val fractionByBook by graph.progress.observeBookFractions().collectAsState(initial = emptyMap())
@@ -151,7 +152,7 @@ fun LibraryRoute(
                     }
                 },
                 layout = preferences?.libraryLayout ?: LibraryLayout.MEDIUM,
-                showAllCategory = preferences?.showAllCategory ?: true,
+                showAllCategory = showAllCategory,
                 gridStateFor = gridStateFor,
             )
         }

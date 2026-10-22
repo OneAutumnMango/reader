@@ -1,6 +1,9 @@
 package dev.reader.app.ui.reader
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
@@ -89,5 +92,35 @@ class ContinuousReaderTest {
         }
 
         assertEquals(1 to 2, reported)
+    }
+
+    @Test
+    fun `jumping twice to the same block with a different id scrolls both times`() {
+        val long = RichDocument((1..60).map { Block.Paragraph(listOf(Span("Paragraph $it"))) })
+        var jump by mutableStateOf<BlockJump?>(null)
+        composeRule.setContent {
+            ContinuousReader(
+                long,
+                ReaderTheme.Default,
+                ReaderSettings(),
+                Modifier.size(300.dp, 400.dp).testTag("reader"),
+                jump = jump,
+            )
+        }
+
+        jump = BlockJump(block = 40, id = 1)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Paragraph 60").assertDoesNotExist() // scrolled to 40, not past it
+
+        // Scroll away so the second jump to the SAME block has somewhere real to prove it moved
+        // from — without this, the assertion below would pass even if the nonce were ignored.
+        composeRule.onNodeWithTag("reader").performScrollToIndex(0)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Paragraph 41").assertDoesNotExist()
+
+        // Same block, new id — must scroll again (e.g. after a user action moved away).
+        jump = BlockJump(block = 40, id = 2)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Paragraph 41").assertIsDisplayed()
     }
 }

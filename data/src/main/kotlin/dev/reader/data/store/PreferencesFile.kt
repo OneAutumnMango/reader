@@ -5,6 +5,7 @@ import dev.reader.core.stats.StatsGraph
 import dev.reader.core.theme.AppTheme
 import dev.reader.core.theme.LibraryLayout
 import dev.reader.core.theme.ReaderTheme
+import dev.reader.core.theme.SavedCustomTheme
 import kotlinx.serialization.Serializable
 
 /** Bumped when a stored shape changes in a way that needs migrating. */
@@ -55,6 +56,7 @@ data class PreferencesFile(
     val librarySort: LibrarySort = LibrarySort.ADDED,
     val librarySortDescending: Boolean = true,
     val statsGraphs: List<StatsGraph> = emptyList(),
+    val customAppThemes: List<SavedCustomTheme> = emptyList(),
     val singleCategoryPerBook: Boolean = false,
     val automaticBackupsEnabled: Boolean = false,
     val automaticBackupFolderUri: String? = null,
