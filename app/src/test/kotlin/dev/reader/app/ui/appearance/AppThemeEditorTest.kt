@@ -424,4 +424,94 @@ class AppThemeEditorTest {
 
         composeRule.onNodeWithTag("color-picker-hex").assertExists()
     }
+
+    @Test
+    fun `long-pressing a saved tile shows an Edit action alongside Remove`() {
+        val saved = SavedCustomTheme(id = "abc", seedColor = 0xFF445566L)
+        composeRule.setContent {
+            AppThemeEditor(AppTheme(), customThemes = listOf(saved), onChange = {}, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+        }
+        composeRule.onNodeWithTag("saved-theme-abc").performTouchInput { down(center); advanceEventTime(600L); up() }
+        composeRule.onNodeWithTag("saved-theme-edit-abc").assertExists()
+        composeRule.onNodeWithTag("saved-theme-remove-abc").assertExists()
+    }
+
+    @Test
+    fun `tapping Edit opens the dialog seeded with that tile's colours, titled Edit theme`() {
+        val saved = SavedCustomTheme(id = "abc", seedColor = 0xFF445566L, overrides = AppPaletteOverrides(accent = 0xFF112233L))
+        var theme by mutableStateOf(AppTheme())
+        composeRule.setContent {
+            AppThemeEditor(theme, customThemes = listOf(saved), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+        }
+        composeRule.onNodeWithTag("saved-theme-abc").performTouchInput { down(center); advanceEventTime(600L); up() }
+        composeRule.onNodeWithTag("saved-theme-edit-abc").performClick()
+
+        composeRule.onNodeWithText("Edit theme").assertExists()
+        assertEquals(saved.seedColor, theme.seedColor)
+        assertEquals(saved.overrides, theme.overrides)
+    }
+
+    @Test
+    fun `editing a non-active saved tile seeds the dialog from the tile, not the active theme`() {
+        val saved = SavedCustomTheme(id = "abc", seedColor = 0xFF445566L)
+        var theme by mutableStateOf(AppTheme(seedColor = 0xFF111111L))
+        composeRule.setContent {
+            AppThemeEditor(theme, customThemes = listOf(saved), onChange = { theme = it }, onAddCustomTheme = {}, onRemoveCustomTheme = {})
+        }
+        composeRule.onNodeWithTag("saved-theme-abc").performTouchInput { down(center); advanceEventTime(600L); up() }
+        composeRule.onNodeWithTag("saved-theme-edit-abc").performClick()
+
+        assertEquals(saved.seedColor, theme.seedColor)
+    }
+
+    @Test
+    fun `tapping Done after Edit updates the existing tile instead of adding a new one`() {
+        val saved = SavedCustomTheme(id = "abc", seedColor = 0xFF445566L)
+        var theme by mutableStateOf(AppTheme())
+        var customThemes by mutableStateOf(listOf(saved))
+        composeRule.setContent {
+            AppThemeEditor(
+                theme,
+                customThemes = customThemes,
+                onChange = { theme = it },
+                onAddCustomTheme = { customThemes = customThemes + it },
+                onUpdateCustomTheme = { updated -> customThemes = customThemes.map { if (it.id == updated.id) updated else it } },
+                onRemoveCustomTheme = { id -> customThemes = customThemes.filterNot { it.id == id } },
+            )
+        }
+
+        composeRule.onNodeWithTag("saved-theme-abc").performTouchInput { down(center); advanceEventTime(600L); up() }
+        composeRule.onNodeWithTag("saved-theme-edit-abc").performClick()
+        composeRule.onNodeWithTag("theme-color-Accent").performClick()
+        composeRule.onNodeWithTag("color-picker-hex").performTextClearance()
+        composeRule.onNodeWithTag("color-picker-hex").performTextInput("#FF778899")
+        composeRule.onNodeWithText("Set").performClick()
+        composeRule.onNodeWithText("Done").performClick()
+
+        assertEquals(1, customThemes.size)
+        assertEquals("abc", customThemes[0].id)
+        assertEquals(0xFF778899L, customThemes[0].overrides.accent)
+    }
+
+    @Test
+    fun `edit and remove menu items stay paired with the right tile as the list shrinks`() {
+        val first = SavedCustomTheme(id = "one", seedColor = 0xFF2E7D32L)
+        val second = SavedCustomTheme(id = "two", seedColor = 0xFF1565C0L)
+        var customThemes by mutableStateOf(listOf(first, second))
+        composeRule.setContent {
+            AppThemeEditor(
+                AppTheme(),
+                customThemes = customThemes,
+                onChange = {},
+                onAddCustomTheme = {},
+                onRemoveCustomTheme = { id -> customThemes = customThemes.filterNot { it.id == id } },
+            )
+        }
+        composeRule.onNodeWithTag("saved-theme-one").performTouchInput { down(center); advanceEventTime(600L); up() }
+        composeRule.onNodeWithTag("saved-theme-remove-one").performClick()
+
+        composeRule.onNodeWithTag("saved-theme-two").performTouchInput { down(center); advanceEventTime(600L); up() }
+        composeRule.onNodeWithTag("saved-theme-edit-two").assertExists()
+        composeRule.onNodeWithTag("saved-theme-edit-one").assertDoesNotExist()
+    }
 }

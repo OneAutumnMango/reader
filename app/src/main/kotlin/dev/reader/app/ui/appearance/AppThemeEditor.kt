@@ -91,11 +91,13 @@ fun AppThemeEditor(
     customThemes: List<SavedCustomTheme>,
     onChange: (AppTheme) -> Unit,
     onAddCustomTheme: (SavedCustomTheme) -> Unit,
+    onUpdateCustomTheme: (SavedCustomTheme) -> Unit = {},
     onRemoveCustomTheme: (id: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showCustomDialog by remember { mutableStateOf(false) }
-    var showRemoveMenuFor by remember { mutableStateOf<String?>(null) }
+    var showThemeMenuFor by remember { mutableStateOf<String?>(null) }
+    var editingThemeId by remember { mutableStateOf<String?>(null) }
     val systemDark = isSystemInDarkTheme()
 
     Column(modifier = modifier) {
@@ -125,17 +127,27 @@ fun AppThemeEditor(
                         overrides = saved.overrides,
                         contentDescription = "Custom theme",
                         testTag = "saved-theme-${saved.id}",
-                        onLongClick = { showRemoveMenuFor = saved.id },
+                        onLongClick = { showThemeMenuFor = saved.id },
                     )
                     DropdownMenu(
-                        expanded = showRemoveMenuFor == saved.id,
-                        onDismissRequest = { showRemoveMenuFor = null },
+                        expanded = showThemeMenuFor == saved.id,
+                        onDismissRequest = { showThemeMenuFor = null },
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit") },
+                            onClick = {
+                                editingThemeId = saved.id
+                                onChange(theme.copy(seedColor = saved.seedColor, overrides = saved.overrides))
+                                showCustomDialog = true
+                                showThemeMenuFor = null
+                            },
+                            modifier = Modifier.testTag("saved-theme-edit-${saved.id}"),
+                        )
                         DropdownMenuItem(
                             text = { Text("Remove") },
                             onClick = {
                                 onRemoveCustomTheme(saved.id)
-                                showRemoveMenuFor = null
+                                showThemeMenuFor = null
                             },
                             modifier = Modifier.testTag("saved-theme-remove-${saved.id}"),
                         )
@@ -155,7 +167,20 @@ fun AppThemeEditor(
     }
 
     if (showCustomDialog) {
-        CustomThemeDialog(theme, systemDark, onChange, onAddCustomTheme, onDismiss = { showCustomDialog = false })
+        CustomThemeDialog(
+            theme,
+            systemDark,
+            onChange,
+            isEditing = editingThemeId != null,
+            onConfirm = { saved ->
+                val id = editingThemeId
+                if (id != null) onUpdateCustomTheme(saved.copy(id = id)) else onAddCustomTheme(saved)
+            },
+            onDismiss = {
+                showCustomDialog = false
+                editingThemeId = null
+            },
+        )
     }
 }
 
@@ -164,7 +189,8 @@ private fun CustomThemeDialog(
     theme: AppTheme,
     systemInDarkTheme: Boolean,
     onChange: (AppTheme) -> Unit,
-    onAddCustomTheme: (SavedCustomTheme) -> Unit,
+    isEditing: Boolean,
+    onConfirm: (SavedCustomTheme) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val scheme = remember(theme.seedColor, theme.mode, systemInDarkTheme, theme.overrides) {
@@ -173,7 +199,7 @@ private fun CustomThemeDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Custom theme") },
+        title = { Text(if (isEditing) "Edit theme" else "Custom theme") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -198,7 +224,7 @@ private fun CustomThemeDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                onAddCustomTheme(
+                onConfirm(
                     SavedCustomTheme(
                         id = UUID.randomUUID().toString(),
                         seedColor = theme.seedColor,
