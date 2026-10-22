@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,7 +38,6 @@ class BookSearch {
     var active by mutableStateOf<Int?>(null)
         private set
     private var jump by mutableStateOf<Pair<Int, BlockJump>?>(null)
-    private var jumps by mutableIntStateOf(0)
 
     /** Stable between edits, so it can key effects; null while closed or empty. */
     val compiled by derivedStateOf { if (open) TextSearch.compile(query, options) else null }
@@ -49,12 +47,15 @@ class BookSearch {
     val ui: SearchUiState
         get() = SearchUiState(query, options, hits, searching, compiled?.isFailure == true, active)
 
-    /** Makes match [index] current and returns the chapter page it lives on. */
-    fun select(index: Int): Int? {
+    /**
+     * Makes match [index] current and returns the chapter page it lives on. [nonce] is caller-
+     * supplied (rather than generated here) so it can share one nonce space with other jump
+     * sources — e.g. the reader scrubber — letting whichever jump is newest always win.
+     */
+    fun select(index: Int, nonce: Int): Int? {
         val hit = hits?.getOrNull(index) ?: return null
         active = index
-        jumps++
-        jump = hit.chapterIndex to BlockJump(hit.match.block, jumps)
+        jump = hit.chapterIndex to BlockJump(hit.match.block, nonce)
         return hit.chapterIndex
     }
 

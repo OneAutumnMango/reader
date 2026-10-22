@@ -107,7 +107,9 @@ fun ReaderRoute(
     // Keyed by the page it was generated for, so a stale scrub from a chapter the user has since
     // swiped away from never gets fed as another chapter's jump (see jump expression below).
     var scrubJump by remember(bookId) { mutableStateOf<Pair<Int, BlockJump>?>(null) }
-    var scrubJumps by remember(bookId) { mutableIntStateOf(0) }
+    // Shared by both search's jumpFor and the scrubber, so whichever jump is newest always wins
+    // instead of one permanently shadowing the other via fixed priority.
+    var jumpNonce by remember(bookId) { mutableIntStateOf(0) }
 
     if (book == null || chapters.isEmpty() || prefs == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -146,8 +148,17 @@ fun ReaderRoute(
                 onToggleMenu = { showMenu = !showMenu },
                 onPositionChanged = { index, total -> positions[page] = index to total },
                 highlight = search.highlight,
-                jump = search.jumpFor(page) ?: scrubJump?.takeIf { it.first == page }?.second,
+                jump = listOfNotNull(search.jumpFor(page), scrubJump?.takeIf { it.first == page }?.second)
+                    .maxByOrNull { it.id },
             )
+        }
+
+        // Clears a scrub jump once the pager has moved away from the page it targeted, so
+        // revisiting that page later shows its real saved position instead of re-applying a stale
+        // jump (the same class of bug the page-scoping above already guards against, but
+        // triggered by returning to a page rather than by a chapter change).
+        LaunchedEffect(pagerState.currentPage) {
+            scrubJump?.let { (page, _) -> if (page != pagerState.currentPage) scrubJump = null }
         }
 
         if (showMenu) {
@@ -193,7 +204,8 @@ fun ReaderRoute(
                             onQueryChange = { search.query = it },
                             onOptionsChange = { search.options = it },
                             onSelect = { index ->
-                                search.select(index)?.let { scope.launch { pagerState.scrollToPage(it) } }
+                                jumpNonce++
+                                search.select(index, jumpNonce)?.let { scope.launch { pagerState.scrollToPage(it) } }
                             },
                             onClose = { search.open = false },
                         )
@@ -211,8 +223,8 @@ fun ReaderRoute(
                 fraction = scrubberFraction(position),
                 onScrub = { newFraction ->
                     val total = position?.second ?: return@ReaderScrubber
-                    scrubJumps++
-                    scrubJump = pagerState.currentPage to nextScrubJump(newFraction, total, scrubJumps)
+                    jumpNonce++
+                    scrubJump = pagerState.currentPage to nextScrubJump(newFraction, total, jumpNonce)
                 },
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(0.7f).padding(end = 8.dp),
             )

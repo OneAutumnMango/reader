@@ -109,10 +109,13 @@ class ReaderScrubberHelpersTest {
     }
 
     @Test
-    fun `scrubberFraction is 0 for null position or zero total, otherwise index over total`() {
+    fun `scrubberFraction is 0 for degenerate totals, otherwise index over the last valid index`() {
         assertEquals(0f, scrubberFraction(null))
         assertEquals(0f, scrubberFraction(5 to 0))
-        assertEquals(0.5f, scrubberFraction(5 to 10))
+        assertEquals(0f, scrubberFraction(0 to 1))
+        assertEquals(0.5f, scrubberFraction(5 to 11))
+        // The last block should put the thumb all the way at the bottom of the track, not short of it.
+        assertEquals(1f, scrubberFraction(9 to 10))
     }
 
     @Test
@@ -120,6 +123,12 @@ class ReaderScrubberHelpersTest {
         assertEquals(0, nextScrubJump(fraction = 0.5f, total = 0, nonce = 1).block)
         assertEquals(0, nextScrubJump(fraction = 0.5f, total = 1, nonce = 1).block)
         assertEquals(5, nextScrubJump(fraction = 0.5f, total = 10, nonce = 1).block)
+    }
+
+    @Test
+    fun `nextScrubJump at fraction 1 resolves to the last valid block, the inverse of scrubberFraction`() {
+        assertEquals(9, nextScrubJump(fraction = 1f, total = 10, nonce = 1).block)
+        assertEquals(0, nextScrubJump(fraction = 0f, total = 10, nonce = 1).block)
     }
 
     @Test
