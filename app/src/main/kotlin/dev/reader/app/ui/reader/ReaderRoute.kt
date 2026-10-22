@@ -4,8 +4,10 @@ import android.os.SystemClock
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.AlertDialog
@@ -19,6 +21,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -101,6 +104,8 @@ fun ReaderRoute(
     var menuExpanded by remember(bookId) { mutableStateOf(false) }
     // Per chapter page, so the label is right the moment a chapter is swiped in.
     val positions = remember(bookId) { mutableStateMapOf<Int, Pair<Int, Int>>() }
+    var scrubJump by remember(bookId) { mutableStateOf<BlockJump?>(null) }
+    var scrubJumps by remember(bookId) { mutableIntStateOf(0) }
 
     if (book == null || chapters.isEmpty() || prefs == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -139,7 +144,7 @@ fun ReaderRoute(
                 onToggleMenu = { showMenu = !showMenu },
                 onPositionChanged = { index, total -> positions[page] = index to total },
                 highlight = search.highlight,
-                jump = search.jumpFor(page),
+                jump = search.jumpFor(page) ?: scrubJump.takeIf { page == pagerState.currentPage },
             )
         }
 
@@ -195,6 +200,19 @@ fun ReaderRoute(
                     null
                 },
                 modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+
+        if (scrubberVisible(showMenu, menuExpanded, readingMode)) {
+            val position = positions[pagerState.currentPage]
+            ReaderScrubber(
+                fraction = scrubberFraction(position),
+                onScrub = { newFraction ->
+                    val total = position?.second ?: return@ReaderScrubber
+                    scrubJumps++
+                    scrubJump = nextScrubJump(newFraction, total, scrubJumps)
+                },
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(0.7f).padding(end = 8.dp),
             )
         }
     }
