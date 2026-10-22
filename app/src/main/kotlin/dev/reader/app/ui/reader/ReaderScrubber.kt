@@ -26,7 +26,7 @@ import kotlin.math.roundToInt
 
 // The thumb's own fixed size; when the caller's modifier doesn't pin a width (as in the real
 // reader, which only constrains height), a BoxWithConstraints with no fillMax* wraps to this.
-private val THUMB_WIDTH = 28.dp
+private val THUMB_WIDTH = 14.dp
 private val THUMB_HEIGHT = 48.dp
 
 /**
