@@ -84,7 +84,9 @@ fun ReaderRoute(
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    // Extras (title page, copyright…) open on their own; otherwise only real chapters are swipeable.
+    // Opening an extra (title page, copyright…) swipes through the full, in-order list — extras
+    // included — so front matter flows into chapter one like any other page turn. Opening a real
+    // chapter keeps extras out of the swipe sequence so normal reading isn't interrupted by them.
     val chapters = remember(allChapters, chapterId, books) {
         val pdfPages = books.find { it.id == bookId }
             ?.let { it.format == BookFormat.PDF && it.pdfRenderMode != PdfRenderMode.REFLOW_TEXT } == true
@@ -92,7 +94,7 @@ fun ReaderRoute(
         when {
             // Chapters can start mid-page, so page view always shows the whole PDF.
             pdfPages -> allChapters.take(1)
-            opened?.isExtra == true -> listOf(opened)
+            opened?.isExtra == true -> allChapters
             else -> allChapters.filterNot { it.isExtra }.ifEmpty { allChapters }
         }
     }

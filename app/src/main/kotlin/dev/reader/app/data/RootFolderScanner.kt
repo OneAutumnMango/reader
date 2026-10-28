@@ -10,6 +10,9 @@ import dev.reader.data.repo.LibraryRepository
 import dev.reader.data.repo.SettingsRepository
 import dev.reader.data.store.CollectionKind
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -62,27 +65,32 @@ class RootFolderScanner(
             AppLog.warn("Saved library folder is unavailable or unreadable", "LibraryScan")
             return 0
         }
-        var imported = 0
         val entries = when (kind) {
             CollectionKind.FILES -> collectBookFiles(root)
             CollectionKind.FOLDERS -> root.listFiles().filter { it.isDirectory }
             null -> root.listFiles().toList()
         }
         AppLog.debug("Found ${entries.size} matching library-folder entry(s)", "LibraryScan")
-        for (child in entries) {
-            val key = child.uri.toString()
-            val knownSource = settings.preferences.first().rootEntryBooks[key]
-            if (knownSource != null && library.findBySourcePath(knownSource) != null) continue
-
-            runCatching { importEntry(child) }
-                .onFailure { AppLog.error("Library entry import failed", "LibraryScan", it) }
-                .getOrNull()
-                ?.let { book ->
-                    settings.update { it.copy(rootEntryBooks = it.rootEntryBooks + (key to book.sourcePath)) }
-                    imported++
+        // Each entry's SAF/DB lookup is latency-bound rather than CPU-bound, so running them
+        // concurrently instead of one by one is what keeps a 30-book library's rescan quick.
+        val knownSources = settings.preferences.first().rootEntryBooks
+        val imports = coroutineScope {
+            entries.map { child ->
+                async(Dispatchers.IO) {
+                    val key = child.uri.toString()
+                    val knownSource = knownSources[key]
+                    if (knownSource != null && library.findBySourcePath(knownSource) != null) return@async null
+                    runCatching { importEntry(child) }
+                        .onFailure { AppLog.error("Library entry import failed", "LibraryScan", it) }
+                        .getOrNull()
+                        ?.let { book -> key to book.sourcePath }
                 }
+            }.awaitAll()
+        }.filterNotNull()
+        if (imports.isNotEmpty()) {
+            settings.update { it.copy(rootEntryBooks = it.rootEntryBooks + imports) }
         }
-        return imported
+        return imports.size
     }
 
     private suspend fun importEntry(entry: DocumentFile): Book? {
@@ -104,15 +112,23 @@ class RootFolderScanner(
 
 private const val MAX_FOLDER_DEPTH = 12
 
-/** Every supported book file under [folder], however deeply nested; hidden folders (".thumbnails" etc.) are skipped. */
-internal fun collectBookFiles(folder: DocumentFile, depth: Int = 0): List<DocumentFile> {
+/**
+ * Every supported book file under [folder], however deeply nested; hidden folders (".thumbnails"
+ * etc.) are skipped. Each child's name/type check is its own SAF round trip over a tree Uri, so
+ * siblings are probed concurrently rather than one at a time.
+ */
+internal suspend fun collectBookFiles(folder: DocumentFile, depth: Int = 0): List<DocumentFile> {
     if (depth > MAX_FOLDER_DEPTH) return emptyList()
-    return folder.listFiles().flatMap { entry ->
-        val name = entry.name.orEmpty()
-        when {
-            entry.isDirectory && !name.startsWith(".") -> collectBookFiles(entry, depth + 1)
-            entry.isFile && BookFormat.fromFileName(name) != null -> listOf(entry)
-            else -> emptyList()
-        }
+    return coroutineScope {
+        folder.listFiles().map { entry ->
+            async(Dispatchers.IO) {
+                val name = entry.name.orEmpty()
+                when {
+                    entry.isDirectory && !name.startsWith(".") -> collectBookFiles(entry, depth + 1)
+                    entry.isFile && BookFormat.fromFileName(name) != null -> listOf(entry)
+                    else -> emptyList()
+                }
+            }
+        }.awaitAll().flatten()
     }
 }

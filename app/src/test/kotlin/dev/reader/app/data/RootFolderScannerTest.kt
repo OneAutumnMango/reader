@@ -1,6 +1,7 @@
 package dev.reader.app.data
 
 import androidx.documentfile.provider.DocumentFile
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -12,7 +13,7 @@ import kotlin.test.assertEquals
 class RootFolderScannerTest {
 
     @Test
-    fun `file collections find books in nested folders and skip everything else`() {
+    fun `file collections find books in nested folders and skip everything else`() = runBlocking {
         val root = createTempDirectory("library").toFile()
         try {
             fun touch(path: String) = File(root, path).apply { parentFile?.mkdirs() }.writeText("x")

@@ -98,7 +98,10 @@ object ChapterLoader {
             }
             else -> Unit
         }
-        val parsed = parseWholeBook(file, book.copy(format = format))
+        // Light novel "chapters" are each their own small file, so a whole-book parse here is already
+        // cheap and per-file; only the single-file multi-chapter formats below need the cache.
+        val bookForFormat = book.copy(format = format)
+        val parsed = if (isLightNovel) parseWholeBook(file, bookForFormat) else cachedParse(file, bookForFormat)
         val chapters = parsed.chapters.filterIsInstance<ParsedChapter.TextChapter>()
         val document = if (isLightNovel) {
             RichDocument(chapters.flatMap { it.document.blocks })
@@ -106,6 +109,24 @@ object ChapterLoader {
             chapters.getOrNull(chapterIndex)?.document ?: return null
         }
         return ChapterContent.Text(document)
+    }
+
+    private data class TextKey(
+        val path: String,
+        val modified: Long,
+        val format: BookFormat,
+        val pattern: String?,
+        val excluded: Set<Int>,
+    )
+
+    private var textCache: Pair<TextKey, ParsedBook>? = null
+
+    /** Splitting needs the whole file's text, so keep the last parse for swiping between its chapters. */
+    @Synchronized
+    private fun cachedParse(file: File, book: Book): ParsedBook {
+        val key = TextKey(file.path, file.lastModified(), book.format, book.patternFor(), book.excludedLinesFor())
+        textCache?.takeIf { it.first == key }?.let { return it.second }
+        return parseWholeBook(file, book).also { textCache = key to it }
     }
 
     private fun parseWholeBook(file: File, book: Book) = when (book.format) {
