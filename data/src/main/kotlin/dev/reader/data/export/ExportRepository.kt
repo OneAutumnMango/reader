@@ -54,7 +54,11 @@ class ExportRepository(
         return bundle
     }
 
-    /** Clears every table, then applies [bundle] — the result mirrors the bundle exactly. */
+    /**
+     * Clears every table, then applies [bundle] — the result mirrors the bundle exactly. Both
+     * steps run in one transaction, so a bundle that fails partway through leaves the previous
+     * data intact instead of leaving the library deleted with nothing restored in its place.
+     */
     suspend fun replaceAll(bundle: ExportBundle) {
         database.withTransaction {
             with(database.maintenance()) {
@@ -68,8 +72,8 @@ class ExportRepository(
                 deleteCategories()
                 deleteSessions()
             }
+            apply(bundle)
         }
-        apply(bundle)
     }
 
     private suspend fun withLibrary(bundle: ExportBundle): ExportBundle {
