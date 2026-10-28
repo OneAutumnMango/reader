@@ -79,22 +79,26 @@ class RootFolderScanner(
             null -> root.listFiles().toList()
         }
         AppLog.debug("Found ${entries.size} matching library-folder entry(s)", "LibraryScan")
-        // Each entry's SAF/DB lookup is latency-bound rather than CPU-bound, so running them
-        // concurrently instead of one by one is what keeps a 30-book library's rescan quick.
+        // Each entry's "already known?" SAF/DB lookup is latency-bound rather than CPU-bound, so
+        // running those concurrently is what keeps a 30-book library's rescan quick. The actual
+        // imports below stay sequential: importEntry's content-hash dedup is a check-then-insert,
+        // so importing two new, identical-content files concurrently could let both pass the
+        // dedup check before either is inserted, creating two library entries for one book.
         val knownSources = settings.preferences.first().rootEntryBooks
-        val imports = coroutineScope {
+        val newEntries = coroutineScope {
             entries.map { child ->
                 async(Dispatchers.IO) {
-                    val key = child.uri.toString()
-                    val knownSource = knownSources[key]
-                    if (knownSource != null && library.findBySourcePath(knownSource) != null) return@async null
-                    runCatching { importEntry(child) }
-                        .onFailure { AppLog.error("Library entry import failed", "LibraryScan", it) }
-                        .getOrNull()
-                        ?.let { book -> key to book.sourcePath }
+                    val knownSource = knownSources[child.uri.toString()]
+                    if (knownSource != null && library.findBySourcePath(knownSource) != null) null else child
                 }
             }.awaitAll()
         }.filterNotNull()
+        val imports = newEntries.mapNotNull { child ->
+            runCatching { importEntry(child) }
+                .onFailure { AppLog.error("Library entry import failed", "LibraryScan", it) }
+                .getOrNull()
+                ?.let { book -> child.uri.toString() to book.sourcePath }
+        }
         if (imports.isNotEmpty()) {
             settings.update { it.copy(rootEntryBooks = it.rootEntryBooks + imports) }
         }
