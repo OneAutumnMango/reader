@@ -237,6 +237,9 @@ fun ReaderRoute(
         if (pagerState.currentPage != pagerState.settledPage || pagerState.isScrollInProgress || !isResumed) {
             return@LaunchedEffect
         }
+        // Extras (title page, copyright…) don't count as "where you're reading" — passing through
+        // one on the way into chapter one shouldn't move the Resume button's target.
+        if (currentChapter.isExtra) return@LaunchedEffect
         // Keep the book-level "last opened" pointer up to date as chapters are swiped through.
         val existing = graph.progress.observe(bookId).first()
         graph.progress.update(
