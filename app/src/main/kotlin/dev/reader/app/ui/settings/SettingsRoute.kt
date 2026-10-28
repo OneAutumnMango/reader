@@ -101,8 +101,7 @@ fun LibrarySourcesRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
     if (missingBooks.isNotEmpty()) {
         MissingBooksDialog(
             books = missingBooks,
-            onRemoveAll = {
-                val toRemove = missingBooks
+            onRemove = { toRemove ->
                 missingBooks = emptyList()
                 scope.launch { toRemove.forEach { graph.library.deleteBook(it.id) } }
             },
