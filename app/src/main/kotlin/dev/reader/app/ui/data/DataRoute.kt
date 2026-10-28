@@ -4,9 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -17,7 +14,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.documentfile.provider.DocumentFile
 import dev.reader.app.data.AppLog
 import dev.reader.app.data.AutomaticBackupScheduler
@@ -26,11 +22,15 @@ import dev.reader.app.ui.describeImportError
 import dev.reader.data.export.ExportScope
 import dev.reader.data.store.PreferencesFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 
 private val ANY_FILE = arrayOf("*/*")
+
+/** A picked backup file, read far enough to show what restoring it would change. */
+private data class PendingRestore(val uri: Uri, val preview: RestorePreview)
 
 @Composable
 fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
@@ -41,7 +41,7 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
     var busy by remember { mutableStateOf(false) }
     var pendingScopes by remember { mutableStateOf(ExportScope.entries.toSet()) }
     var includeBooks by remember { mutableStateOf(false) }
-    var confirmRestore by remember { mutableStateOf(false) }
+    var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var danger by remember { mutableStateOf<DangerAction?>(null) }
 
     LaunchedEffect(
@@ -104,10 +104,28 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
             graph.backups.write(out, withBooks)
         }
     }
-    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {
-        read(it, "Backup applied") { input ->
-            graph.backups.restore(input)
-            graph.refreshMissingCovers()
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        busy = true
+        status = "Reading backup…"
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching {
+                    val backupBooks = requireNotNull(context.contentResolver.openInputStream(uri)) {
+                        "Couldn't open that file"
+                    }.use { graph.backups.preview(it) }
+                    val current = graph.library.observeBooks().first()
+                    PendingRestore(uri, restorePreview(current, backupBooks))
+                }
+            }
+            busy = false
+            outcome.fold(
+                onSuccess = {
+                    status = ""
+                    pendingRestore = it
+                },
+                onFailure = { status = "Failed: ${describeImportError(it)}" },
+            )
         }
     }
     val backupFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -137,7 +155,7 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         includeBooksInBackup = includeBooks,
         onIncludeBooksInBackupChange = { includeBooks = it },
         onCreateBackup = { backupLauncher.launch("reader-backup-${today()}.zip") },
-        onRestoreBackup = { confirmRestore = true },
+        onRestoreBackup = { restoreLauncher.launch(ANY_FILE) },
         onDanger = { danger = it },
         modifier = modifier,
         automaticBackupsEnabled = preferences.automaticBackupsEnabled,
@@ -156,21 +174,24 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         },
     )
 
-    if (confirmRestore) {
-        AlertDialog(
-            onDismissRequest = { confirmRestore = false },
-            title = { Text("Apply backup?") },
-            text = { Text("Your current library, progress, stats and settings will be replaced by the backup's.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmRestore = false
-                        restoreLauncher.launch(ANY_FILE)
-                    },
-                    modifier = Modifier.testTag("confirm-restore"),
-                ) { Text("Choose backup") }
+    pendingRestore?.let { pending ->
+        RestorePreviewDialog(
+            preview = pending.preview,
+            onMerge = {
+                pendingRestore = null
+                read(pending.uri, "Backup merged") { input ->
+                    graph.backups.restore(input, merge = true)
+                    graph.refreshMissingCovers()
+                }
             },
-            dismissButton = { TextButton(onClick = { confirmRestore = false }) { Text("Cancel") } },
+            onReplace = {
+                pendingRestore = null
+                read(pending.uri, "Backup applied") { input ->
+                    graph.backups.restore(input)
+                    graph.refreshMissingCovers()
+                }
+            },
+            onDismiss = { pendingRestore = null },
         )
     }
 

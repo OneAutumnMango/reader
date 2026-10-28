@@ -35,12 +35,26 @@ class BackupRepository(
         }
     }
 
-    suspend fun restore(input: InputStream) {
+    /** The backup's books, for showing what a restore would add, update or (unless merging) remove. */
+    suspend fun preview(input: InputStream): List<Book> {
+        val manifest = ZipInputStream(input).use { zip -> peekManifest(zip) }
+        return exporter.decode(requireNotNull(manifest) { "That file isn't a reader backup" }).books
+    }
+
+    /** Replaces everything by default; [merge] upserts the backup into the current data instead. */
+    suspend fun restore(input: InputStream, merge: Boolean = false) {
         val target = File(restoreRoot, "restored/${now()}")
         val manifest = ZipInputStream(input).use { zip -> unpack(zip, target) }
         val bundle = exporter.decode(requireNotNull(manifest) { "That file isn't a reader backup" })
-        exporter.replaceAll(bundle.relocatedTo(target))
+        val relocated = bundle.relocatedTo(target)
+        if (merge) exporter.mergeAll(relocated) else exporter.replaceAll(relocated)
     }
+
+    /** The manifest is always the first entry [write] adds, so this stops as soon as it's found. */
+    private fun peekManifest(zip: ZipInputStream): String? =
+        generateSequence { zip.nextEntry }.firstNotNullOfOrNull { entry ->
+            if (!entry.isDirectory && entry.name == MANIFEST) zip.readBytes().decodeToString() else null
+        }
 
     /** Extracts every file under [target] and returns the manifest text, if there was one. */
     private fun unpack(zip: ZipInputStream, target: File): String? {

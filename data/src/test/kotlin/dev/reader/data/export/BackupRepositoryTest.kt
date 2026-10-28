@@ -124,6 +124,41 @@ class BackupRepositoryTest {
     }
 
     @Test
+    fun `preview reports the backup's books without touching the destination library`() = runBlocking {
+        val (_, exporter, book) = seededSource()
+        val zip = ByteArrayOutputStream().also { BackupRepository(exporter, tempDir).write(it, includeBooks = false) }
+
+        val restoredDb = newDatabase()
+        val backups = BackupRepository(ExportRepository(restoredDb, newSettings("dest")), File(tempDir, "restore"))
+        val preview = backups.preview(ByteArrayInputStream(zip.toByteArray()))
+
+        assertEquals(listOf(book.id), preview.map { it.id })
+        assertEquals(emptyList(), LibraryRepository(restoredDb).observeBooks().first())
+    }
+
+    @Test
+    fun `merging a backup keeps books that aren't in it`() = runBlocking {
+        val (_, exporter, book) = seededSource()
+        val zip = ByteArrayOutputStream().also { BackupRepository(exporter, tempDir).write(it, includeBooks = false) }
+
+        val restoredDb = newDatabase()
+        val keptBook = Book(
+            id = BookId("kept"),
+            title = "Kept",
+            format = BookFormat.TXT,
+            sourcePath = File(tempDir, "kept.txt").apply { writeText("kept") }.path,
+            addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+        LibraryRepository(restoredDb).upsertBook(keptBook, emptyList())
+
+        BackupRepository(ExportRepository(restoredDb, newSettings("dest")), File(tempDir, "restore"))
+            .restore(ByteArrayInputStream(zip.toByteArray()), merge = true)
+
+        val ids = LibraryRepository(restoredDb).observeBooks().first().map { it.id }.toSet()
+        assertEquals(setOf(book.id, keptBook.id), ids)
+    }
+
+    @Test
     fun `entries that escape the restore folder are rejected`() {
         val zip = ByteArrayOutputStream().also { bytes ->
             ZipOutputStream(bytes).use { out ->
