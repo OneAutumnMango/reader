@@ -50,6 +50,16 @@ abstract class ReaderDatabase : RoomDatabase() {
     abstract fun maintenance(): MaintenanceDao
 
     companion object {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `chapter_progress` (`bookId` TEXT NOT NULL, " +
+                        "`chapterId` TEXT NOT NULL, `position` REAL NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                        "`finished` INTEGER NOT NULL, PRIMARY KEY(`bookId`, `chapterId`))",
+                )
+            }
+        }
+
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE reading_sessions ADD COLUMN pagesTurned INTEGER NOT NULL DEFAULT 0")

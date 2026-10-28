@@ -36,13 +36,15 @@ class ReaderGraph(context: Context) {
         ReaderDatabase::class.java,
         "reader.db",
     ).addMigrations(
+        ReaderDatabase.MIGRATION_1_2,
         ReaderDatabase.MIGRATION_2_3,
         ReaderDatabase.MIGRATION_3_4,
         ReaderDatabase.MIGRATION_4_5,
         ReaderDatabase.MIGRATION_5_6,
         ReaderDatabase.MIGRATION_6_7,
     )
-        .fallbackToDestructiveMigration(true)
+        // No destructive fallback: a missing or broken migration should crash loudly, not
+        // silently drop the user's whole library, progress and stats.
         .build()
 
     private val stores = ReaderStores(
