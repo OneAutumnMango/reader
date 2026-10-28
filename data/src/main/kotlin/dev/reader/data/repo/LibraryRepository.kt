@@ -8,6 +8,7 @@ import dev.reader.core.model.CategoryId
 import dev.reader.core.model.Chapter
 import dev.reader.data.room.ReaderDatabase
 import dev.reader.data.room.entity.BookCategoryCrossRef
+import dev.reader.data.room.entity.BookEntity
 import dev.reader.data.room.toBook
 import dev.reader.data.room.toCategory
 import dev.reader.data.room.toChapter
@@ -15,6 +16,7 @@ import dev.reader.data.room.toEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.io.File
 
 @Suppress("TooManyFunctions")
 class LibraryRepository(private val database: ReaderDatabase) {
@@ -55,22 +57,35 @@ class LibraryRepository(private val database: ReaderDatabase) {
     }
 
     /** Removes every book along with its chapters, bookmarks and progress; categories, stats and settings stay. */
-    suspend fun removeAllBooks() = database.withTransaction {
-        with(database.maintenance()) {
-            deleteBookCategories()
-            deleteBookmarks()
-            deleteProgress()
-            deleteChapterProgress()
-            deleteSearchIndex()
-            deleteChapters()
-            deleteBooks()
+    suspend fun removeAllBooks() {
+        val books = database.books().observeAll().first()
+        database.withTransaction {
+            with(database.maintenance()) {
+                deleteBookCategories()
+                deleteBookmarks()
+                deleteProgress()
+                deleteChapterProgress()
+                deleteSearchIndex()
+                deleteChapters()
+                deleteBooks()
+            }
         }
+        books.forEach { deleteBookFiles(it) }
     }
 
     suspend fun deleteBook(bookId: BookId) {
-        database.books().getById(bookId.value)?.let { database.books().delete(it) }
+        database.books().getById(bookId.value)?.let { book ->
+            database.books().delete(book)
+            deleteBookFiles(book)
+        }
         database.chapters().deleteForBook(bookId.value)
         database.books().clearCategories(bookId.value)
+    }
+
+    /** Removing a book from the library also removes its own copy of the file and cover. */
+    private fun deleteBookFiles(book: BookEntity) {
+        File(book.sourcePath).deleteRecursively()
+        book.coverPath?.let { File(it).delete() }
     }
 
     /** Updates title/author/cover/etc. without touching chapters or category links. */
