@@ -73,6 +73,11 @@ class RootFolderScanner(
             AppLog.warn("Saved library folder is unavailable or unreadable", "LibraryScan")
             return 0
         }
+        return scanEntries(root, kind)
+    }
+
+    /** Imports every new entry under [root]. Internal so a test can drive it without a real SAF tree Uri. */
+    internal suspend fun scanEntries(root: DocumentFile, kind: CollectionKind?): Int {
         val entries = when (kind) {
             CollectionKind.FILES -> collectBookFiles(root)
             CollectionKind.FOLDERS -> root.listFiles().filter { it.isDirectory }
