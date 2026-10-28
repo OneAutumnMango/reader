@@ -16,7 +16,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.documentfile.provider.DocumentFile
 import dev.reader.app.data.ReaderGraph
 import dev.reader.app.data.collectionDisplayName
+import dev.reader.app.ui.library.MissingBooksDialog
 import dev.reader.app.ui.rememberImportActions
+import dev.reader.core.model.Book
 import dev.reader.data.store.CollectionKind
 import dev.reader.data.store.PreferencesFile
 import kotlinx.coroutines.launch
@@ -29,12 +31,15 @@ fun LibrarySourcesRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
     val preferences by graph.settings.preferences.collectAsState(initial = PreferencesFile())
     var scanStatus by remember { mutableStateOf("") }
     var scanning by remember { mutableStateOf(false) }
+    var missingBooks by remember { mutableStateOf<List<Book>>(emptyList()) }
 
     fun scan(message: (Int) -> String) {
         scanning = true
         scanStatus = "Scanning library folders…"
         scope.launch {
-            scanStatus = message(graph.rootFolderScanner.scanAll())
+            val result = graph.rootFolderScanner.scanAll()
+            scanStatus = message(result.imported)
+            missingBooks = result.missingBooks
             scanning = false
         }
     }
@@ -92,4 +97,16 @@ fun LibrarySourcesRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         },
         modifier = modifier,
     )
+
+    if (missingBooks.isNotEmpty()) {
+        MissingBooksDialog(
+            books = missingBooks,
+            onRemoveAll = {
+                val toRemove = missingBooks
+                missingBooks = emptyList()
+                scope.launch { toRemove.forEach { graph.library.deleteBook(it.id) } }
+            },
+            onDismiss = { missingBooks = emptyList() },
+        )
+    }
 }

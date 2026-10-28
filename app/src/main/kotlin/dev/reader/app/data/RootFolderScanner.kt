@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
+
+/** The result of a library scan: how many new items were imported, and any book whose source file is now gone. */
+data class LibraryScanResult(val imported: Int, val missingBooks: List<Book>)
 
 /**
  * Scans the user's saved root folders and imports any entry that isn't already in the library —
@@ -31,7 +35,7 @@ class RootFolderScanner(
 
     private val mutex = Mutex()
 
-    suspend fun scanAll(): Int = mutex.withLock {
+    suspend fun scanAll(): LibraryScanResult = mutex.withLock {
         withContext(Dispatchers.IO) {
             var imported = 0
             val prefs = settings.preferences.first()
@@ -41,7 +45,11 @@ class RootFolderScanner(
                     .onFailure { AppLog.error("Couldn't scan library folder", "LibraryScan", it) }
             }
             AppLog.info("Library folder scan imported $imported new item(s)", "LibraryScan")
-            imported
+            val missing = library.observeBooks().first().filterNot { File(it.sourcePath).exists() }
+            if (missing.isNotEmpty()) {
+                AppLog.warn("${missing.size} book(s) in the library have a missing source file", "LibraryScan")
+            }
+            LibraryScanResult(imported, missing)
         }
     }
 

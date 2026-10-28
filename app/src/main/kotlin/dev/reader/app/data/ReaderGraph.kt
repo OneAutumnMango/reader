@@ -73,7 +73,12 @@ class ReaderGraph(context: Context) {
             runCatching { importer.refreshLegacyBooks(appContext) }
                 .onFailure { AppLog.error("Legacy book refresh failed", "Startup", it) }
             runCatching { rootFolderScanner.scanAll() }
-                .onSuccess { AppLog.info("Launch-time library refresh complete", "Startup") }
+                .onSuccess { result ->
+                    AppLog.info("Launch-time library refresh complete", "Startup")
+                    if (result.missingBooks.isNotEmpty()) {
+                        AppLog.warn("${result.missingBooks.size} book(s) have a missing source file", "Startup")
+                    }
+                }
                 .onFailure { AppLog.error("Launch-time library scan failed", "Startup", it) }
             runCatching { refreshMissingCovers() }
                 .onFailure { AppLog.error("Missing cover refresh failed", "Startup", it) }

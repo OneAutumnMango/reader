@@ -25,9 +25,13 @@ import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.ReadingMode
 import kotlin.math.roundToInt
 
-// The thumb's own fixed size; when the caller's modifier doesn't pin a width (as in the real
-// reader, which only constrains height), a BoxWithConstraints with no fillMax* wraps to this.
-private val THUMB_WIDTH = 14.dp
+// The visible thumb's width. Thinner than the touch target below so it's easy to see without
+// being easy to miss with a finger.
+private val THUMB_WIDTH = 6.dp
+
+// The touch target's own fixed size; when the caller's modifier doesn't pin a width (as in the
+// real reader, which only constrains height), a BoxWithConstraints with no fillMax* wraps to this.
+private val THUMB_TOUCH_WIDTH = 14.dp
 private val THUMB_HEIGHT = 48.dp
 
 /**
@@ -71,10 +75,20 @@ fun ReaderScrubber(fraction: Float, onScrub: (Float) -> Unit, modifier: Modifier
         val displayedFraction = if (isDragging) dragFraction else animatedFraction
         val offsetY = (maxHeight - THUMB_HEIGHT) * displayedFraction
 
+        // Invisible footprint at the old thumb size, so the touch target — and the track's
+        // wrap-content width, when the caller doesn't pin one — stays put even though the
+        // visible thumb below is drawn thinner.
+        Box(
+            modifier = Modifier
+                .offset(y = offsetY)
+                .width(THUMB_TOUCH_WIDTH)
+                .height(THUMB_HEIGHT),
+        )
+
         Box(
             modifier = Modifier
                 .testTag("reader-scrubber-thumb")
-                .offset(y = offsetY)
+                .offset(x = (THUMB_TOUCH_WIDTH - THUMB_WIDTH) / 2, y = offsetY)
                 .width(THUMB_WIDTH)
                 .height(THUMB_HEIGHT)
                 .clip(RoundedCornerShape(50))

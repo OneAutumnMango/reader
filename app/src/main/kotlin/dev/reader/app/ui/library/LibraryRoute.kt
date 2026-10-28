@@ -75,6 +75,7 @@ fun LibraryRoute(
     var coverSearchBook by remember { mutableStateOf<Book?>(null) }
     var showCategoryPickerForSelection by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var missingBooks by remember { mutableStateOf<List<Book>>(emptyList()) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val coverPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -110,7 +111,7 @@ fun LibraryRoute(
             onRefresh = {
                 isRefreshing = true
                 scope.launch {
-                    graph.rootFolderScanner.scanAll()
+                    missingBooks = graph.rootFolderScanner.scanAll().missingBooks
                     isRefreshing = false
                 }
             },
@@ -210,6 +211,18 @@ fun LibraryRoute(
 
         chapterDetectBook?.let { book ->
             ChapterDetectHost(graph, book, onDismiss = { chapterDetectBook = null })
+        }
+
+        if (missingBooks.isNotEmpty()) {
+            MissingBooksDialog(
+                books = missingBooks,
+                onRemoveAll = {
+                    val toRemove = missingBooks
+                    missingBooks = emptyList()
+                    scope.launch { toRemove.forEach { graph.library.deleteBook(it.id) } }
+                },
+                onDismiss = { missingBooks = emptyList() },
+            )
         }
 
         if (selecting) {
