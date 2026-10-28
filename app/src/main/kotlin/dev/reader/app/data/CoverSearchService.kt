@@ -35,7 +35,9 @@ class CoverSearchService {
     }
 
     fun saveToCache(context: Context, bytes: ByteArray): File {
-        val target = File(File(context.cacheDir, "covers"), "${System.currentTimeMillis()}_online_cover.jpg")
+        // filesDir, not cacheDir: a book's cover path is kept forever, and the system can clear
+        // the cache dir on its own to free up space.
+        val target = File(File(context.filesDir, "covers"), "${System.currentTimeMillis()}_online_cover.jpg")
         target.parentFile?.mkdirs()
         target.writeBytes(bytes)
         return target

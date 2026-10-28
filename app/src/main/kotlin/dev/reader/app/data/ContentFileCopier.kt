@@ -6,12 +6,17 @@ import android.provider.OpenableColumns
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 
-/** Copies SAF content:// Uris into local files so the rest of the app can work with plain [File]s. */
+/**
+ * Copies SAF content:// Uris into local files so the rest of the app can work with plain [File]s.
+ * These are a book's permanent copy (its [Book.sourcePath][dev.reader.core.model.Book.sourcePath]
+ * forever points here), so they go under [Context.getFilesDir], not [Context.getCacheDir] — the
+ * system can and does clear the cache dir on its own to free up space.
+ */
 object ContentFileCopier {
 
     fun copyToCache(context: Context, uri: Uri): File? {
         val name = displayName(context, uri) ?: uri.lastPathSegment ?: "import"
-        val target = File(File(context.cacheDir, "imports"), "${System.currentTimeMillis()}_$name")
+        val target = File(File(context.filesDir, "imports"), "${System.currentTimeMillis()}_$name")
         target.parentFile?.mkdirs()
         val input = context.contentResolver.openInputStream(uri) ?: return null
         input.use { source -> target.outputStream().use { source.copyTo(it) } }
@@ -26,7 +31,7 @@ object ContentFileCopier {
 
     /** Copies every file directly inside a [DocumentFile] folder (non-recursive) into a local temp folder. */
     fun copyFolderToCache(context: Context, folder: DocumentFile): File {
-        val target = File(context.cacheDir, "imports/${System.currentTimeMillis()}_${folder.name ?: "book"}")
+        val target = File(context.filesDir, "imports/${System.currentTimeMillis()}_${folder.name ?: "book"}")
         target.mkdirs()
         folder.listFiles().filter { it.isFile }.forEach { doc ->
             val name = doc.name
@@ -50,7 +55,7 @@ object ContentFileCopier {
     /** Copies a single [DocumentFile] (not a tree/folder) into a local temp file. */
     fun copyDocumentToCache(context: Context, document: DocumentFile): File? {
         val name = document.name ?: "import"
-        val target = File(File(context.cacheDir, "imports"), "${System.currentTimeMillis()}_$name")
+        val target = File(File(context.filesDir, "imports"), "${System.currentTimeMillis()}_$name")
         target.parentFile?.mkdirs()
         val input = context.contentResolver.openInputStream(document.uri) ?: return null
         input.use { source -> target.outputStream().use { source.copyTo(it) } }
