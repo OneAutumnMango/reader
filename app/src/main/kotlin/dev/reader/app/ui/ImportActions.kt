@@ -15,12 +15,16 @@ import androidx.compose.ui.platform.LocalContext
 import dev.reader.app.data.AppLog
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.data.ReaderGraph
+import dev.reader.parser.epub.EpubContentMissingException
 import kotlinx.coroutines.launch
 
 private const val LOG_TAG = "ReaderImport"
 
 internal fun describeImportError(error: Throwable): String {
     val root = generateSequence(error) { it.cause }.last()
+    if (root is EpubContentMissingException) {
+        return "the file seems to be missing content — you may need a different copy"
+    }
     val message = root.message?.takeIf { it.isNotBlank() } ?: root.javaClass.simpleName
     return message
 }

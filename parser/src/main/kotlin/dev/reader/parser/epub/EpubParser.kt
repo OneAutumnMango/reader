@@ -17,6 +17,9 @@ import java.util.zip.ZipFile
 
 private const val EPUB_TYPE_SCAN_DEPTH = 4
 
+/** The EPUB's own manifest/spine names a file the archive doesn't actually contain — the file itself is broken. */
+class EpubContentMissingException(message: String) : Exception(message)
+
 object EpubParser {
 
     fun parseChapter(file: File, orderIndex: Int): ParsedChapter.TextChapter? = ZipFile(file).use { zip ->
@@ -174,7 +177,7 @@ object EpubParser {
     private fun Element.resolve(baseDir: String): String = resolvePath(baseDir, attr("href"))
 
     private fun ZipFile.readEntryText(name: String): String {
-        val entry = getEntry(name) ?: error("EPUB is missing entry: $name")
+        val entry = getEntry(name) ?: throw EpubContentMissingException("EPUB is missing entry: $name")
         return getInputStream(entry).bufferedReader().use { it.readText() }
     }
 }

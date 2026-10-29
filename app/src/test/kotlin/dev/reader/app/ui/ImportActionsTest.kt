@@ -1,5 +1,6 @@
 package dev.reader.app.ui
 
+import dev.reader.parser.epub.EpubContentMissingException
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -21,5 +22,15 @@ class ImportActionsTest {
         val error = NoSuchFieldError()
 
         assertEquals("NoSuchFieldError", describeImportError(error))
+    }
+
+    @Test
+    fun `describeImportError explains a broken epub archive in plain terms`() {
+        val error = EpubContentMissingException("EPUB is missing entry: OEBPS/Text/001_1.00.xhtml")
+
+        assertEquals(
+            "the file seems to be missing content — you may need a different copy",
+            describeImportError(error),
+        )
     }
 }
