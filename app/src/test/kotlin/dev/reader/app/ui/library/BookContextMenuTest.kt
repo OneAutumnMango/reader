@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import dev.reader.core.model.Book
@@ -107,9 +108,33 @@ class BookContextMenuTest {
             )
         }
 
-        composeRule.onNodeWithTag("book-menu-remove").performClick()
+        composeRule.onNodeWithTag("book-menu-remove").performScrollTo().performClick()
 
         assertTrue(removed)
+        assertTrue(dismissed)
+    }
+
+    @Test
+    fun `reimport triggers the callback and dismisses`() {
+        var reimported = false
+        var dismissed = false
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = {},
+                onRename = {},
+                onChangeCover = {},
+                onMarkAllRead = {},
+                onRemove = {},
+                onDismiss = { dismissed = true },
+                onReimport = { reimported = true },
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-reimport").performScrollTo().performClick()
+
+        assertTrue(reimported)
         assertTrue(dismissed)
     }
 

@@ -3,6 +3,7 @@ package dev.reader.app.data
 import android.content.Context
 import android.net.Uri
 import androidx.room.Room
+import dev.reader.core.model.Book
 import dev.reader.core.model.Progress
 import dev.reader.core.stats.ReadingSessionEvent
 import dev.reader.data.export.BackupRepository
@@ -86,6 +87,9 @@ class ReaderGraph(context: Context) {
                 .onFailure { AppLog.error("Missing cover refresh failed", "Startup", it) }
         }
     }
+
+    /** Re-parses [book]'s source file, refreshing its chapter list in place (e.g. after a parser fix). */
+    suspend fun reimportBook(book: Book): Book = importer.reimport(book, appContext)
 
     suspend fun refreshMissingCovers(): Int = importer.refreshMissingCovers(appContext) { book ->
         File(book.sourcePath).takeIf { it.isFile && it.canRead() }

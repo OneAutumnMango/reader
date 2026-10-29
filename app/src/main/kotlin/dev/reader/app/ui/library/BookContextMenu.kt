@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material3.AlertDialog
@@ -42,6 +44,7 @@ fun BookContextMenu(
     onDismiss: () -> Unit,
     allRead: Boolean = false,
     onDetectChapters: (() -> Unit)? = null,
+    onReimport: (() -> Unit)? = null,
     onShowDetails: (() -> Unit)? = null,
     singleCategoryPerBook: Boolean = false,
 ) {
@@ -98,7 +101,7 @@ fun BookContextMenu(
         onDismissRequest = onDismiss,
         title = { Text(book.title) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 if (onShowDetails != null) {
                     MenuRow("Details", Modifier.testTag("book-menu-details")) {
                         onShowDetails()
@@ -135,6 +138,12 @@ fun BookContextMenu(
                 ) {
                     if (allRead) onMarkAllUnread() else onMarkAllRead()
                     onDismiss()
+                }
+                if (onReimport != null) {
+                    MenuRow("Reimport", Modifier.testTag("book-menu-reimport")) {
+                        onReimport()
+                        onDismiss()
+                    }
                 }
                 MenuRow("Remove from library", Modifier.testTag("book-menu-remove")) {
                     onRemove()

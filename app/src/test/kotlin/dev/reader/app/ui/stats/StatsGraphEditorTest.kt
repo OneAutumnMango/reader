@@ -1,7 +1,9 @@
 package dev.reader.app.ui.stats
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -64,6 +66,34 @@ class StatsGraphEditorTest {
         assertEquals(GraphGrouping.WEEK, saved?.grouping)
         assertEquals(GraphRange.LAST_30_DAYS, saved?.range)
         assertEquals(GraphAxis.DATE, saved?.xAxis)
+    }
+
+    @Test
+    fun `swap button exchanges the x axis and the single y metric`() {
+        var saved: StatsGraph? = null
+        composeRule.setContent {
+            StatsGraphEditor(
+                StatsGraph(xAxis = GraphAxis.WORDS, metrics = listOf(GraphMetric.READING_MINUTES)),
+                books,
+                onDismiss = {},
+                onSave = { saved = it },
+            )
+        }
+
+        composeRule.onNodeWithTag("graph-swap-axes").performScrollTo().performClick()
+        composeRule.onNodeWithTag("graph-editor-save").performClick()
+
+        assertEquals(GraphAxis.READING_MINUTES, saved?.xAxis)
+        assertEquals(listOf(GraphMetric.WORDS), saved?.metrics)
+    }
+
+    @Test
+    fun `swap button is hidden for category axes or multiple metrics`() {
+        composeRule.setContent {
+            StatsGraphEditor(StatsGraph(), books, onDismiss = {}, onSave = {})
+        }
+
+        composeRule.onAllNodesWithTag("graph-swap-axes").assertCountEquals(0)
     }
 
     @Test

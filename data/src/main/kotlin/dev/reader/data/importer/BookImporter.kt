@@ -89,6 +89,13 @@ class BookImporter(
         return refreshed
     }
 
+    /** Re-parses a book's source file in place, replacing its chapter list (e.g. after a parser fix). */
+    suspend fun reimport(book: Book, pdfContext: Context? = null): Book = if (book.isLightNovel) {
+        importLightNovelFolder(File(book.sourcePath), originUri = book.originUri)
+    } else {
+        importFile(File(book.sourcePath), pdfContext = pdfContext, target = book)
+    }
+
     /** Re-splits a text-based [book] on [pattern] (null = its default chapters), skipping [excludedLines]. */
     suspend fun applyChapterPattern(
         book: Book,

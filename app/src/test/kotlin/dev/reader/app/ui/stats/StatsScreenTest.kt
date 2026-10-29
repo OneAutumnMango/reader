@@ -1,5 +1,6 @@
 package dev.reader.app.ui.stats
 
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -45,6 +46,7 @@ class StatsScreenTest {
         composeRule.onNodeWithText("150 wpm").assertExists()
         composeRule.onNodeWithText("42").assertExists()
         composeRule.onNodeWithTag("week-chart").assertExists()
+        composeRule.onNodeWithTag("week-chart-y-max").assertTextEquals("1h 0m")
         assertEquals(0, composeRule.onAllNodesWithText("Insights").fetchSemanticsNodes().size)
         composeRule.onNodeWithText("Dune").assertExists()
     }

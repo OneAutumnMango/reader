@@ -127,6 +127,22 @@ internal fun StatsGraphEditor(
                             draft = draft.copy(xAxis = axis, grouping = axis.defaultGrouping())
                         },
                     )
+                    val swapTarget = draft.xAxis.toMetricOrNull()
+                    if (swapTarget != null && draft.metrics.size == 1) {
+                        TextButton(
+                            onClick = {
+                                val newAxis = draft.metrics.single().toAxis()
+                                draft = draft.copy(
+                                    xAxis = newAxis,
+                                    metrics = listOf(swapTarget),
+                                    grouping = newAxis.defaultGrouping(),
+                                )
+                            },
+                            modifier = Modifier.testTag("graph-swap-axes"),
+                        ) {
+                            Text("Swap X / Y axis")
+                        }
+                    }
                     SectionTitle("Metrics")
                     GraphMetric.entries.forEach { metric ->
                         CheckRow(
@@ -276,6 +292,10 @@ private fun CheckRow(label: String, checked: Boolean, tag: String, onCheckedChan
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
+
+private fun GraphAxis.toMetricOrNull(): GraphMetric? = runCatching { GraphMetric.valueOf(name) }.getOrNull()
+
+private fun GraphMetric.toAxis(): GraphAxis = GraphAxis.valueOf(name)
 
 private fun GraphAxis.defaultGrouping(): GraphGrouping = when (this) {
     GraphAxis.DATE -> GraphGrouping.DAY

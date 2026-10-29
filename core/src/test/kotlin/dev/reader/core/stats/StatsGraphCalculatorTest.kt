@@ -25,6 +25,33 @@ class StatsGraphCalculatorTest {
     }
 
     @Test
+    fun `average session length divides total time by session count`() {
+        val result = calculate(
+            graph = StatsGraph(metrics = listOf(GraphMetric.AVERAGE_SESSION_MINUTES)),
+            sessions = listOf(
+                session("2026-06-10T10:00:00Z", "2026-06-10T10:02:00Z", 1),
+                session("2026-06-10T10:02:00Z", "2026-06-10T10:06:00Z", 1),
+            ),
+        )
+
+        assertEquals(3.0, result.series.single().points.single().y)
+    }
+
+    @Test
+    fun `books read counts distinct books in the bucket`() {
+        val result = calculate(
+            graph = StatsGraph(metrics = listOf(GraphMetric.BOOKS_READ)),
+            sessions = listOf(
+                session("2026-06-10T10:00:00Z", "2026-06-10T10:01:00Z", 1, book = "a"),
+                session("2026-06-10T10:01:00Z", "2026-06-10T10:02:00Z", 1, book = "a"),
+                session("2026-06-10T10:02:00Z", "2026-06-10T10:03:00Z", 1, book = "b"),
+            ),
+        )
+
+        assertEquals(2.0, result.series.single().points.single().y)
+    }
+
+    @Test
     fun `range includes today and the prior six local dates`() {
         val result = calculate(
             graph = StatsGraph(range = GraphRange.LAST_7_DAYS),

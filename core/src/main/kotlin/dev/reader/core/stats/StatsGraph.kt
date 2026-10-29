@@ -44,6 +44,8 @@ enum class GraphAxis(val label: String) {
     WORDS("Words"),
     PAGES("Pages"),
     SESSIONS("Sessions"),
+    AVERAGE_SESSION_MINUTES("Avg session length"),
+    BOOKS_READ("Books read"),
 }
 
 @Serializable
@@ -53,6 +55,8 @@ enum class GraphMetric(val label: String, val unit: String) {
     WORDS("Words read", "words"),
     PAGES("Pages turned", "pages"),
     SESSIONS("Sessions", "sessions"),
+    AVERAGE_SESSION_MINUTES("Avg session length", "min"),
+    BOOKS_READ("Books read", "books"),
 }
 
 @Serializable
@@ -302,6 +306,12 @@ object StatsGraphCalculator {
             GraphMetric.WORDS -> words.toDouble()
             GraphMetric.PAGES -> sessions.sumOf { maxOf(0, it.pagesTurned) }.toDouble()
             GraphMetric.SESSIONS -> sessions.size.toDouble()
+            GraphMetric.AVERAGE_SESSION_MINUTES -> if (sessions.isNotEmpty()) {
+                totalSeconds / SECONDS_PER_MINUTE / sessions.size
+            } else {
+                0.0
+            }
+            GraphMetric.BOOKS_READ -> sessions.map { it.bookId }.distinct().size.toDouble()
         }
     }
 
@@ -311,6 +321,8 @@ object StatsGraphCalculator {
         GraphAxis.WORDS -> GraphMetric.WORDS
         GraphAxis.PAGES -> GraphMetric.PAGES
         GraphAxis.SESSIONS -> GraphMetric.SESSIONS
+        GraphAxis.AVERAGE_SESSION_MINUTES -> GraphMetric.AVERAGE_SESSION_MINUTES
+        GraphAxis.BOOKS_READ -> GraphMetric.BOOKS_READ
         else -> error("Category axes do not have numeric values")
     }
 

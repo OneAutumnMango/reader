@@ -149,29 +149,43 @@ private fun WeekChart(days: List<DailyReading>) {
         Text("Nothing read in the last week yet.")
         return
     }
-    Row(
-        modifier = Modifier.fillMaxWidth().testTag("week-chart"),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        days.forEachIndexed { index, day ->
-            val isToday = index == days.lastIndex
-            val color = MaterialTheme.colorScheme.primary
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(maxOf(BAR_MAX_HEIGHT * (day.time / max).toFloat(), MIN_BAR_HEIGHT))
-                        .background(
-                            if (isToday) color else color.copy(alpha = INACTIVE_BAR_ALPHA),
-                            RoundedCornerShape(4.dp),
-                        ),
-                )
-                Text(
-                    day.date.dayOfWeek.displayName().take(3),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = if (isToday) FontWeight.Bold else null,
-                )
+    Row(modifier = Modifier.fillMaxWidth().testTag("week-chart")) {
+        Column(
+            modifier = Modifier.height(BAR_MAX_HEIGHT).padding(end = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                max.toReadableDuration(),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.testTag("week-chart-y-max"),
+            )
+            Text((max / 2).toReadableDuration(), style = MaterialTheme.typography.labelSmall)
+            Text("0m", style = MaterialTheme.typography.labelSmall)
+        }
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            days.forEachIndexed { index, day ->
+                val isToday = index == days.lastIndex
+                val color = MaterialTheme.colorScheme.primary
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(maxOf(BAR_MAX_HEIGHT * (day.time / max).toFloat(), MIN_BAR_HEIGHT))
+                            .background(
+                                if (isToday) color else color.copy(alpha = INACTIVE_BAR_ALPHA),
+                                RoundedCornerShape(4.dp),
+                            ),
+                    )
+                    Text(
+                        day.date.dayOfWeek.displayName().take(3),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (isToday) FontWeight.Bold else null,
+                    )
+                }
             }
         }
     }

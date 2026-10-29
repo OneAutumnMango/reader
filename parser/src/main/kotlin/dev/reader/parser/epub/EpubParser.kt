@@ -8,6 +8,7 @@ import dev.reader.parser.ParsedBook
 import dev.reader.parser.ParsedChapter
 import dev.reader.parser.html.parseHtmlToRichDocument
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
 import java.io.File
@@ -22,7 +23,7 @@ object EpubParser {
         val container = Jsoup.parse(zip.readEntryText("META-INF/container.xml"), "", Parser.xmlParser())
         val opfPath = container.select("rootfile").first()?.attr("full-path")
             ?: error("EPUB container.xml has no rootfile")
-        val opf = Jsoup.parse(zip.readEntryText(opfPath), "", Parser.xmlParser())
+        val opf = Jsoup.parse(zip.readEntryText(opfPath), "", Parser.xmlParser()).stripNamespacePrefixes()
         val manifest = opf.select("manifest > item").associateBy { it.attr("id") }
         val entries = opf.select("spine > itemref").mapNotNull { manifest[it.attr("idref")] }
         val entry = entries.getOrNull(orderIndex) ?: return@use null
@@ -40,7 +41,7 @@ object EpubParser {
                 .select("rootfile").first()?.attr("full-path")
                 ?: error("EPUB container.xml has no rootfile")
 
-            val opf = Jsoup.parse(zip.readEntryText(opfPath), "", Parser.xmlParser())
+            val opf = Jsoup.parse(zip.readEntryText(opfPath), "", Parser.xmlParser()).stripNamespacePrefixes()
             val baseDir = opfPath.substringBeforeLast('/', "")
 
             val items = opf.select("manifest > item")
@@ -155,6 +156,19 @@ object EpubParser {
         val coverId = opf.select("metadata > meta[name=cover]").attr("content")
         manifest[coverId]?.let { return it }
         return opf.select("manifest > item[properties~=cover-image]").first()?.resolve(baseDir)
+    }
+
+    /**
+     * Some generators qualify every OPF element with a namespace prefix (e.g. `opf:manifest`,
+     * `opf:item`, `dc:title`). Jsoup's XML parser keeps that prefix as part of the tag name, so
+     * plain selectors like "manifest > item" would otherwise never match. Stripping prefixes
+     * here lets the rest of the parser stay namespace-agnostic.
+     */
+    private fun Document.stripNamespacePrefixes(): Document = apply {
+        allElements.forEach { element ->
+            val local = element.tagName().substringAfter(':')
+            if (local != element.tagName()) element.tagName(local)
+        }
     }
 
     private fun Element.resolve(baseDir: String): String = resolvePath(baseDir, attr("href"))
