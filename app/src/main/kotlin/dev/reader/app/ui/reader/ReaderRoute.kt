@@ -70,6 +70,7 @@ fun ReaderRoute(
     onOpenMenu: () -> Unit,
     modifier: Modifier = Modifier,
     startBlock: Int? = null,
+    startHighlight: Regex? = null,
 ) {
     val scope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -152,7 +153,7 @@ fun ReaderRoute(
                 theme = theme,
                 onToggleMenu = { showMenu = !showMenu },
                 onPositionChanged = { index, total -> positions[page] = index to total },
-                highlight = search.highlight,
+                highlight = search.highlight ?: startHighlight,
                 jump = listOfNotNull(
                     search.jumpFor(page),
                     scrubJump?.takeIf { it.first == page }?.second,

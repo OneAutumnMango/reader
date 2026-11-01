@@ -62,6 +62,7 @@ import dev.reader.app.ui.settings.SettingsRoute
 import dev.reader.app.ui.stats.StatsRoute
 import dev.reader.core.model.BookId
 import dev.reader.core.model.CategoryId
+import dev.reader.core.search.TextSearch
 import kotlinx.coroutines.launch
 
 private val CONTENT_MARGIN = 16.dp
@@ -237,7 +238,10 @@ fun ReaderApp(graph: ReaderGraph) {
                         books,
                         onBookClick = { navigator.push(Destination.BookDetail(it.id)) },
                         onOpenChapter = { book, chapter, block ->
-                            navigator.push(Destination.Reader(book.id, chapter.id, block))
+                            val query = searchState.query.trim().takeIf { block != null && searchState.inText }
+                            navigator.push(
+                                Destination.Reader(book.id, chapter.id, block, query, searchState.options),
+                            )
                         },
                         modifier = content,
                     )
@@ -287,6 +291,9 @@ private fun ReaderDestinationContent(graph: ReaderGraph, navigator: Navigator) {
         destination.chapterId,
         onOpenMenu = { navigator.pop() },
         startBlock = destination.block,
+        startHighlight = remember(destination) {
+            destination.searchQuery?.let { TextSearch.compile(it, destination.searchOptions)?.getOrNull() }
+        },
     )
 }
 

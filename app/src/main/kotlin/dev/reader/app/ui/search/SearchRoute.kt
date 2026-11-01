@@ -20,7 +20,6 @@ import dev.reader.app.data.ReaderGraph
 import dev.reader.app.ui.ScreenTopBar
 import dev.reader.core.model.Book
 import dev.reader.core.model.Chapter
-import dev.reader.core.search.SearchOptions
 import dev.reader.core.search.TextSearch
 import dev.reader.core.theme.LibraryLayout
 import kotlinx.coroutines.delay
@@ -60,10 +59,12 @@ fun SearchRoute(
         }
     }
 
-    LaunchedEffect(state.query, state.inText) {
+    val compiled = remember(state.query, state.options) { TextSearch.compile(state.query.trim(), state.options) }
+    LaunchedEffect(compiled, state.inText) {
         if (!state.inText) return@LaunchedEffect
-        val key = state.query.trim()
-        val regex = TextSearch.compile(key, SearchOptions())?.getOrNull()
+        val options = state.options
+        val key = "${state.query.trim()}|${options.matchCase}|${options.regex}|${options.anyWhitespace}"
+        val regex = compiled?.getOrNull()
         if (regex == null) {
             state.clearResults()
             return@LaunchedEffect
@@ -91,6 +92,9 @@ fun SearchRoute(
         unreadChaptersFor = { id -> unreadByBook[id] ?: 0 },
         gridState = state.gridState,
         inText = state.inText,
+        options = state.options,
+        onOptionsChange = { state.options = it },
+        invalidQuery = compiled?.isFailure == true,
         textResults = state.results,
         searchProgress = if (state.searching) state.booksSearched to state.booksToSearch else null,
         collapsed = state.collapsed,

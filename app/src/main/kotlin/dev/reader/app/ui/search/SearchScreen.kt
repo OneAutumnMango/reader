@@ -42,9 +42,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.library.BookCard
 import dev.reader.app.ui.library.BookCover
+import dev.reader.app.ui.reader.SearchOptionToggles
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Chapter
+import dev.reader.core.search.SearchOptions
 import dev.reader.core.search.Snippet
 import dev.reader.core.theme.LibraryLayout
 
@@ -68,6 +70,9 @@ fun SearchScreen(
     unreadChaptersFor: (BookId) -> Int = { 0 },
     gridState: LazyGridState = rememberLazyGridState(),
     inText: Boolean = false,
+    options: SearchOptions = SearchOptions(),
+    onOptionsChange: (SearchOptions) -> Unit = {},
+    invalidQuery: Boolean = false,
     textResults: TextSearchResults? = null,
     searchProgress: Pair<Int, Int>? = null,
     collapsed: Set<BookId> = emptySet(),
@@ -81,10 +86,21 @@ fun SearchScreen(
             onValueChange = onQueryChange,
             label = { Text(if (inText) "Search inside books" else "Search") },
             singleLine = true,
+            isError = inText && invalidQuery,
+            trailingIcon = if (inText) ({ SearchOptionToggles(options, onOptionsChange) }) else null,
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).testTag("search-field"),
         )
         if (inText) {
-            TextResults(query, textResults, searchProgress, collapsed, onCollapsedChange, onMatchClick, listState)
+            TextResults(
+                query,
+                textResults,
+                invalidQuery,
+                searchProgress,
+                collapsed,
+                onCollapsedChange,
+                onMatchClick,
+                listState,
+            )
         } else {
             TitleResults(
                 results = filterBooksByQuery(books, query),
@@ -173,6 +189,7 @@ private fun ChapterMatchRow(match: ChapterMatch, onChapterClick: (Book, Chapter)
     }
 }
 
+private const val INVALID_REGEX = "That isn't a valid regular expression."
 private val COVER_THUMB_WIDTH = 36.dp
 private val COVER_THUMB_HEIGHT = 52.dp
 
@@ -180,17 +197,19 @@ private val COVER_THUMB_HEIGHT = 52.dp
 private fun TextResults(
     query: String,
     results: TextSearchResults?,
+    invalid: Boolean,
     progress: Pair<Int, Int>?,
     collapsed: Set<BookId>,
     onCollapsedChange: (Set<BookId>) -> Unit,
     onMatchClick: (Book, Chapter, Int) -> Unit,
     listState: LazyListState,
 ) {
-    if (query.isBlank() || results == null) {
+    if (query.isBlank() || results == null || invalid) {
+        val hint = if (invalid) INVALID_REGEX else "Type to search the text of every book in your library."
         Text(
-            "Type to search the text of every book in your library.",
+            hint,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (invalid) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
         )
         return

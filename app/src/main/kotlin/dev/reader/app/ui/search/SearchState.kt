@@ -15,6 +15,7 @@ import dev.reader.core.model.BookId
 import dev.reader.core.model.Chapter
 import dev.reader.core.reader.PdfRenderMode
 import dev.reader.core.search.SearchMatch
+import dev.reader.core.search.SearchOptions
 import dev.reader.core.search.TextSearch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -44,6 +45,7 @@ internal fun Book.hasSearchableText(): Boolean = when (format) {
 class SearchState {
     var query by mutableStateOf("")
     var inText by mutableStateOf(false)
+    var options by mutableStateOf(SearchOptions())
     var results by mutableStateOf<TextSearchResults?>(null)
         private set
 

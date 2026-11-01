@@ -71,23 +71,7 @@ fun ReaderSearchPanel(
                 singleLine = true,
                 placeholder = { Text("Search book") },
                 isError = state.invalid,
-                trailingIcon = {
-                    Row {
-                        OptionToggle(options.matchCase, "Match case", "search-match-case", {
-                            onOptionsChange(options.copy(matchCase = it))
-                        }) { Text("Aa", fontWeight = FontWeight.Bold) }
-                        OptionToggle(options.regex, "Regular expression", "search-regex", {
-                            onOptionsChange(options.copy(regex = it))
-                        }) { Text(".*", fontWeight = FontWeight.Bold) }
-                        OptionToggle(
-                            options.anyWhitespace,
-                            "Match any whitespace",
-                            "search-whitespace",
-                            { onOptionsChange(options.copy(anyWhitespace = it)) },
-                            enabled = !options.regex,
-                        ) { Icon(Icons.Filled.SpaceBar, contentDescription = null) }
-                    }
-                },
+                trailingIcon = { SearchOptionToggles(options, onOptionsChange) },
                 modifier = Modifier.weight(1f).testTag("reader-search-field"),
             )
             IconButton(onClick = onClose, modifier = Modifier.testTag("reader-search-close")) {
@@ -167,6 +151,26 @@ private fun SearchHitRow(hit: SearchHit, active: Boolean, onClick: () -> Unit) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/** Match-case (Aa), regex (.*) and any-whitespace toggles, shared by the reader's and the library's text search. */
+@Composable
+fun SearchOptionToggles(options: SearchOptions, onOptionsChange: (SearchOptions) -> Unit) {
+    Row {
+        OptionToggle(options.matchCase, "Match case", "search-match-case", {
+            onOptionsChange(options.copy(matchCase = it))
+        }) { Text("Aa", fontWeight = FontWeight.Bold) }
+        OptionToggle(options.regex, "Regular expression", "search-regex", {
+            onOptionsChange(options.copy(regex = it))
+        }) { Text(".*", fontWeight = FontWeight.Bold) }
+        OptionToggle(
+            options.anyWhitespace,
+            "Match any whitespace",
+            "search-whitespace",
+            { onOptionsChange(options.copy(anyWhitespace = it)) },
+            enabled = !options.regex,
+        ) { Icon(Icons.Filled.SpaceBar, contentDescription = null) }
     }
 }
 

@@ -63,4 +63,24 @@ class SearchStateTest {
         assertFalse(state.searching)
         assertTrue(comic.hasSearchableText().not())
     }
+
+    @Test
+    fun `search options change what matches`() = runBlocking {
+        val dragons = book("dragons", "A Dragon and a dragon.")
+        val chapters = mapOf(dragons.id to listOf(Chapter(ChapterId("c"), dragons.id, "One", dragons.sourcePath, 0)))
+
+        suspend fun hits(query: String, options: SearchOptions): Int {
+            val state = SearchState()
+            val regex = TextSearch.compile(query, options)!!.getOrThrow()
+            val context = RuntimeEnvironment.getApplication()
+            state.searchLibraryText(context, listOf(dragons), { chapters.getValue(it) }, regex, query)
+            return state.results!!.totalHits
+        }
+
+        assertEquals(2, hits("dragon", SearchOptions()))
+        assertEquals(1, hits("dragon", SearchOptions(matchCase = true)))
+        assertEquals(2, hits("[Dd]rag.n", SearchOptions(regex = true)))
+        assertEquals(2, hits("a  dragon", SearchOptions(anyWhitespace = true)))
+        assertEquals(1, hits("a  dragon", SearchOptions(anyWhitespace = true, matchCase = true)))
+    }
 }

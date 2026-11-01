@@ -13,12 +13,14 @@ import dev.reader.core.model.BookId
 import dev.reader.core.model.Chapter
 import dev.reader.core.model.ChapterId
 import dev.reader.core.search.SearchMatch
+import dev.reader.core.search.SearchOptions
 import dev.reader.core.search.Snippet
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
@@ -130,6 +132,53 @@ class SearchScreenTest {
 
         composeRule.onNodeWithTag("search-book-1").performClick()
 
+        composeRule.onNodeWithTag("search-match-4").assertDoesNotExist()
+    }
+
+    @Test
+    fun `text search shows the option toggles and reports changes`() {
+        var options = SearchOptions()
+        composeRule.setContent {
+            SearchScreen(
+                emptyList(),
+                query = "dragon",
+                onQueryChange = {},
+                onBookClick = {},
+                inText = true,
+                options = options,
+                onOptionsChange = { options = it },
+            )
+        }
+
+        composeRule.onNodeWithTag("search-match-case").performClick()
+        assertTrue(options.matchCase)
+        composeRule.onNodeWithTag("search-regex").performClick()
+        assertTrue(options.regex)
+    }
+
+    @Test
+    fun `title search has no option toggles`() {
+        composeRule.setContent { SearchScreen(emptyList(), query = "", onQueryChange = {}, onBookClick = {}) }
+
+        composeRule.onNodeWithTag("search-regex").assertDoesNotExist()
+    }
+
+    @Test
+    fun `an invalid regular expression is explained instead of showing results`() {
+        composeRule.setContent {
+            SearchScreen(
+                emptyList(),
+                query = "(",
+                onQueryChange = {},
+                onBookClick = {},
+                inText = true,
+                options = SearchOptions(regex = true),
+                invalidQuery = true,
+                textResults = textResults,
+            )
+        }
+
+        composeRule.onNodeWithText("That isn't a valid regular expression.").assertExists()
         composeRule.onNodeWithTag("search-match-4").assertDoesNotExist()
     }
 }
