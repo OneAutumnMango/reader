@@ -29,7 +29,15 @@ data class BookMatches(val book: Book, val chapters: List<ChapterMatches>) {
     val total: Int get() = chapters.sumOf { it.matches.size }
 }
 
-data class TextSearchResults(val books: List<BookMatches>, val totalHits: Int, val truncated: Boolean = false)
+data class TextSearchResults(
+    val books: List<BookMatches>,
+    val totalHits: Int,
+    val truncated: Boolean = false,
+    /** Chapters that failed to load, so a search that quietly found nothing can be told from one that couldn't read. */
+    val unreadableChapters: Int = 0,
+)
+
+private data class BookScan(val chapters: List<ChapterMatches>, val unreadable: Int)
 
 /** Comics and page-image PDFs have no text to search. */
 internal fun Book.hasSearchableText(): Boolean = when (format) {
@@ -49,8 +57,18 @@ class SearchState {
     var results by mutableStateOf<TextSearchResults?>(null)
         private set
 
-    /** The query [results] were computed for, so coming back to an unchanged query doesn't search again. */
-    var resultsKey by mutableStateOf<String?>(null)
+    /** Bumped by [submit]; the search only runs for an explicit request, never as the query is typed. */
+    var searchRequest by mutableIntStateOf(0)
+        private set
+
+    /** The last request whose search ran to the end, so coming back from reading a result doesn't search again. */
+    var completedRequest by mutableIntStateOf(0)
+        private set
+
+    /** What the shown [results] were searched with, which may differ from what's typed now. */
+    var submittedQuery by mutableStateOf("")
+        private set
+    var submittedOptions by mutableStateOf(SearchOptions())
         private set
     var searching by mutableStateOf(false)
         private set
@@ -62,9 +80,15 @@ class SearchState {
     val gridState = LazyGridState()
     val listState = LazyListState()
 
+    fun submit() {
+        submittedQuery = query.trim()
+        submittedOptions = options
+        searchRequest++
+    }
+
     fun clearResults() {
         results = null
-        resultsKey = null
+        completedRequest = searchRequest
     }
 
     /**
@@ -77,7 +101,6 @@ class SearchState {
         books: List<Book>,
         chaptersOf: (BookId) -> List<Chapter>,
         regex: Regex,
-        key: String,
     ) {
         val searchable = books.filter { it.hasSearchableText() }
         searching = true
@@ -87,18 +110,20 @@ class SearchState {
         try {
             val found = mutableListOf<BookMatches>()
             var total = 0
+            var unreadable = 0
             for (book in searchable) {
                 if (total >= MAX_TOTAL_HITS) break
-                val chapters = searchBook(context, book, chaptersOf(book.id), regex, MAX_TOTAL_HITS - total)
-                if (chapters.isNotEmpty()) {
-                    found += BookMatches(book, chapters)
-                    total += chapters.sumOf { it.matches.size }
-                    results = TextSearchResults(found.toList(), total)
+                val scan = searchBook(context, book, chaptersOf(book.id), regex, MAX_TOTAL_HITS - total)
+                unreadable += scan.unreadable
+                if (scan.chapters.isNotEmpty()) {
+                    found += BookMatches(book, scan.chapters)
+                    total += scan.chapters.sumOf { it.matches.size }
                 }
                 booksSearched++
+                results = TextSearchResults(found.toList(), total, unreadableChapters = unreadable)
             }
-            results = TextSearchResults(found.toList(), total, truncated = total >= MAX_TOTAL_HITS)
-            resultsKey = key
+            results = TextSearchResults(found.toList(), total, total >= MAX_TOTAL_HITS, unreadable)
+            completedRequest = searchRequest
         } finally {
             searching = false
         }
@@ -110,12 +135,14 @@ class SearchState {
         chapters: List<Chapter>,
         regex: Regex,
         budget: Int,
-    ): List<ChapterMatches> {
+    ): BookScan {
         val found = mutableListOf<ChapterMatches>()
         var left = budget
+        var unreadable = 0
         for (chapter in chapters) {
             if (left <= 0) break
             val document = (ChapterLoader.load(context, book, chapter) as? ChapterContent.Text)?.document
+            if (document == null) unreadable++
             val matches = document?.let {
                 withContext(Dispatchers.Default) { TextSearch.find(it, regex, minOf(MAX_HITS_PER_CHAPTER, left)) }
             }.orEmpty()
@@ -124,6 +151,6 @@ class SearchState {
                 left -= matches.size
             }
         }
-        return found
+        return BookScan(found, unreadable)
     }
 }

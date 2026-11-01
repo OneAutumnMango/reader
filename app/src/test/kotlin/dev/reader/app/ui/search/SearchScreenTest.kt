@@ -181,4 +181,54 @@ class SearchScreenTest {
         composeRule.onNodeWithText("That isn't a valid regular expression.").assertExists()
         composeRule.onNodeWithTag("search-match-4").assertDoesNotExist()
     }
+
+    @Test
+    fun `the search button asks to search`() {
+        var searches = 0
+        composeRule.setContent {
+            SearchScreen(
+                emptyList(),
+                query = "dragon",
+                onQueryChange = {},
+                onBookClick = {},
+                inText = true,
+                onSearch = { searches++ },
+            )
+        }
+
+        composeRule.onNodeWithTag("search-submit").performClick()
+
+        assertEquals(1, searches)
+    }
+
+    @Test
+    fun `text search says how far along it is and when chapters could not be read`() {
+        composeRule.setContent {
+            SearchScreen(
+                emptyList(),
+                query = "dragon",
+                onQueryChange = {},
+                onBookClick = {},
+                inText = true,
+                textResults = textResults,
+                searchProgress = 12 to 80,
+            )
+        }
+        composeRule.onNodeWithText("\"dragon\": 1 hits in 1 book \u00b7 searched 12 of 80 books").assertExists()
+    }
+
+    @Test
+    fun `unreadable chapters are reported once the search is done`() {
+        composeRule.setContent {
+            SearchScreen(
+                emptyList(),
+                query = "dragon",
+                onQueryChange = {},
+                onBookClick = {},
+                inText = true,
+                textResults = textResults.copy(unreadableChapters = 3),
+            )
+        }
+        composeRule.onNodeWithText("3 chapters couldn't be read", substring = true).assertExists()
+    }
 }

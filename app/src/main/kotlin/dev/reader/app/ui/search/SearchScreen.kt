@@ -18,11 +18,15 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +42,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.library.BookCard
@@ -73,6 +78,8 @@ fun SearchScreen(
     options: SearchOptions = SearchOptions(),
     onOptionsChange: (SearchOptions) -> Unit = {},
     invalidQuery: Boolean = false,
+    onSearch: () -> Unit = {},
+    resultsQuery: String = query,
     textResults: TextSearchResults? = null,
     searchProgress: Pair<Int, Int>? = null,
     collapsed: Set<BookId> = emptySet(),
@@ -87,12 +94,25 @@ fun SearchScreen(
             label = { Text(if (inText) "Search inside books" else "Search") },
             singleLine = true,
             isError = inText && invalidQuery,
-            trailingIcon = if (inText) ({ SearchOptionToggles(options, onOptionsChange) }) else null,
+            trailingIcon = if (inText) {
+                {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SearchOptionToggles(options, onOptionsChange)
+                        IconButton(onClick = onSearch, modifier = Modifier.testTag("search-submit")) {
+                            Icon(Icons.Filled.Search, contentDescription = "Search")
+                        }
+                    }
+                }
+            } else {
+                null
+            },
+            keyboardOptions = KeyboardOptions(imeAction = if (inText) ImeAction.Search else ImeAction.Default),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).testTag("search-field"),
         )
         if (inText) {
             TextResults(
-                query,
+                resultsQuery,
                 textResults,
                 invalidQuery,
                 searchProgress,
@@ -204,8 +224,8 @@ private fun TextResults(
     onMatchClick: (Book, Chapter, Int) -> Unit,
     listState: LazyListState,
 ) {
-    if (query.isBlank() || results == null || invalid) {
-        val hint = if (invalid) INVALID_REGEX else "Type to search the text of every book in your library."
+    if (results == null || invalid) {
+        val hint = if (invalid) INVALID_REGEX else "Type a search and press Enter to search inside every book."
         Text(
             hint,
             style = MaterialTheme.typography.bodyMedium,
@@ -265,9 +285,15 @@ private fun ResultsSummary(
     Column(modifier = Modifier.padding(bottom = 4.dp)) {
         val hits = if (results.truncated) "${results.totalHits}+ hits" else "${results.totalHits} hits"
         val books = if (results.books.size == 1) "1 book" else "${results.books.size} books"
+        val status = when {
+            progress != null -> " \u00b7 searched ${progress.first} of ${progress.second} books"
+            results.unreadableChapters > 0 ->
+                " \u00b7 ${results.unreadableChapters} chapters couldn't be read (see Logs)"
+            else -> ""
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "\"${query.trim()}\": $hits in $books",
+                "\"${query.trim()}\": $hits in $books$status",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.weight(1f).testTag("search-summary"),
             )

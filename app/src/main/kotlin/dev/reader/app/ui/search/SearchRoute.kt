@@ -22,9 +22,6 @@ import dev.reader.core.model.Book
 import dev.reader.core.model.Chapter
 import dev.reader.core.search.TextSearch
 import dev.reader.core.theme.LibraryLayout
-import kotlinx.coroutines.delay
-
-private const val TYPING_DEBOUNCE_MILLIS = 300L
 
 @Composable
 fun SearchRoute(
@@ -60,18 +57,14 @@ fun SearchRoute(
     }
 
     val compiled = remember(state.query, state.options) { TextSearch.compile(state.query.trim(), state.options) }
-    LaunchedEffect(compiled, state.inText) {
-        if (!state.inText) return@LaunchedEffect
-        val options = state.options
-        val key = "${state.query.trim()}|${options.matchCase}|${options.regex}|${options.anyWhitespace}"
-        val regex = compiled?.getOrNull()
+    LaunchedEffect(state.searchRequest) {
+        if (state.searchRequest == state.completedRequest) return@LaunchedEffect
+        val regex = TextSearch.compile(state.submittedQuery, state.submittedOptions)?.getOrNull()
         if (regex == null) {
             state.clearResults()
             return@LaunchedEffect
         }
-        if (state.resultsKey == key) return@LaunchedEffect
-        delay(TYPING_DEBOUNCE_MILLIS)
-        state.searchLibraryText(context, latestBooks, { latestChapters[it].orEmpty() }, regex, key)
+        state.searchLibraryText(context, latestBooks, { latestChapters[it].orEmpty() }, regex)
     }
 
     SearchScreen(
@@ -95,6 +88,8 @@ fun SearchRoute(
         options = state.options,
         onOptionsChange = { state.options = it },
         invalidQuery = compiled?.isFailure == true,
+        onSearch = state::submit,
+        resultsQuery = state.submittedQuery,
         textResults = state.results,
         searchProgress = if (state.searching) state.booksSearched to state.booksToSearch else null,
         collapsed = state.collapsed,
