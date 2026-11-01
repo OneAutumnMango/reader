@@ -69,6 +69,7 @@ fun ReaderRoute(
     chapterId: ChapterId,
     onOpenMenu: () -> Unit,
     modifier: Modifier = Modifier,
+    startBlock: Int? = null,
 ) {
     val scope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -112,6 +113,8 @@ fun ReaderRoute(
     // Shared by both search's jumpFor and the scrubber, so whichever jump is newest always wins
     // instead of one permanently shadowing the other via fixed priority.
     var jumpNonce by remember(bookId) { mutableIntStateOf(0) }
+    // Scrolls the opened chapter to a search result's block; dropped once the reader pages away.
+    var pendingStartBlock by remember(bookId) { mutableStateOf(startBlock) }
 
     if (book == null || chapters.isEmpty() || prefs == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -150,8 +153,11 @@ fun ReaderRoute(
                 onToggleMenu = { showMenu = !showMenu },
                 onPositionChanged = { index, total -> positions[page] = index to total },
                 highlight = search.highlight,
-                jump = listOfNotNull(search.jumpFor(page), scrubJump?.takeIf { it.first == page }?.second)
-                    .maxByOrNull { it.id },
+                jump = listOfNotNull(
+                    search.jumpFor(page),
+                    scrubJump?.takeIf { it.first == page }?.second,
+                    pendingStartBlock?.takeIf { page == initialPage }?.let { BlockJump(it, 0) },
+                ).maxByOrNull { it.id },
             )
         }
 
@@ -160,6 +166,7 @@ fun ReaderRoute(
         // jump (the same class of bug the page-scoping above already guards against, but
         // triggered by returning to a page rather than by a chapter change).
         LaunchedEffect(pagerState.currentPage) {
+            if (pagerState.currentPage != initialPage) pendingStartBlock = null
             scrubJump?.let { (page, _) -> if (page != pagerState.currentPage) scrubJump = null }
         }
 

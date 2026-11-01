@@ -16,5 +16,7 @@ sealed interface Destination {
     data class BookDetail(val bookId: BookId) : Destination
     data class BookInfo(val bookId: BookId) : Destination
     data class Bookmarks(val bookId: BookId) : Destination
-    data class Reader(val bookId: BookId, val chapterId: ChapterId) : Destination
+
+    /** [block] scrolls the chapter to that block on open, e.g. when coming from a text search result. */
+    data class Reader(val bookId: BookId, val chapterId: ChapterId, val block: Int? = null) : Destination
 }

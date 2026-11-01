@@ -55,6 +55,7 @@ import dev.reader.app.ui.library.BookInfoRoute
 import dev.reader.app.ui.library.LibraryRoute
 import dev.reader.app.ui.reader.ReaderRoute
 import dev.reader.app.ui.search.SearchRoute
+import dev.reader.app.ui.search.SearchState
 import dev.reader.app.ui.settings.LibrarySettingsRoute
 import dev.reader.app.ui.settings.LogHistoryRoute
 import dev.reader.app.ui.settings.SettingsRoute
@@ -101,6 +102,7 @@ fun ReaderApp(graph: ReaderGraph) {
     // and saveable so a rotation or a low-memory process restart doesn't reset the scroll either.
     val libraryGridStates = rememberSaveable(saver = LibraryGridStatesSaver) { mutableMapOf() }
     val bookDetailStates = remember { mutableMapOf<BookId, BookDetailState>() }
+    val searchState = remember { SearchState() }
     val topBar = remember { TopBarState() }
     var libraryCategory by remember { mutableStateOf<CategoryId?>(null) }
     // Collected here, not inside the library screen: a fresh collection starts empty, and an empty grid
@@ -231,7 +233,12 @@ fun ReaderApp(graph: ReaderGraph) {
                     )
                     Destination.Search -> SearchRoute(
                         graph,
+                        searchState,
+                        books,
                         onBookClick = { navigator.push(Destination.BookDetail(it.id)) },
+                        onOpenChapter = { book, chapter, block ->
+                            navigator.push(Destination.Reader(book.id, chapter.id, block))
+                        },
                         modifier = content,
                     )
                     Destination.Stats -> StatsRoute(graph, content)
@@ -279,6 +286,7 @@ private fun ReaderDestinationContent(graph: ReaderGraph, navigator: Navigator) {
         destination.bookId,
         destination.chapterId,
         onOpenMenu = { navigator.pop() },
+        startBlock = destination.block,
     )
 }
 
