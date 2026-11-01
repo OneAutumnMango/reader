@@ -73,12 +73,23 @@ class StatsAndSearchRepositoryTest {
     }
 
     @Test
-    fun `indexed chapter text is searchable`() = runBlocking {
+    fun `a book's indexed chapters are replaced as a whole and paged in order`() = runBlocking {
         val repository = SearchRepository(database)
-        val chapterId = ChapterId("ch-1")
-        repository.indexChapter(chapterId, BookId("book-1"), "The quick brown fox jumps")
+        val one = BookId("book-1")
+        val two = BookId("book-2")
+        repository.replaceBook(one, listOf(ChapterId("a") to "alpha", ChapterId("b") to "beta"))
+        repository.replaceBook(two, listOf(ChapterId("c") to "gamma"))
 
-        assertEquals(listOf(chapterId), repository.search("quick"))
-        assertEquals(emptyList(), repository.search("elephant"))
+        repository.replaceBook(one, listOf(ChapterId("a") to "alpha again"))
+
+        val all = repository.page(after = 0, limit = 10)
+        assertEquals(listOf("c", "a"), all.map { it.chapterId.value })
+        assertEquals("alpha again", all.last().body)
+        val firstPage = repository.page(after = 0, limit = 1)
+        assertEquals(listOf("c"), firstPage.map { it.chapterId.value })
+        assertEquals(listOf("a"), repository.page(after = firstPage.last().rowId, limit = 1).map { it.chapterId.value })
+
+        repository.removeBook(two)
+        assertEquals(listOf("a"), repository.page(0, 10).map { it.chapterId.value })
     }
 }

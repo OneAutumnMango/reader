@@ -31,10 +31,16 @@ object TextSearch {
     }
 
     /** Non-empty matches of [regex] in [document], in reading order, stopping after [limit]. */
-    fun find(document: RichDocument, regex: Regex, limit: Int = Int.MAX_VALUE): List<SearchMatch> {
+    fun find(document: RichDocument, regex: Regex, limit: Int = Int.MAX_VALUE): List<SearchMatch> =
+        findInBlocks(document.blocks.asSequence().map { it.plainText() }, regex, limit)
+
+    /** Like [find], over text made by [indexText]: one block per line, so block numbers still line up. */
+    fun findInIndexedText(text: String, regex: Regex, limit: Int = Int.MAX_VALUE): List<SearchMatch> =
+        findInBlocks(text.lineSequence(), regex, limit)
+
+    private fun findInBlocks(blocks: Sequence<String>, regex: Regex, limit: Int): List<SearchMatch> {
         val matches = mutableListOf<SearchMatch>()
-        document.blocks.forEachIndexed { index, block ->
-            val text = block.plainText()
+        blocks.forEachIndexed { index, text ->
             for (match in regex.findAll(text)) {
                 if (matches.size >= limit) return matches
                 if (match.range.isEmpty()) continue
@@ -62,3 +68,7 @@ fun Block.plainText(): String = when (this) {
     is Block.ListItem -> spans.joinToString("") { it.text }
     is Block.Image -> ""
 }
+
+/** The text stored in the search index: every block (images included, empty) on its own line. */
+fun RichDocument.indexText(): String =
+    blocks.joinToString("\n") { it.plainText().replace('\n', ' ').replace('\r', ' ') }

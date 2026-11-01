@@ -13,7 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.app.data.ReaderGraph
@@ -32,7 +31,6 @@ fun SearchRoute(
     onOpenChapter: (Book, Chapter, block: Int?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val allChapters by graph.library.observeAllChapters().collectAsState(initial = emptyList())
     val preferences by graph.settings.preferences.collectAsState(initial = null)
     val progressByBook by graph.progress.observeAll().collectAsState(initial = emptyMap())
@@ -64,7 +62,13 @@ fun SearchRoute(
             state.clearResults()
             return@LaunchedEffect
         }
-        state.searchLibraryText(context, latestBooks, { latestChapters[it].orEmpty() }, regex)
+        state.searchLibraryText(
+            latestBooks,
+            { latestChapters[it].orEmpty() },
+            regex,
+            graph.search,
+            graph.indexer,
+        )
     }
 
     SearchScreen(

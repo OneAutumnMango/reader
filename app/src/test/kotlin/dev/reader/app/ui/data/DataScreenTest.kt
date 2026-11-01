@@ -1,10 +1,12 @@
 package dev.reader.app.ui.data
 
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import dev.reader.app.data.IndexStatus
 import dev.reader.data.export.ExportScope
 import dev.reader.data.store.AutomaticBackupFrequency
 import org.junit.Rule
@@ -28,6 +30,8 @@ class DataScreenTest {
     private var backupFolderName: String? = null
     private var backupFrequency = AutomaticBackupFrequency.DAILY
     private var automaticIncludeBooks = false
+    private var indexStatus: IndexStatus = IndexStatus.Idle
+    private var reindexes = 0
 
     private fun setContent() = composeRule.setContent {
         DataScreen(
@@ -48,6 +52,8 @@ class DataScreenTest {
             onAutomaticBackupFrequencyChange = { backupFrequency = it },
             automaticBackupIncludeBooks = automaticIncludeBooks,
             onAutomaticBackupIncludeBooksChange = { automaticIncludeBooks = it },
+            indexStatus = indexStatus,
+            onReindex = { reindexes++ },
         )
     }
 
@@ -118,6 +124,34 @@ class DataScreenTest {
         composeRule.onNodeWithTag("automatic-backup-include-books").performScrollTo().performClick()
         assertEquals(AutomaticBackupFrequency.WEEKLY, backupFrequency)
         assertTrue(automaticIncludeBooks)
+    }
+
+    @Test
+    fun `reindexing can be started`() {
+        setContent()
+
+        composeRule.onNodeWithTag("reindex-library").performScrollTo().performClick()
+
+        assertEquals(1, reindexes)
+    }
+
+    @Test
+    fun `reindexing shows its progress and can't be started twice`() {
+        indexStatus = IndexStatus.Running(3, 10)
+        setContent()
+
+        composeRule.onNodeWithTag("reindex-status").performScrollTo()
+        composeRule.onNodeWithText("Indexing 3 of 10 books\u2026").assertExists()
+        composeRule.onNodeWithTag("reindex-library").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `a finished reindex reports what it covered`() {
+        indexStatus = IndexStatus.Done(books = 4, unreadableChapters = 2)
+        setContent()
+
+        composeRule.onNodeWithTag("reindex-status").performScrollTo()
+        composeRule.onNodeWithText("Indexed 4 books. 2 chapters couldn't be read.").assertExists()
     }
 }
 

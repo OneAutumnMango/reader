@@ -37,6 +37,7 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val preferences by graph.settings.preferences.collectAsState(initial = PreferencesFile())
+    val indexStatus by graph.indexer.status.collectAsState()
     var status by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var pendingScopes by remember { mutableStateOf(ExportScope.entries.toSet()) }
@@ -158,6 +159,8 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         onRestoreBackup = { restoreLauncher.launch(ANY_FILE) },
         onDanger = { danger = it },
         modifier = modifier,
+        indexStatus = indexStatus,
+        onReindex = graph.indexer::reindexLibrary,
         automaticBackupsEnabled = preferences.automaticBackupsEnabled,
         onAutomaticBackupsEnabledChange = { enabled ->
             scope.launch { graph.settings.update { it.copy(automaticBackupsEnabled = enabled) } }

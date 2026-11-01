@@ -61,4 +61,32 @@ class TextSearchTest {
         val any = requireNotNull(TextSearch.compile("e", SearchOptions())).getOrThrow()
         assertEquals(2, TextSearch.find(document, any, limit = 2).size)
     }
+
+    @Test
+    fun `searching the indexed text finds the same matches in the same blocks`() {
+        val regex = requireNotNull(TextSearch.compile("this is", SearchOptions(anyWhitespace = true))).getOrThrow()
+
+        val live = TextSearch.find(document, regex)
+        val indexed = TextSearch.findInIndexedText(document.indexText(), regex)
+
+        assertEquals(live, indexed)
+        assertEquals(listOf(1, 1, 1), indexed.map { it.block })
+    }
+
+    @Test
+    fun `index text keeps one line per block, even for images and multi-line paragraphs`() {
+        val doc = RichDocument(
+            listOf(
+                Block.Paragraph(listOf(Span("line one\nline two\r\nthree"))),
+                Block.Image("a.png", "alt"),
+                Block.Paragraph(listOf(Span("needle"))),
+            ),
+        )
+
+        val text = doc.indexText()
+
+        assertEquals(3, text.lines().size)
+        val regex = requireNotNull(TextSearch.compile("needle", SearchOptions())).getOrThrow()
+        assertEquals(2, TextSearch.findInIndexedText(text, regex).single().block)
+    }
 }

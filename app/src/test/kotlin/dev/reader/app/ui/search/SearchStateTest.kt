@@ -1,5 +1,9 @@
 package dev.reader.app.ui.search
 
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import dev.reader.app.data.IndexStatus
+import dev.reader.app.data.LibraryIndexer
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
 import dev.reader.core.model.BookId
@@ -7,75 +11,106 @@ import dev.reader.core.model.Chapter
 import dev.reader.core.model.ChapterId
 import dev.reader.core.search.SearchOptions
 import dev.reader.core.search.TextSearch
+import dev.reader.data.repo.LibraryRepository
+import dev.reader.data.repo.SearchRepository
+import dev.reader.data.room.ReaderDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
 class SearchStateTest {
 
+    private lateinit var database: ReaderDatabase
+    private lateinit var library: LibraryRepository
+    private lateinit var index: SearchRepository
+    private lateinit var indexer: LibraryIndexer
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val dir = File.createTempFile("search-state", "").apply {
         delete()
         mkdirs()
     }
 
+    @Before
+    fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        database = Room.inMemoryDatabaseBuilder(context, ReaderDatabase::class.java).allowMainThreadQueries().build()
+        library = LibraryRepository(database)
+        index = SearchRepository(database)
+        indexer = LibraryIndexer(context, library, index, scope)
+    }
+
     @After
     fun tearDown() {
+        database.close()
         dir.deleteRecursively()
     }
 
-    private fun book(id: String, text: String, format: BookFormat = BookFormat.TXT): Book {
+    private fun txt(id: String, text: String, format: BookFormat = BookFormat.TXT): Pair<Book, List<Chapter>> {
         val file = File(dir, "$id.txt").apply { writeText(text) }
-        return Book(BookId(id), id, format = format, sourcePath = file.path, addedAt = Instant.fromEpochSeconds(0))
+        val book = Book(BookId(id), id, format = format, sourcePath = file.path, addedAt = Instant.fromEpochSeconds(0))
+        return book to listOf(Chapter(ChapterId("$id-1"), book.id, "One", file.path, 0))
+    }
+
+    private suspend fun search(
+        vararg books: Pair<Book, List<Chapter>>,
+        query: String = "dragon",
+        options: SearchOptions = SearchOptions(),
+    ): SearchState {
+        val state = SearchState()
+        val chapters = books.associate { it.first.id to it.second }
+        val regex = TextSearch.compile(query, options)!!.getOrThrow()
+        state.searchLibraryText(books.map { it.first }, { chapters.getValue(it) }, regex, index, indexer)
+        return state
     }
 
     @Test
-    fun `finds matches across books, skipping books with none and page-based formats`() = runBlocking {
-        val dragons = book("dragons", "Once there was a Dragon.\n\nThe dragon slept.")
-        val quiet = book("quiet", "Nothing to see here.")
-        val comic = book("comic", "dragon", BookFormat.CBZ)
-        val chapters = listOf(dragons, quiet, comic).associate {
-            it.id to listOf(Chapter(ChapterId("${it.id.value}-1"), it.id, "One", it.sourcePath, 0))
-        }
-        val state = SearchState()
-        val regex = TextSearch.compile("dragon", SearchOptions())!!.getOrThrow()
+    fun `searches the stored text without opening the book again`() = runBlocking {
+        val (book, chapters) = txt("dragons", "Nothing here.")
+        index.replaceBook(book.id, listOf(chapters.single().id to "A quiet start\nThe dragon slept"))
+        File(book.sourcePath).delete()
 
-        state.searchLibraryText(
-            RuntimeEnvironment.getApplication(),
-            listOf(dragons, quiet, comic),
-            { chapters.getValue(it) },
-            regex,
-        )
+        val state = search(book to chapters)
 
-        val results = state.results!!
-        assertEquals(listOf("dragons"), results.books.map { it.book.id.value })
-        assertEquals(2, results.totalHits)
-        assertFalse(state.searching)
-        assertTrue(comic.hasSearchableText().not())
+        val hit = state.results!!.books.single().chapters.single().matches.single()
+        assertEquals(1, hit.block)
+        assertEquals(1, state.results!!.totalHits)
+    }
+
+    @Test
+    fun `a book missing from the index is read once and indexed`() = runBlocking {
+        val dragons = txt("dragons", "Once there was a Dragon.\n\nThe dragon slept.")
+        val quiet = txt("quiet", "Nothing to see here.")
+        val comic = txt("comic", "dragon", BookFormat.CBZ)
+
+        val state = search(dragons, quiet, comic)
+
+        assertEquals(listOf("dragons"), state.results!!.books.map { it.book.id.value })
+        assertEquals(2, state.results!!.totalHits)
+        assertEquals(listOf("dragons-1", "quiet-1"), index.page(0, 10).map { it.chapterId.value }.sorted())
+        assertEquals(state.searchRequest, state.completedRequest)
+        assertEquals(false, state.searching)
     }
 
     @Test
     fun `search options change what matches`() = runBlocking {
-        val dragons = book("dragons", "A Dragon and a dragon.")
-        val chapters = mapOf(dragons.id to listOf(Chapter(ChapterId("c"), dragons.id, "One", dragons.sourcePath, 0)))
+        val book = txt("dragons", "A Dragon and a dragon.")
 
-        suspend fun hits(query: String, options: SearchOptions): Int {
-            val state = SearchState()
-            val regex = TextSearch.compile(query, options)!!.getOrThrow()
-            val context = RuntimeEnvironment.getApplication()
-            state.searchLibraryText(context, listOf(dragons), { chapters.getValue(it) }, regex)
-            return state.results!!.totalHits
-        }
+        suspend fun hits(query: String, options: SearchOptions) = search(book, query = query, options = options)
+            .results!!.totalHits
 
         assertEquals(2, hits("dragon", SearchOptions()))
         assertEquals(1, hits("dragon", SearchOptions(matchCase = true)))
@@ -85,7 +120,7 @@ class SearchStateTest {
     }
 
     @Test
-    fun `finds text inside an epub`() = runBlocking {
+    fun `finds text inside an epub that is not indexed yet`() = runBlocking {
         val file = File(dir, "story.epub")
         ZipOutputStream(file.outputStream()).use { zip ->
             fun entry(name: String, content: String) {
@@ -120,27 +155,23 @@ class SearchStateTest {
             Chapter(ChapterId("c1"), book.id, "One", file.path, 0),
             Chapter(ChapterId("c2"), book.id, "Two", file.path, 1),
         )
-        val state = SearchState()
-        val regex = TextSearch.compile("dragon", SearchOptions())!!.getOrThrow()
 
-        state.searchLibraryText(RuntimeEnvironment.getApplication(), listOf(book), { chapters }, regex)
+        val state = search(book to chapters)
 
         assertEquals(1, state.results!!.totalHits)
+        assertEquals(2, index.page(0, 10).size)
     }
 
     @Test
     fun `a search only runs when submitted, and counts chapters it could not read`() = runBlocking {
-        val readable = book("readable", "A dragon.")
+        val readable = txt("readable", "A dragon.")
         val broken = Book(
             BookId("broken"),
             "Broken",
             format = BookFormat.TXT,
             sourcePath = "/missing.txt",
             addedAt = Instant.fromEpochSeconds(0),
-        )
-        val chapters = listOf(readable, broken).associate {
-            it.id to listOf(Chapter(ChapterId("${it.id.value}-1"), it.id, "One", it.sourcePath, 0))
-        }
+        ) to listOf(Chapter(ChapterId("broken-1"), BookId("broken"), "One", "/missing.txt", 0))
         val state = SearchState()
         state.query = "  dragon "
         assertEquals(0, state.searchRequest)
@@ -150,11 +181,29 @@ class SearchStateTest {
         assertEquals(1, state.searchRequest)
         assertEquals("dragon", state.submittedQuery)
         assertTrue(state.completedRequest < state.searchRequest)
+        val chapters = mapOf(readable.first.id to readable.second, broken.first.id to broken.second)
         val regex = TextSearch.compile(state.submittedQuery, state.submittedOptions)!!.getOrThrow()
-        val context = RuntimeEnvironment.getApplication()
-        state.searchLibraryText(context, listOf(readable, broken), { chapters.getValue(it) }, regex)
+        state.searchLibraryText(listOf(readable.first, broken.first), { chapters.getValue(it) }, regex, index, indexer)
         assertEquals(state.searchRequest, state.completedRequest)
         assertEquals(1, state.results!!.totalHits)
         assertEquals(1, state.results!!.unreadableChapters)
+    }
+
+    @Test
+    fun `reindexing the library rebuilds the stored text of searchable books`() = runBlocking {
+        val (book, chapters) = txt("dragons", "The dragon slept.")
+        library.upsertBook(book, chapters)
+        index.replaceBook(book.id, listOf(chapters.single().id to "stale text"))
+        val (comic, comicChapters) = txt("comic", "x", BookFormat.CBZ)
+        library.upsertBook(comic, comicChapters)
+        index.replaceBook(comic.id, listOf(comicChapters.single().id to "should be dropped"))
+
+        indexer.reindexLibrary()
+        while (indexer.status.first { it !is IndexStatus.Idle } is IndexStatus.Running) kotlinx.coroutines.yield()
+
+        assertEquals(IndexStatus.Done(books = 1, unreadableChapters = 0), indexer.status.value)
+        val stored = index.page(0, 10)
+        assertEquals(listOf("dragons-1"), stored.map { it.chapterId.value })
+        assertEquals("The dragon slept.", stored.single().body)
     }
 }

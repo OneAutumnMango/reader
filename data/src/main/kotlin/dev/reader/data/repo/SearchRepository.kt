@@ -1,19 +1,25 @@
 package dev.reader.data.repo
 
+import androidx.room.withTransaction
 import dev.reader.core.model.BookId
 import dev.reader.core.model.ChapterId
 import dev.reader.data.room.ReaderDatabase
-import dev.reader.data.room.entity.ChapterFtsEntity
 
+/** One chapter's stored text, one block per line; [rowId] is the position to continue paging from. */
+data class IndexedChapter(val rowId: Int, val chapterId: ChapterId, val bookId: BookId, val body: String)
+
+/** The text index behind library search: a copy of each chapter's plain text. */
 class SearchRepository(private val database: ReaderDatabase) {
 
-    suspend fun indexChapter(chapterId: ChapterId, bookId: BookId, plainText: String) {
-        database.search().removeFromIndex(chapterId.value)
-        database.search().index(
-            ChapterFtsEntity(rowId = 0, chapterId = chapterId.value, bookId = bookId.value, body = plainText),
-        )
+    /** Replaces everything indexed for [bookId] with [chapters] (chapter id to its indexed text). */
+    suspend fun replaceBook(bookId: BookId, chapters: List<Pair<ChapterId, String>>) = database.withTransaction {
+        database.search().removeBook(bookId.value)
+        chapters.forEach { (chapterId, text) -> database.search().insert(chapterId.value, bookId.value, text) }
     }
 
-    suspend fun search(query: String): List<ChapterId> =
-        database.search().search(query).map { ChapterId(it.chapterId) }
+    suspend fun removeBook(bookId: BookId) = database.search().removeBook(bookId.value)
+
+    suspend fun page(after: Int, limit: Int): List<IndexedChapter> = database.search().page(after, limit).map {
+        IndexedChapter(it.rowId, ChapterId(it.chapterId), BookId(it.bookId), it.body)
+    }
 }

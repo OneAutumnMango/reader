@@ -7,9 +7,13 @@ import dev.reader.core.model.BookId
 import dev.reader.core.model.CategoryId
 import dev.reader.core.model.Chapter
 import dev.reader.core.model.ChapterId
+import dev.reader.core.richtext.RichDocument
 import dev.reader.core.richtext.wordCount
+import dev.reader.core.search.hasSearchableText
+import dev.reader.core.search.indexText
 import dev.reader.core.util.NaturalSortComparator
 import dev.reader.data.repo.LibraryRepository
+import dev.reader.data.repo.SearchRepository
 import dev.reader.parser.ParsedBook
 import dev.reader.parser.ParsedChapter
 import dev.reader.parser.TextBookParser
@@ -28,6 +32,7 @@ class BookImporter(
     private val library: LibraryRepository,
     private val newId: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> kotlin.time.Instant = { Clock.System.now() },
+    private val search: SearchRepository? = null,
 ) {
 
     suspend fun importFile(
@@ -66,7 +71,24 @@ class BookImporter(
             chapter.toChapterModel(bookId, index, chapterIds[index])
         }
         library.upsertBook(book, chapters)
+        indexBook(
+            book,
+            chapters.zip(parsed.chapters).mapNotNull { (chapter, parsedChapter) ->
+                (parsedChapter as? ParsedChapter.TextChapter)?.let { chapter.id to it.document.indexText() }
+            },
+        )
         return book
+    }
+
+    /**
+     * Keeps the search index in step with the book. An indexing failure must never fail the import:
+     * a book missing from the index is simply indexed the first time it's searched.
+     */
+    private suspend fun indexBook(book: Book, texts: List<Pair<ChapterId, String>>) {
+        val index = search ?: return
+        runCatching {
+            if (book.hasSearchableText()) index.replaceBook(book.id, texts) else index.removeBook(book.id)
+        }
     }
 
     /** Rebuilds missing covers without changing book metadata, chapters, or reading progress. */
@@ -120,6 +142,7 @@ class BookImporter(
         val existing = library.findByContentHash(hash) ?: library.findBySourcePath(folder.path)
         val bookId = existing?.id ?: BookId(newId())
         val chapterIds = existingChapterIds(existing)
+        val texts = mutableListOf<Pair<ChapterId, String>>()
         val chapters = files.mapIndexedNotNull { index, file ->
             val format = BookFormat.fromFileName(file.name) ?: return@mapIndexedNotNull null
             val parsed = parse(file, format, pdfContext = null)
@@ -131,7 +154,9 @@ class BookImporter(
                 sourcePath = file.path,
                 orderIndex = index,
                 wordCount = textChapters.sumOf { it.document.wordCount() },
-            )
+            ).also { chapter ->
+                texts += chapter.id to RichDocument(textChapters.flatMap { it.document.blocks }).indexText()
+            }
         }
 
         val book = Book(
@@ -149,6 +174,7 @@ class BookImporter(
             originUri = originUri ?: existing?.originUri,
         )
         library.upsertBook(book, chapters)
+        indexBook(book, texts)
         return book
     }
 

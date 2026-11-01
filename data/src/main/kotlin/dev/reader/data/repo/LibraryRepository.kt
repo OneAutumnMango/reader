@@ -80,6 +80,7 @@ class LibraryRepository(private val database: ReaderDatabase) {
         }
         database.chapters().deleteForBook(bookId.value)
         database.books().clearCategories(bookId.value)
+        database.search().removeBook(bookId.value)
     }
 
     /** Removing a book from the library also removes its own copy of the file and cover. */

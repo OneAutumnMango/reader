@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.reader.core.model.Progress
 import dev.reader.data.repo.LibraryRepository
 import dev.reader.data.repo.ProgressRepository
+import dev.reader.data.repo.SearchRepository
 import dev.reader.data.room.ReaderDatabase
 import dev.reader.parser.TextBookParser
 import dev.reader.parser.text.ChapterSplitter
@@ -362,5 +363,28 @@ class BookImporterTest {
             )
             zip.closeEntry()
         }
+    }
+
+    @Test
+    fun `importing indexes each chapter's text and removing the book drops it`() = runBlocking {
+        val search = SearchRepository(database)
+        val library = LibraryRepository(database)
+        var counter = 0
+        val indexing = BookImporter(library, newId = { "idx-${counter++}" }, search = search)
+        val file = File(tempDir, "Indexed.txt").apply { writeText("First paragraph.\n\nA hidden dragon.") }
+
+        val book = indexing.importFile(file)
+
+        val stored = search.page(0, 10)
+        assertEquals(1, stored.size)
+        assertEquals(book.id, stored.single().bookId)
+        assertEquals("First paragraph.\nA hidden dragon.", stored.single().body)
+
+        file.writeText("Rewritten text.")
+        indexing.reimport(book)
+        assertEquals("Rewritten text.", search.page(0, 10).single().body)
+
+        library.deleteBook(book.id)
+        assertEquals(emptyList(), search.page(0, 10))
     }
 }

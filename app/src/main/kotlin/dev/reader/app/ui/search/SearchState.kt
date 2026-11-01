@@ -1,27 +1,28 @@
 package dev.reader.app.ui.search
 
-import android.content.Context
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import dev.reader.app.data.ChapterContent
-import dev.reader.app.data.ChapterLoader
+import dev.reader.app.data.LibraryIndexer
 import dev.reader.core.model.Book
-import dev.reader.core.model.BookFormat
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Chapter
-import dev.reader.core.reader.PdfRenderMode
+import dev.reader.core.model.ChapterId
 import dev.reader.core.search.SearchMatch
 import dev.reader.core.search.SearchOptions
 import dev.reader.core.search.TextSearch
+import dev.reader.core.search.hasSearchableText
+import dev.reader.data.repo.IndexedChapter
+import dev.reader.data.repo.SearchRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private const val MAX_TOTAL_HITS = 2000
 private const val MAX_HITS_PER_CHAPTER = 100
+private const val INDEX_PAGE_SIZE = 25
 
 data class ChapterMatches(val chapter: Chapter, val matches: List<SearchMatch>)
 
@@ -36,15 +37,6 @@ data class TextSearchResults(
     /** Chapters that failed to load, so a search that quietly found nothing can be told from one that couldn't read. */
     val unreadableChapters: Int = 0,
 )
-
-private data class BookScan(val chapters: List<ChapterMatches>, val unreadable: Int)
-
-/** Comics and page-image PDFs have no text to search. */
-internal fun Book.hasSearchableText(): Boolean = when (format) {
-    BookFormat.CBZ, BookFormat.CBR -> false
-    BookFormat.PDF -> pdfRenderMode == PdfRenderMode.REFLOW_TEXT
-    else -> true
-}
 
 /**
  * Library search state, kept above the search screen so the query, results and scroll positions
@@ -92,15 +84,15 @@ class SearchState {
     }
 
     /**
-     * Scans every searchable book's chapters for [regex], publishing results as each book finishes.
-     * shortcut: parses chapters on demand rather than from an index, so a big library takes a while;
-     * upgrade to filling the (currently unused) chapter_fts table at import time.
+     * Searches the stored text of every searchable book for [regex], publishing results as it goes.
+     * Books missing from the index are read and indexed on the spot, so that only happens once.
      */
     suspend fun searchLibraryText(
-        context: Context,
         books: List<Book>,
         chaptersOf: (BookId) -> List<Chapter>,
         regex: Regex,
+        index: SearchRepository,
+        indexer: LibraryIndexer,
     ) {
         val searchable = books.filter { it.hasSearchableText() }
         searching = true
@@ -108,49 +100,70 @@ class SearchState {
         booksToSearch = searchable.size
         results = TextSearchResults(emptyList(), 0)
         try {
-            val found = mutableListOf<BookMatches>()
-            var total = 0
-            var unreadable = 0
-            for (book in searchable) {
-                if (total >= MAX_TOTAL_HITS) break
-                val scan = searchBook(context, book, chaptersOf(book.id), regex, MAX_TOTAL_HITS - total)
-                unreadable += scan.unreadable
-                if (scan.chapters.isNotEmpty()) {
-                    found += BookMatches(book, scan.chapters)
-                    total += scan.chapters.sumOf { it.matches.size }
-                }
-                booksSearched++
-                results = TextSearchResults(found.toList(), total, unreadableChapters = unreadable)
+            val scan = Scan(searchable, searchable.flatMap { chaptersOf(it.id) }.associateBy { it.id }, regex)
+            scanIndex(scan, index)
+            for (book in searchable.filter { it.id !in scan.indexed }) {
+                if (scan.total >= MAX_TOTAL_HITS) break
+                val (texts, failed) = indexer.loadTexts(book, chaptersOf(book.id))
+                index.replaceBook(book.id, texts)
+                scan.unreadable += failed
+                texts.forEach { (chapterId, text) -> scan.add(book.id, chapterId, text) }
+                scan.indexed += book.id
+                booksSearched = scan.indexed.size
+                publish(scan)
             }
-            results = TextSearchResults(found.toList(), total, total >= MAX_TOTAL_HITS, unreadable)
+            results = scan.results(truncated = scan.total >= MAX_TOTAL_HITS)
             completedRequest = searchRequest
         } finally {
             searching = false
         }
     }
 
-    private suspend fun searchBook(
-        context: Context,
-        book: Book,
-        chapters: List<Chapter>,
-        regex: Regex,
-        budget: Int,
-    ): BookScan {
-        val found = mutableListOf<ChapterMatches>()
-        var left = budget
-        var unreadable = 0
-        for (chapter in chapters) {
-            if (left <= 0) break
-            val document = (ChapterLoader.load(context, book, chapter) as? ChapterContent.Text)?.document
-            if (document == null) unreadable++
-            val matches = document?.let {
-                withContext(Dispatchers.Default) { TextSearch.find(it, regex, minOf(MAX_HITS_PER_CHAPTER, left)) }
-            }.orEmpty()
-            if (matches.isNotEmpty()) {
-                found += ChapterMatches(chapter, matches)
-                left -= matches.size
-            }
+    private suspend fun scanIndex(scan: Scan, index: SearchRepository) {
+        var after = 0
+        while (scan.total < MAX_TOTAL_HITS) {
+            val rows = index.page(after, INDEX_PAGE_SIZE)
+            if (rows.isEmpty()) break
+            after = rows.last().rowId
+            withContext(Dispatchers.Default) { rows.forEach { scan.add(it) } }
+            booksSearched = scan.indexed.size
+            publish(scan)
         }
-        return BookScan(found, unreadable)
+    }
+
+    private fun publish(scan: Scan) {
+        results = scan.results(truncated = false)
+    }
+
+    /** Hits gathered so far; only touched by one search at a time. */
+    private class Scan(books: List<Book>, val chapters: Map<ChapterId, Chapter>, val regex: Regex) {
+        private val order = books.withIndex().associate { (position, book) -> book.id to position }
+        private val byId = books.associateBy { it.id }
+        private val found = mutableMapOf<BookId, MutableList<ChapterMatches>>()
+        val indexed = mutableSetOf<BookId>()
+        var unreadable = 0
+        var total = 0
+            private set
+
+        fun add(row: IndexedChapter) = add(row.bookId, row.chapterId, row.body)
+
+        fun add(bookId: BookId, chapterId: ChapterId, body: String) {
+            if (bookId !in byId) return
+            indexed += bookId
+            val chapter = chapters[chapterId] ?: return
+            val matches = TextSearch.findInIndexedText(body, regex, minOf(MAX_HITS_PER_CHAPTER, MAX_TOTAL_HITS - total))
+            if (matches.isEmpty()) return
+            found.getOrPut(bookId) { mutableListOf() } += ChapterMatches(chapter, matches)
+            total += matches.size
+        }
+
+        fun results(truncated: Boolean) = TextSearchResults(
+            found.entries.sortedBy { order.getValue(it.key) }.map { (id, chapterMatches) ->
+                BookMatches(byId.getValue(id), chapterMatches.sortedBy { it.chapter.orderIndex })
+            },
+            total,
+            truncated,
+            unreadable,
+        )
     }
 }
