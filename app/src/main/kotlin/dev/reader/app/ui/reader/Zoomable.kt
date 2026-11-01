@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.testTag
 
 private const val MAX_ZOOM = 5f
+private const val DOUBLE_TAP_ZOOM = 3f
 
 /** Current pinch zoom of the enclosing [Zoomable], so content can re-render sharper while zoomed. */
 class ZoomState {
@@ -59,12 +60,17 @@ fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composab
     // Disabling only stops gesture handling; [content] keeps its place in the tree (and its scroll state).
     val gesture = Modifier.pointerInput(enabled) {
         if (!enabled) return@pointerInput
+        var lastTapTime = 0L
+        var lastTapPosition = Offset.Zero
         awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            var upChange = down
+            var multiTouch = false
             do {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val pressed = event.changes.count { it.pressed }
-                val multiTouch = pressed > 1
+                if (pressed > 1) multiTouch = true
+                event.changes.firstOrNull { it.id == down.id }?.let { upChange = it }
                 if (pressed > 0 && (multiTouch || scale > 1f)) {
                     val newScale = (scale * event.calculateZoom()).coerceIn(1f, MAX_ZOOM)
                     val centroid = event.calculateCentroid() - Offset(size.width / 2f, size.height / 2f)
@@ -78,6 +84,37 @@ fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composab
                     if (multiTouch || moved) event.changes.forEach { if (it.positionChanged()) it.consume() }
                 }
             } while (event.changes.any { it.pressed })
+
+            // Not a tap (moved too much, or a second finger showed up) — nothing more to do.
+            if (multiTouch || (upChange.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                return@awaitEachGesture
+            }
+            val now = upChange.uptimeMillis
+            val isDoubleTap = now - lastTapTime < viewConfiguration.doubleTapTimeoutMillis &&
+                (down.position - lastTapPosition).getDistance() < viewConfiguration.touchSlop
+            if (!isDoubleTap) {
+                lastTapTime = now
+                lastTapPosition = down.position
+                return@awaitEachGesture
+            }
+            lastTapTime = 0L
+            // shortcut: consuming here stops the tap zone from also acting on this (second) tap, but
+            // the *first* tap of the double-tap already fired before we knew a second one was coming —
+            // upgrade by giving TapZoneOverlay an onDoubleTap and a shared ZoomState if that glitch matters.
+            upChange.consume()
+            val newScale = if (scale > 1f) 1f else DOUBLE_TAP_ZOOM
+            offset = if (newScale == 1f) {
+                Offset.Zero
+            } else {
+                val centroid = down.position - Offset(size.width / 2f, size.height / 2f)
+                val maxX = size.width * (newScale - 1f) / 2f
+                val maxY = size.height * (newScale - 1f) / 2f
+                Offset(
+                    (-centroid.x * (newScale - 1f)).coerceIn(-maxX, maxX),
+                    (-centroid.y * (newScale - 1f)).coerceIn(-maxY, maxY),
+                )
+            }
+            scale = newScale
         }
     }
 
