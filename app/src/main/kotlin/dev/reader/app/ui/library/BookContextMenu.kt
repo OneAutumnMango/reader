@@ -51,6 +51,21 @@ fun BookContextMenu(
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showCoverSourcePicker by remember { mutableStateOf(false) }
+    var showRemoveConfirm by remember { mutableStateOf(false) }
+
+    if (showRemoveConfirm) {
+        ConfirmRemoveDialog(
+            count = 1,
+            title = book.title,
+            onConfirm = {
+                showRemoveConfirm = false
+                onRemove()
+                onDismiss()
+            },
+            onDismiss = { showRemoveConfirm = false },
+        )
+        return
+    }
 
     if (showCategoryPicker) {
         CategoryPickerDialog(
@@ -146,8 +161,7 @@ fun BookContextMenu(
                     }
                 }
                 MenuRow("Remove from library", Modifier.testTag("book-menu-remove")) {
-                    onRemove()
-                    onDismiss()
+                    showRemoveConfirm = true
                 }
             }
         },

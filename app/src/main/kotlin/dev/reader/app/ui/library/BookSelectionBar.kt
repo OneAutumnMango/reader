@@ -49,6 +49,18 @@ fun BookSelectionBar(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var confirmRemove by remember { mutableStateOf(false) }
+    if (confirmRemove) {
+        ConfirmRemoveDialog(
+            count = selectedCount,
+            title = null,
+            onConfirm = {
+                confirmRemove = false
+                onRemove()
+            },
+            onDismiss = { confirmRemove = false },
+        )
+    }
     Surface(
         tonalElevation = 6.dp,
         shadowElevation = 6.dp,
@@ -92,7 +104,10 @@ fun BookSelectionBar(
                     }
                 }
                 Tooltip("Remove from library") {
-                    IconButton(onClick = onRemove, modifier = Modifier.testTag("book-selection-remove")) {
+                    IconButton(
+                        onClick = { confirmRemove = true },
+                        modifier = Modifier.testTag("book-selection-remove"),
+                    ) {
                         Icon(Icons.Filled.Delete, contentDescription = "Remove from library")
                     }
                 }

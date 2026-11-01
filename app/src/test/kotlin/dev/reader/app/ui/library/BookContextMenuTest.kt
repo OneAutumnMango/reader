@@ -22,6 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -109,9 +110,34 @@ class BookContextMenuTest {
         }
 
         composeRule.onNodeWithTag("book-menu-remove").performScrollTo().performClick()
+        assertFalse(removed)
+        composeRule.onNodeWithTag("confirm-remove").performClick()
 
         assertTrue(removed)
         assertTrue(dismissed)
+    }
+
+    @Test
+    fun `cancelling the remove confirmation keeps the book`() {
+        var removed = false
+        composeRule.setContent {
+            BookContextMenu(
+                book = book,
+                categories = categories,
+                onChangeCategories = {},
+                onRename = {},
+                onChangeCover = {},
+                onMarkAllRead = {},
+                onRemove = { removed = true },
+                onDismiss = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("book-menu-remove").performScrollTo().performClick()
+        composeRule.onNodeWithTag("cancel-remove").performClick()
+
+        assertFalse(removed)
+        composeRule.onNodeWithTag("book-menu-remove").assertExists()
     }
 
     @Test
