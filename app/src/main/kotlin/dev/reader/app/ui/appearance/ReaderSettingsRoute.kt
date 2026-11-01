@@ -76,6 +76,13 @@ fun ReaderSettingsRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
             )
         }
 
+        MenuSection("Zoom") {
+            ReaderZoomEditor(
+                preferences.readerSettings,
+                onChange = { settings -> update { it.copy(readerSettings = settings) } },
+            )
+        }
+
         MenuSection("Tap zones") {
             MenuSubheader("Reader gestures", Modifier.padding(top = 0.dp))
             TapZoneEditor(

@@ -57,18 +57,6 @@ fun ReaderSettingsEditor(settings: ReaderSettings, onChange: (ReaderSettings) ->
 
         Row(
             modifier = Modifier
-                .testTag("zoom-toggle")
-                .fillMaxWidth()
-                .clickable { onChange(settings.copy(zoomEnabled = !settings.zoomEnabled)) },
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Pinch to zoom")
-            Switch(checked = settings.zoomEnabled, onCheckedChange = null)
-        }
-
-        Row(
-            modifier = Modifier
                 .testTag("page-gap-toggle")
                 .fillMaxWidth()
                 .clickable { onChange(settings.copy(pageGap = !settings.pageGap)) },

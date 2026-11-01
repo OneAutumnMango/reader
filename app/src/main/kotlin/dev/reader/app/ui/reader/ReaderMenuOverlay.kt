@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.MenuSubheader
 import dev.reader.app.ui.appearance.ReaderSettingsEditor
 import dev.reader.app.ui.appearance.ReaderThemeEditor
+import dev.reader.app.ui.appearance.ReaderZoomEditor
 import dev.reader.core.reader.PdfRenderMode
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode
@@ -190,6 +191,9 @@ fun ReaderMenuOverlay(
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                         MenuSubheader("Reading", Modifier.padding(top = 0.dp))
                         ReaderSettingsEditor(settings, onSettingsChange)
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                        MenuSubheader("Zoom", Modifier.padding(top = 0.dp))
+                        ReaderZoomEditor(settings, onSettingsChange)
                     }
                 }
             }

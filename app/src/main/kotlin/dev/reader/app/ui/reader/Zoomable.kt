@@ -26,8 +26,8 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.testTag
 
-private const val MAX_ZOOM = 5f
-private const val DOUBLE_TAP_ZOOM = 3f
+const val MAX_ZOOM = 5f
+private const val DEFAULT_DOUBLE_TAP_ZOOM = 3f
 
 /** Current pinch zoom of the enclosing [Zoomable], so content can re-render sharper while zoomed. */
 class ZoomState {
@@ -46,7 +46,13 @@ val LocalZoomState = compositionLocalOf<ZoomState?> { null }
  * has already hit the zoomed edge — fall through so scrolling and page turns keep working.
  */
 @Composable
-fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun Zoomable(
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    doubleTapEnabled: Boolean = true,
+    doubleTapZoomScale: Float = DEFAULT_DOUBLE_TAP_ZOOM,
+    content: @Composable () -> Unit,
+) {
     val zoom = remember { ZoomState() }
     var scale by zoom::scale
     var offset by zoom::offset
@@ -57,13 +63,18 @@ fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composab
         }
     }
 
-    // Disabling only stops gesture handling; [content] keeps its place in the tree (and its scroll state).
-    val gesture = Modifier.pointerInput(enabled) {
-        if (!enabled) return@pointerInput
+    // Disabling only stops the pinch/zoom handling below; a confirmed double tap is still always
+    // consumed here regardless, so it can never fall through to the text selection underneath.
+    val gesture = Modifier.pointerInput(enabled, doubleTapEnabled, doubleTapZoomScale) {
         var lastTapTime = 0L
         var lastTapPosition = Offset.Zero
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            // Text selection starts on this second *down*, not the up, so it has to be consumed here
+            // (parents see the Initial pass first) for a double tap not to select a word.
+            val secondTap = down.uptimeMillis - lastTapTime < viewConfiguration.doubleTapTimeoutMillis &&
+                (down.position - lastTapPosition).getDistance() < viewConfiguration.touchSlop
+            if (secondTap) down.consume()
             var upChange = down
             var multiTouch = false
             do {
@@ -71,7 +82,7 @@ fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composab
                 val pressed = event.changes.count { it.pressed }
                 if (pressed > 1) multiTouch = true
                 event.changes.firstOrNull { it.id == down.id }?.let { upChange = it }
-                if (pressed > 0 && (multiTouch || scale > 1f)) {
+                if (enabled && pressed > 0 && (multiTouch || scale > 1f)) {
                     val newScale = (scale * event.calculateZoom()).coerceIn(1f, MAX_ZOOM)
                     val centroid = event.calculateCentroid() - Offset(size.width / 2f, size.height / 2f)
                     val target = centroid - (centroid - offset) * (newScale / scale) + event.calculatePan()
@@ -98,11 +109,14 @@ fun Zoomable(enabled: Boolean, modifier: Modifier = Modifier, content: @Composab
                 return@awaitEachGesture
             }
             lastTapTime = 0L
+            // Always consumed, even when zoom is off, so a double tap can never reach the text
+            // selection underneath and select a word instead.
             // shortcut: consuming here stops the tap zone from also acting on this (second) tap, but
             // the *first* tap of the double-tap already fired before we knew a second one was coming —
             // upgrade by giving TapZoneOverlay an onDoubleTap and a shared ZoomState if that glitch matters.
             upChange.consume()
-            val newScale = if (scale > 1f) 1f else DOUBLE_TAP_ZOOM
+            if (!enabled || !doubleTapEnabled) return@awaitEachGesture
+            val newScale = if (scale > 1f) 1f else doubleTapZoomScale.coerceIn(1f, MAX_ZOOM)
             offset = if (newScale == 1f) {
                 Offset.Zero
             } else {

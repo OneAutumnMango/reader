@@ -78,6 +78,8 @@ fun PdfReaderScreen(
                     readingMode = settings.readingMode,
                     initialPage = (initialPositionFraction * pageRenderer.pageCount).roundToInt(),
                     zoomEnabled = settings.zoomEnabled,
+                    doubleTapZoomEnabled = settings.doubleTapZoomEnabled,
+                    doubleTapZoomScale = settings.doubleTapZoomScale,
                     pageGap = settings.pageGap,
                     onPageChanged = { onPageChanged(it, pageRenderer.pageCount) },
                 ) { index, continuous ->

@@ -70,7 +70,12 @@ fun ReaderScreen(
             LocalTextContextMenuDropdownProvider provides selectionToolbar,
         ) {
             TapZoneOverlay(settings.tapZones, showTapZoneLabels, onTapAction, Modifier.fillMaxSize()) {
-                Zoomable(settings.zoomEnabled, Modifier.fillMaxSize()) {
+                Zoomable(
+                    settings.zoomEnabled,
+                    Modifier.fillMaxSize(),
+                    settings.doubleTapZoomEnabled,
+                    settings.doubleTapZoomScale,
+                ) {
                     when (settings.readingMode) {
                         ReadingMode.CONTINUOUS_SCROLL -> ContinuousReader(
                             document,

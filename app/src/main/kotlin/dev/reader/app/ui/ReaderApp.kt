@@ -37,6 +37,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -63,6 +65,18 @@ import kotlinx.coroutines.launch
 
 private val CONTENT_MARGIN = 16.dp
 
+/** Saves each category's scroll index/offset, so it survives a rotation or a low-memory restart. */
+internal val LibraryGridStatesSaver = Saver<MutableMap<CategoryId?, LazyGridState>, List<List<Any?>>>(
+    save = { map ->
+        map.map { (key, state) -> listOf(key?.value, state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset) }
+    },
+    restore = { saved ->
+        saved.associateTo(mutableMapOf()) { (keyValue, index, offset) ->
+            (keyValue as String?)?.let(::CategoryId) to LazyGridState(index as Int, offset as Int)
+        }
+    },
+)
+
 private fun titleFor(destination: Destination): String = when (destination) {
     Destination.Library -> "Library"
     Destination.Search -> "Search"
@@ -83,8 +97,9 @@ private fun titleFor(destination: Destination): String = when (destination) {
 @Composable
 fun ReaderApp(graph: ReaderGraph) {
     val navigator = remember { Navigator() }
-    // Kept here so each category tab's scroll position and the chosen tab survive opening a book.
-    val libraryGridStates = remember { mutableMapOf<CategoryId?, LazyGridState>() }
+    // Kept here so each category tab's scroll position and the chosen tab survive opening a book,
+    // and saveable so a rotation or a low-memory process restart doesn't reset the scroll either.
+    val libraryGridStates = rememberSaveable(saver = LibraryGridStatesSaver) { mutableMapOf() }
     val bookDetailStates = remember { mutableMapOf<BookId, BookDetailState>() }
     val topBar = remember { TopBarState() }
     var libraryCategory by remember { mutableStateOf<CategoryId?>(null) }

@@ -20,4 +20,7 @@ data class ReaderSettings(
     val zoomEnabled: Boolean = true,
     /** Visible gap between PDF/comic pages; off gives a seamless strip. */
     val pageGap: Boolean = true,
+    val doubleTapZoomEnabled: Boolean = true,
+    /** How far a double tap zooms in, from 1 (no zoom) up to the 5x pinch ceiling. */
+    val doubleTapZoomScale: Float = 3f,
 )

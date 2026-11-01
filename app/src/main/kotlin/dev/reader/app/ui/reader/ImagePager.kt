@@ -29,6 +29,8 @@ fun ImagePager(
     modifier: Modifier = Modifier,
     initialPage: Int = 0,
     zoomEnabled: Boolean = true,
+    doubleTapZoomEnabled: Boolean = true,
+    doubleTapZoomScale: Float = 3f,
     pageGap: Boolean = true,
     onPageChanged: (index: Int) -> Unit = {},
     pageContent: @Composable (index: Int, continuous: Boolean) -> Unit,
@@ -39,7 +41,7 @@ fun ImagePager(
     if (readingMode == ReadingMode.CONTINUOUS_SCROLL) {
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = startPage)
         ReportReadingPosition(listState, pageCount) { index, _ -> onPageChanged(index) }
-        Zoomable(zoomEnabled, modifier.fillMaxSize()) {
+        Zoomable(zoomEnabled, modifier.fillMaxSize(), doubleTapZoomEnabled, doubleTapZoomScale) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().testTag("image-strip"),
@@ -54,7 +56,9 @@ fun ImagePager(
     val pagerState = rememberPagerState(initialPage = startPage, pageCount = { pageCount })
     LaunchedEffect(pagerState.currentPage) { onPageChanged(pagerState.currentPage) }
     val page: @Composable (Int) -> Unit = { index ->
-        Zoomable(zoomEnabled, Modifier.fillMaxSize()) { pageContent(index, false) }
+        Zoomable(zoomEnabled, Modifier.fillMaxSize(), doubleTapZoomEnabled, doubleTapZoomScale) {
+            pageContent(index, false)
+        }
     }
 
     when (readingMode) {

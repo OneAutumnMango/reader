@@ -51,6 +51,8 @@ fun ComicReaderScreen(
                 readingMode = settings.readingMode,
                 initialPage = (initialPositionFraction * pages.size).roundToInt(),
                 zoomEnabled = settings.zoomEnabled,
+                doubleTapZoomEnabled = settings.doubleTapZoomEnabled,
+                doubleTapZoomScale = settings.doubleTapZoomScale,
                 pageGap = settings.pageGap,
                 onPageChanged = { onPageChanged(it, pages.size) },
             ) { index, continuous ->
