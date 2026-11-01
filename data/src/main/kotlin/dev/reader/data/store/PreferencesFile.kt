@@ -62,6 +62,7 @@ data class PreferencesFile(
     val automaticBackupFolderUri: String? = null,
     val automaticBackupFrequency: AutomaticBackupFrequency = AutomaticBackupFrequency.DAILY,
     val automaticBackupIncludeBooks: Boolean = false,
+    val searchSettings: SearchSettings = SearchSettings(),
 ) {
     /** The active preset, with its night colors swapped in for rendering when [nightThemeEnabled]. */
     val activeReaderTheme: ReaderTheme

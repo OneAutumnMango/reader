@@ -33,6 +33,8 @@ class BookImporter(
     private val newId: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> kotlin.time.Instant = { Clock.System.now() },
     private val search: SearchRepository? = null,
+    /** Whether a freshly imported [Book] should be indexed; false keeps it, and any old index of it, out. */
+    private val shouldIndex: suspend (Book) -> Boolean = { true },
 ) {
 
     suspend fun importFile(
@@ -87,7 +89,8 @@ class BookImporter(
     private suspend fun indexBook(book: Book, texts: List<Pair<ChapterId, String>>) {
         val index = search ?: return
         runCatching {
-            if (book.hasSearchableText()) index.replaceBook(book.id, texts) else index.removeBook(book.id)
+            val wanted = book.hasSearchableText() && shouldIndex(book)
+            if (wanted) index.replaceBook(book.id, texts) else index.removeBook(book.id)
         }
     }
 

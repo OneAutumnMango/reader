@@ -11,6 +11,7 @@ sealed interface Destination {
     data object Appearance : Destination
     data object ReaderSettings : Destination
     data object LibrarySettings : Destination
+    data object SearchSettings : Destination
     data object Data : Destination
     data object Settings : Destination
     data object LogHistory : Destination

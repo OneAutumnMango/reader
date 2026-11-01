@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,6 +26,7 @@ class SettingsScreenTest {
             onAppearanceClick = { clickedDestinations += "appearance" },
             onReaderClick = { clickedDestinations += "reader" },
             onLibraryClick = { clickedDestinations += "library" },
+            onSearchClick = { clickedDestinations += "search" },
             onDataClick = { clickedDestinations += "data" },
         )
     }
@@ -33,12 +35,13 @@ class SettingsScreenTest {
     fun `settings links invoke their destination callbacks`() {
         setContent()
 
-        composeRule.onNodeWithText("App appearance").performClick()
-        composeRule.onNodeWithText("Reader settings").performClick()
-        composeRule.onNodeWithText("Library settings").performClick()
-        composeRule.onNodeWithText("Backup and reset").performClick()
+        composeRule.onNodeWithText("App appearance").performScrollTo().performClick()
+        composeRule.onNodeWithText("Reader settings").performScrollTo().performClick()
+        composeRule.onNodeWithText("Library settings").performScrollTo().performClick()
+        composeRule.onNodeWithText("Search settings").performScrollTo().performClick()
+        composeRule.onNodeWithText("Backup and reset").performScrollTo().performClick()
 
-        assertContentEquals(listOf("appearance", "reader", "library", "data"), clickedDestinations)
+        assertContentEquals(listOf("appearance", "reader", "library", "search", "data"), clickedDestinations)
     }
 
     @Test

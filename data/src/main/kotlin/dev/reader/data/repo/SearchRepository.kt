@@ -8,6 +8,9 @@ import dev.reader.data.room.ReaderDatabase
 /** One chapter's stored text, one block per line; [rowId] is the position to continue paging from. */
 data class IndexedChapter(val rowId: Int, val chapterId: ChapterId, val bookId: BookId, val body: String)
 
+/** The indexed text of [bookId], in bytes, over [chapters] chapters. */
+data class BookIndexSize(val bookId: BookId, val chapters: Int, val bytes: Long)
+
 /** The text index behind library search: a copy of each chapter's plain text. */
 class SearchRepository(private val database: ReaderDatabase) {
 
@@ -21,5 +24,12 @@ class SearchRepository(private val database: ReaderDatabase) {
 
     suspend fun page(after: Int, limit: Int): List<IndexedChapter> = database.search().page(after, limit).map {
         IndexedChapter(it.rowId, ChapterId(it.chapterId), BookId(it.bookId), it.body)
+    }
+
+    suspend fun clear() = database.search().clear()
+
+    /** Per-book index sizes, largest first. */
+    suspend fun sizes(): List<BookIndexSize> = database.search().sizes().map {
+        BookIndexSize(BookId(it.bookId), it.chapters, it.bytes)
     }
 }

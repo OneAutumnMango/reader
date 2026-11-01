@@ -35,6 +35,9 @@ class LibraryRepository(private val database: ReaderDatabase) {
     fun observeCategories(): Flow<List<Category>> =
         database.categories().observeAll().map { categories -> categories.map { it.toCategory() } }
 
+    suspend fun findById(bookId: BookId): Book? =
+        database.books().getById(bookId.value)?.let { it.toBook(database.books().categoryIdsFor(it.id)) }
+
     suspend fun findBySourcePath(sourcePath: String): Book? =
         database.books().findBySourcePath(sourcePath)?.let { it.toBook(database.books().categoryIdsFor(it.id)) }
 

@@ -2,65 +2,115 @@ package dev.reader.app.data
 
 import android.content.Context
 import dev.reader.core.model.Book
+import dev.reader.core.model.BookId
 import dev.reader.core.model.Chapter
 import dev.reader.core.model.ChapterId
 import dev.reader.core.search.hasSearchableText
 import dev.reader.core.search.indexText
 import dev.reader.data.repo.LibraryRepository
 import dev.reader.data.repo.SearchRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import dev.reader.data.repo.SettingsRepository
+import dev.reader.data.store.SearchIndexJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
-sealed interface IndexStatus {
-    data object Idle : IndexStatus
-    data class Running(val booksDone: Int, val booksTotal: Int) : IndexStatus
-    data class Done(val books: Int, val unreadableChapters: Int) : IndexStatus
-}
-
-/** Builds the library search index from the same chapter content the reader shows, so block numbers line up. */
+/**
+ * Builds the library search index from the same chapter content the reader shows, so block numbers
+ * line up. A reindex is a queue kept in the settings, so it can be paused, and carries on after the
+ * app is closed: [scheduleWork] asks the system to call [runQueue], and [cancelWork] stops that.
+ */
 class LibraryIndexer(
     private val context: Context,
     private val library: LibraryRepository,
     private val search: SearchRepository,
-    private val scope: CoroutineScope,
+    private val settings: SettingsRepository,
+    private val scheduleWork: () -> Unit = {},
+    private val cancelWork: () -> Unit = {},
 ) {
-    private val _status = MutableStateFlow<IndexStatus>(IndexStatus.Idle)
-    val status: StateFlow<IndexStatus> = _status.asStateFlow()
-    private var job: Job? = null
 
     /** Loads [chapters]' text for the index; chapters that can't be read are counted, not stored. */
     suspend fun loadTexts(book: Book, chapters: List<Chapter>): Pair<List<Pair<ChapterId, String>>, Int> {
         val texts = mutableListOf<Pair<ChapterId, String>>()
         var unreadable = 0
         for (chapter in chapters) {
+            currentCoroutineContext().ensureActive()
             val document = (ChapterLoader.load(context, book, chapter) as? ChapterContent.Text)?.document
             if (document == null) unreadable++ else texts += chapter.id to document.indexText()
         }
         return texts to unreadable
     }
 
-    /** Re-reads every searchable book into the index, book by book, so search keeps working meanwhile. */
-    fun reindexLibrary() {
-        if (job?.isActive == true) return
-        job = scope.launch(Dispatchers.IO) {
-            val books = library.observeBooks().first()
-            val searchable = books.filter { it.hasSearchableText() }
-            var unreadable = 0
-            _status.value = IndexStatus.Running(0, searchable.size)
-            books.filterNot { it.hasSearchableText() }.forEach { search.removeBook(it.id) }
-            searchable.forEachIndexed { done, book ->
-                val (texts, failed) = loadTexts(book, library.chapters(book.id))
-                search.replaceBook(book.id, texts)
-                unreadable += failed
-                _status.value = IndexStatus.Running(done + 1, searchable.size)
-            }
-            _status.value = IndexStatus.Done(searchable.size, unreadable)
+    private suspend fun job(): SearchIndexJob = settings.preferences.first().searchSettings.indexJob
+
+    private suspend fun updateJob(transform: (SearchIndexJob) -> SearchIndexJob) = settings.update {
+        val search = it.searchSettings
+        it.copy(searchSettings = search.copy(indexJob = transform(search.indexJob)))
+    }
+
+    /** Queues every book that belongs in the index, dropping stale index rows of those that don't. */
+    suspend fun startReindex() {
+        val prefs = settings.preferences.first().searchSettings
+        if (!prefs.indexEnabled) return
+        val (eligible, skipped) = library.observeBooks().first()
+            .partition { it.hasSearchableText() && prefs.indexes(it.id) }
+        skipped.forEach { search.removeBook(it.id) }
+        updateJob { SearchIndexJob(pending = eligible.map { it.id.value }, total = eligible.size) }
+        scheduleWork()
+    }
+
+    suspend fun pause() {
+        updateJob { it.copy(paused = true) }
+        cancelWork()
+    }
+
+    suspend fun resume() {
+        updateJob { it.copy(paused = false) }
+        scheduleWork()
+    }
+
+    /** Makes sure unfinished work is queued with the system, e.g. after the process was killed. */
+    suspend fun ensureScheduled() {
+        if (job().running) scheduleWork()
+    }
+
+    /** Takes a book out of the index and out of any reindex under way, e.g. once it's excluded. */
+    suspend fun forget(bookId: BookId) {
+        search.removeBook(bookId)
+        updateJob { it.copy(pending = it.pending - bookId.value) }
+    }
+
+    suspend fun clearIndex() {
+        search.clear()
+        updateJob { SearchIndexJob() }
+        cancelWork()
+    }
+
+    /** Indexes queued books one at a time until the queue is empty or paused; safe to cancel at any point. */
+    suspend fun runQueue(onProgress: suspend (SearchIndexJob) -> Unit = {}) {
+        while (true) {
+            val current = job()
+            onProgress(current)
+            if (!current.running || !indexNext(current)) break
         }
+    }
+
+    /** Indexes the first pending book. Returns false when there is nothing sensible left to do. */
+    private suspend fun indexNext(current: SearchIndexJob): Boolean {
+        val id = BookId(current.pending.first())
+        val book = library.findById(id)
+        val prefs = settings.preferences.first().searchSettings
+        var unreadable = 0
+        if (book != null && book.hasSearchableText() && prefs.indexes(id)) {
+            val (texts, failed) = loadTexts(book, library.chapters(id))
+            search.replaceBook(id, texts)
+            unreadable = failed
+        } else {
+            search.removeBook(id)
+        }
+        updateJob {
+            it.copy(pending = it.pending - id.value, unreadableChapters = it.unreadableChapters + unreadable)
+        }
+        return true
     }
 }

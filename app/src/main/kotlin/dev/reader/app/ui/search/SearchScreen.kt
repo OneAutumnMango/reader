@@ -285,12 +285,16 @@ private fun ResultsSummary(
     Column(modifier = Modifier.padding(bottom = 4.dp)) {
         val hits = if (results.truncated) "${results.totalHits}+ hits" else "${results.totalHits} hits"
         val books = if (results.books.size == 1) "1 book" else "${results.books.size} books"
-        val status = when {
-            progress != null -> " \u00b7 searched ${progress.first} of ${progress.second} books"
-            results.unreadableChapters > 0 ->
-                " \u00b7 ${results.unreadableChapters} chapters couldn't be read (see Logs)"
-            else -> ""
+        val notes = buildList {
+            if (progress != null) add("searched ${progress.first} of ${progress.second} books")
+            if (progress == null && results.unreadableChapters > 0) {
+                add("${results.unreadableChapters} chapters couldn't be read (see Logs)")
+            }
+            if (progress == null && results.unindexedBooks > 0) {
+                add("${results.unindexedBooks} books aren't indexed, so were searched slowly (see Search settings)")
+            }
         }
+        val status = notes.joinToString(separator = "") { " \u00b7 $it" }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "\"${query.trim()}\": $hits in $books$status",

@@ -92,4 +92,22 @@ class StatsAndSearchRepositoryTest {
         repository.removeBook(two)
         assertEquals(listOf("a"), repository.page(0, 10).map { it.chapterId.value })
     }
+
+    @Test
+    fun `index sizes are totalled per book, largest first`() = runBlocking {
+        val repository = SearchRepository(database)
+        repository.replaceBook(BookId("small"), listOf(ChapterId("a") to "abc"))
+        repository.replaceBook(
+            BookId("big"),
+            listOf(ChapterId("b") to "x".repeat(100), ChapterId("c") to "y".repeat(50)),
+        )
+
+        val sizes = repository.sizes()
+
+        assertEquals(listOf("big", "small"), sizes.map { it.bookId.value })
+        assertEquals(150L, sizes.first().bytes)
+        assertEquals(2, sizes.first().chapters)
+        repository.clear()
+        assertEquals(emptyList(), repository.sizes())
+    }
 }

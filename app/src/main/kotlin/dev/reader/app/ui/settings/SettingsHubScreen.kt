@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,6 +31,7 @@ fun SettingsScreen(
     onAppearanceClick: () -> Unit,
     onReaderClick: () -> Unit,
     onLibraryClick: () -> Unit,
+    onSearchClick: () -> Unit,
     onDataClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,6 +49,10 @@ fun SettingsScreen(
         HorizontalDivider()
         SettingsSection("Library") {
             SettingsLink("Library settings", Icons.AutoMirrored.Filled.LibraryBooks, onLibraryClick)
+        }
+        HorizontalDivider()
+        SettingsSection("Search") {
+            SettingsLink("Search settings", Icons.Filled.Search, onSearchClick)
         }
         HorizontalDivider()
         SettingsSection("Data") {

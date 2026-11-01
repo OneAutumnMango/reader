@@ -21,6 +21,7 @@ import dev.reader.core.model.Book
 import dev.reader.core.model.Chapter
 import dev.reader.core.search.TextSearch
 import dev.reader.core.theme.LibraryLayout
+import dev.reader.data.store.SearchSettings
 
 @Composable
 fun SearchRoute(
@@ -40,6 +41,7 @@ fun SearchRoute(
     val chaptersByBook = remember(allChapters) {
         allChapters.groupBy { it.bookId }.mapValues { (_, list) -> list.sortedBy { it.orderIndex } }
     }
+    val latestSettings by rememberUpdatedState(preferences?.searchSettings ?: SearchSettings())
     val latestBooks by rememberUpdatedState(books)
     val latestChapters by rememberUpdatedState(chaptersByBook)
 
@@ -68,7 +70,7 @@ fun SearchRoute(
             regex,
             graph.search,
             graph.indexer,
-        )
+        ) { book -> latestSettings.indexes(book.id) }
     }
 
     SearchScreen(

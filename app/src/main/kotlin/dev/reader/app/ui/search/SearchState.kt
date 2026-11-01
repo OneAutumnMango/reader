@@ -17,6 +17,7 @@ import dev.reader.core.search.TextSearch
 import dev.reader.core.search.hasSearchableText
 import dev.reader.data.repo.IndexedChapter
 import dev.reader.data.repo.SearchRepository
+import dev.reader.data.store.SearchSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -36,6 +37,8 @@ data class TextSearchResults(
     val truncated: Boolean = false,
     /** Chapters that failed to load, so a search that quietly found nothing can be told from one that couldn't read. */
     val unreadableChapters: Int = 0,
+    /** Books that belong in the index but weren't in it, so were read directly (slower) instead. */
+    val unindexedBooks: Int = 0,
 )
 
 /**
@@ -72,6 +75,16 @@ class SearchState {
     val gridState = LazyGridState()
     val listState = LazyListState()
 
+    private var defaultsApplied = false
+
+    /** Starts from the user's search defaults, once, the first time they're known. */
+    fun applyDefaults(settings: SearchSettings) {
+        if (defaultsApplied) return
+        defaultsApplied = true
+        inText = settings.inTextByDefault
+        options = settings.defaultOptions
+    }
+
     fun submit() {
         submittedQuery = query.trim()
         submittedOptions = options
@@ -84,8 +97,9 @@ class SearchState {
     }
 
     /**
-     * Searches the stored text of every searchable book for [regex], publishing results as it goes.
-     * Books missing from the index are read and indexed on the spot, so that only happens once.
+     * Searches every searchable book's text for [regex], publishing results as it goes. Books that
+     * [useIndex] approves are read from the index (if they're in it); the rest are read directly.
+     * Search never writes to the index: building it is up to the user's index settings.
      */
     suspend fun searchLibraryText(
         books: List<Book>,
@@ -93,6 +107,7 @@ class SearchState {
         regex: Regex,
         index: SearchRepository,
         indexer: LibraryIndexer,
+        useIndex: (Book) -> Boolean = { true },
     ) {
         val searchable = books.filter { it.hasSearchableText() }
         searching = true
@@ -101,38 +116,40 @@ class SearchState {
         results = TextSearchResults(emptyList(), 0)
         try {
             val scan = Scan(searchable, searchable.flatMap { chaptersOf(it.id) }.associateBy { it.id }, regex)
-            scanIndex(scan, index)
+            val indexable = searchable.filter(useIndex).map { it.id }.toSet()
+            scanIndex(scan, index, indexable)
+            var unindexed = 0
             for (book in searchable.filter { it.id !in scan.indexed }) {
                 if (scan.total >= MAX_TOTAL_HITS) break
+                if (book.id in indexable) unindexed++
                 val (texts, failed) = indexer.loadTexts(book, chaptersOf(book.id))
-                index.replaceBook(book.id, texts)
                 scan.unreadable += failed
                 texts.forEach { (chapterId, text) -> scan.add(book.id, chapterId, text) }
                 scan.indexed += book.id
                 booksSearched = scan.indexed.size
                 publish(scan)
             }
-            results = scan.results(truncated = scan.total >= MAX_TOTAL_HITS)
+            results = scan.results(truncated = scan.total >= MAX_TOTAL_HITS, unindexed = unindexed)
             completedRequest = searchRequest
         } finally {
             searching = false
         }
     }
 
-    private suspend fun scanIndex(scan: Scan, index: SearchRepository) {
+    private suspend fun scanIndex(scan: Scan, index: SearchRepository, indexable: Set<BookId>) {
         var after = 0
         while (scan.total < MAX_TOTAL_HITS) {
             val rows = index.page(after, INDEX_PAGE_SIZE)
             if (rows.isEmpty()) break
             after = rows.last().rowId
-            withContext(Dispatchers.Default) { rows.forEach { scan.add(it) } }
+            withContext(Dispatchers.Default) { rows.filter { it.bookId in indexable }.forEach { scan.add(it) } }
             booksSearched = scan.indexed.size
             publish(scan)
         }
     }
 
     private fun publish(scan: Scan) {
-        results = scan.results(truncated = false)
+        results = scan.results(truncated = false, unindexed = 0)
     }
 
     /** Hits gathered so far; only touched by one search at a time. */
@@ -157,13 +174,14 @@ class SearchState {
             total += matches.size
         }
 
-        fun results(truncated: Boolean) = TextSearchResults(
+        fun results(truncated: Boolean, unindexed: Int) = TextSearchResults(
             found.entries.sortedBy { order.getValue(it.key) }.map { (id, chapterMatches) ->
                 BookMatches(byId.getValue(id), chapterMatches.sortedBy { it.chapter.orderIndex })
             },
             total,
             truncated,
             unreadable,
+            unindexed,
         )
     }
 }

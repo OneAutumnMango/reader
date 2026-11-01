@@ -8,6 +8,7 @@ fun SettingsRoute(
     onAppearanceClick: () -> Unit,
     onReaderClick: () -> Unit,
     onLibraryClick: () -> Unit,
+    onSearchClick: () -> Unit,
     onDataClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -15,6 +16,7 @@ fun SettingsRoute(
         onAppearanceClick = onAppearanceClick,
         onReaderClick = onReaderClick,
         onLibraryClick = onLibraryClick,
+        onSearchClick = onSearchClick,
         onDataClick = onDataClick,
         modifier = modifier,
     )

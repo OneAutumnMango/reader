@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.reader.app.data.IndexStatus
 import dev.reader.app.ui.MenuSection
 import dev.reader.app.ui.RadioOptions
 import dev.reader.data.export.ExportScope
@@ -55,8 +54,6 @@ fun DataScreen(
     onAutomaticBackupFrequencyChange: (AutomaticBackupFrequency) -> Unit = {},
     automaticBackupIncludeBooks: Boolean = false,
     onAutomaticBackupIncludeBooksChange: (Boolean) -> Unit = {},
-    indexStatus: IndexStatus = IndexStatus.Idle,
-    onReindex: () -> Unit = {},
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(top = 24.dp, bottom = 24.dp),
@@ -152,38 +149,7 @@ fun DataScreen(
             }
         }
 
-        MenuSection("Search index") {
-            Hint(
-                "Searching inside books reads from an index built when each book is imported. " +
-                    "Reindex if results look out of date, or after books were added by an older version.",
-            )
-            OutlinedButton(
-                onClick = onReindex,
-                enabled = indexStatus !is IndexStatus.Running,
-                modifier = Modifier.fillMaxWidth().testTag("reindex-library"),
-            ) { Text("Reindex library") }
-            indexStatus.label()?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("reindex-status"))
-            }
-            (indexStatus as? IndexStatus.Running)?.let {
-                LinearProgressIndicator(
-                    progress = { it.booksDone.toFloat() / it.booksTotal.coerceAtLeast(1) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-
         DangerZone(busy, onDanger)
-    }
-}
-
-private fun IndexStatus.label(): String? = when (this) {
-    IndexStatus.Idle -> null
-    is IndexStatus.Running -> "Indexing $booksDone of $booksTotal books\u2026"
-    is IndexStatus.Done -> {
-        val books = if (books == 1) "1 book" else "$books books"
-        val skipped = if (unreadableChapters > 0) " $unreadableChapters chapters couldn't be read." else ""
-        "Indexed $books.$skipped"
     }
 }
 

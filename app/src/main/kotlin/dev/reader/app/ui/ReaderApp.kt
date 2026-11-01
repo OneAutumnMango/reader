@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.QueryStats
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.DrawerValue
@@ -55,6 +56,7 @@ import dev.reader.app.ui.library.BookInfoRoute
 import dev.reader.app.ui.library.LibraryRoute
 import dev.reader.app.ui.reader.ReaderRoute
 import dev.reader.app.ui.search.SearchRoute
+import dev.reader.app.ui.search.SearchSettingsRoute
 import dev.reader.app.ui.search.SearchState
 import dev.reader.app.ui.settings.LibrarySettingsRoute
 import dev.reader.app.ui.settings.LogHistoryRoute
@@ -80,12 +82,12 @@ internal val LibraryGridStatesSaver = Saver<MutableMap<CategoryId?, LazyGridStat
 )
 
 private fun titleFor(destination: Destination): String = when (destination) {
-    Destination.Library -> "Library"
+    Destination.Library, Destination.LibrarySettings -> "Library"
     Destination.Search -> "Search"
     Destination.Stats -> "Stats"
     Destination.Appearance -> "Appearance"
     Destination.ReaderSettings -> "Reader"
-    Destination.LibrarySettings -> "Library"
+    Destination.SearchSettings -> "Search"
     Destination.Data -> "Data"
     Destination.Settings -> "Settings"
     Destination.LogHistory -> "Logs"
@@ -113,7 +115,13 @@ fun ReaderApp(graph: ReaderGraph) {
     val libraryPreferences by graph.settings.preferences.collectAsState(initial = null)
     val showAllCategory = libraryPreferences?.showAllCategory ?: true
 
-    LaunchedEffect(Unit) { graph.scanRootFoldersOnLaunch() }
+    LaunchedEffect(Unit) {
+        graph.scanRootFoldersOnLaunch()
+        graph.indexer.ensureScheduled()
+    }
+    LaunchedEffect(libraryPreferences) {
+        libraryPreferences?.let { searchState.applyDefaults(it.searchSettings) }
+    }
 
     BackHandler(enabled = navigator.handlesSystemBack) { navigator.back() }
 
@@ -145,6 +153,9 @@ fun ReaderApp(graph: ReaderGraph) {
                             Icons.Filled.Settings,
                             navigator.current,
                         ) {
+                            selectDestination(it)
+                        }
+                        DrawerItem(Destination.SearchSettings, "Search", Icons.Filled.Search, navigator.current) {
                             selectDestination(it)
                         }
                     }
@@ -249,11 +260,13 @@ fun ReaderApp(graph: ReaderGraph) {
                     Destination.Appearance -> AppearanceRoute(graph, content)
                     Destination.ReaderSettings -> ReaderSettingsRoute(graph, content)
                     Destination.LibrarySettings -> LibrarySettingsRoute(graph, content)
+                    Destination.SearchSettings -> SearchSettingsRoute(graph, content)
                     Destination.Data -> DataRoute(graph, content)
                     Destination.Settings -> SettingsRoute(
                         onAppearanceClick = { navigator.switchRoot(Destination.Appearance) },
                         onReaderClick = { navigator.switchRoot(Destination.ReaderSettings) },
                         onLibraryClick = { navigator.switchRoot(Destination.LibrarySettings) },
+                        onSearchClick = { navigator.switchRoot(Destination.SearchSettings) },
                         onDataClick = { navigator.switchRoot(Destination.Data) },
                         modifier = content,
                     )

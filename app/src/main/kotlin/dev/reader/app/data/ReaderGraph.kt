@@ -20,6 +20,7 @@ import dev.reader.data.store.ReaderStores
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okio.FileSystem
 import okio.Path.Companion.toPath
@@ -62,8 +63,21 @@ class ReaderGraph(context: Context) {
     val settings = SettingsRepository(stores)
     val exporter = ExportRepository(database, settings, coverDirectory = File(appContext.filesDir, "covers"))
     val backups = BackupRepository(exporter, context.applicationContext.filesDir)
-    val importer = BookImporter(library, search = search)
-    val indexer = LibraryIndexer(appContext, library, search, scope)
+    val indexer = LibraryIndexer(
+        appContext,
+        library,
+        search,
+        settings,
+        scheduleWork = { SearchIndexScheduler.schedule(appContext) },
+        cancelWork = { SearchIndexScheduler.cancel(appContext) },
+    )
+    val importer = BookImporter(
+        library,
+        search = search,
+        shouldIndex = { book ->
+            settings.preferences.first().searchSettings.let { it.indexOnImport && it.indexes(book.id) }
+        },
+    )
     val coverSearch = CoverSearchService()
     val rootFolderScanner = RootFolderScanner(context.applicationContext, settings, library, importer)
 
