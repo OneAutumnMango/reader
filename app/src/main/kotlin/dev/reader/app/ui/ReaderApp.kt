@@ -103,6 +103,9 @@ fun ReaderApp(graph: ReaderGraph) {
     val bookDetailStates = remember { mutableMapOf<BookId, BookDetailState>() }
     val topBar = remember { TopBarState() }
     var libraryCategory by remember { mutableStateOf<CategoryId?>(null) }
+    // Collected here, not inside the library screen: a fresh collection starts empty, and an empty grid
+    // forgets its scroll position when you come back from a book.
+    val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
     val libraryPreferences by graph.settings.preferences.collectAsState(initial = null)
     val showAllCategory = libraryPreferences?.showAllCategory ?: true
@@ -218,6 +221,7 @@ fun ReaderApp(graph: ReaderGraph) {
                         onOpenBook = { navigator.push(Destination.BookDetail(it.id)) },
                         onOpenDetails = { navigator.push(Destination.BookInfo(it.id)) },
                         onSearchClick = { navigator.push(Destination.Search) },
+                        books = books,
                         categories = categories,
                         showAllCategory = showAllCategory,
                         gridStateFor = { libraryGridStates.getOrPut(it) { LazyGridState() } },

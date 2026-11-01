@@ -50,6 +50,7 @@ fun LibraryRoute(
     graph: ReaderGraph,
     onOpenBook: (Book) -> Unit,
     onSearchClick: () -> Unit,
+    books: List<Book>,
     onOpenDetails: (Book) -> Unit = {},
     categories: List<Category> = emptyList(),
     showAllCategory: Boolean = true,
@@ -60,7 +61,6 @@ fun LibraryRoute(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val preferences by graph.settings.preferences.collectAsState(initial = null)
     val progressByBook by graph.progress.observeAll().collectAsState(initial = emptyMap())
     val fractionByBook by graph.progress.observeBookFractions().collectAsState(initial = emptyMap())
