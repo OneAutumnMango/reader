@@ -126,6 +126,22 @@ class StatsCalculatorTest {
         assertEquals(listOf("Dune", "Unknown book"), summary.topBooks.map { it.title })
     }
 
+    @Test
+    fun `lists every book with reading time, not just the top few`() {
+        val sessions = ('a'..'e').mapIndexed { i, id ->
+            session("2026-01-10T10:00:00Z", "2026-01-10T10:${10 + i}:00Z", 10, book = "$id")
+        } + session("2026-01-10T12:00:00Z", "2026-01-10T12:00:00Z", 0, book = "idle")
+
+        val summary = StatsCalculator.summarize(
+            sessions,
+            booksFinished = 0,
+            timeZone = TimeZone.UTC,
+            now = instant("2026-01-10T23:30:00Z"),
+        )
+
+        assertEquals(listOf("e", "d", "c", "b", "a"), summary.topBooks.map { it.bookId.value })
+    }
+
     private fun summarizeAt(sessions: List<ReadingSessionEvent>, now: String) =
         StatsCalculator.summarize(sessions, booksFinished = 0, timeZone = TimeZone.UTC, now = instant(now))
 

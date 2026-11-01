@@ -15,7 +15,6 @@ import kotlin.time.Instant
 
 private const val SECONDS_PER_MINUTE = 60.0
 private const val WEEK_DAYS = 7
-private const val TOP_BOOKS = 3
 private const val MORNING_START = 5
 private const val AFTERNOON_START = 12
 private const val EVENING_START = 17
@@ -91,8 +90,8 @@ object StatsCalculator {
                 .maxByOrNull { (_, times) -> times.fold(Duration.ZERO, Duration::plus) }?.key,
             topBooks = sessions.groupBy { it.bookId }
                 .map { (id, list) -> BookReadingTime(id, bookTitles[id] ?: "Unknown book", list.totalTime()) }
-                .sortedByDescending { it.time }
-                .take(TOP_BOOKS),
+                .filter { it.time > Duration.ZERO }
+                .sortedByDescending { it.time },
         )
     }
 
