@@ -50,6 +50,7 @@ fun BookCard(
     finished: Boolean = false,
     selected: Boolean = false,
     showAuthor: Boolean = true,
+    unreadChapters: Int = 0,
     onLongClick: () -> Unit = {},
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -69,6 +70,20 @@ fun BookCard(
     ) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(COVER_ASPECT_RATIO)) {
             BookCover(book, modifier = Modifier.fillMaxSize())
+            if (unreadChapters > 0) {
+                Text(
+                    "$unreadChapters",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .testTag("book-unread-badge"),
+                )
+            }
             when {
                 selected -> Box(
                     modifier = Modifier

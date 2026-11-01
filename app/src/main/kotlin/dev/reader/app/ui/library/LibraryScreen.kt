@@ -39,6 +39,7 @@ fun LibraryScreen(
     onAddCategory: (String) -> Unit,
     layout: LibraryLayout = LibraryLayout.MEDIUM,
     finishedFor: (BookId) -> Boolean = { false },
+    unreadChaptersFor: (BookId) -> Int = { 0 },
     showAllCategory: Boolean = true,
     gridStateFor: (CategoryId?) -> LazyGridState? = { null },
     selectedBookIds: Set<BookId> = emptySet(),
@@ -88,6 +89,7 @@ fun LibraryScreen(
                         onLongClick = { onBookLongClick(book) },
                         selected = book.id in selectedBookIds,
                         showAuthor = layout == LibraryLayout.LARGE,
+                        unreadChapters = unreadChaptersFor(book.id),
                     )
                 }
             }

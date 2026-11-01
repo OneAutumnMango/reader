@@ -64,6 +64,7 @@ fun LibraryRoute(
     val preferences by graph.settings.preferences.collectAsState(initial = null)
     val progressByBook by graph.progress.observeAll().collectAsState(initial = emptyMap())
     val fractionByBook by graph.progress.observeBookFractions().collectAsState(initial = emptyMap())
+    val unreadByBook by graph.progress.observeUnreadChapterCounts().collectAsState(initial = emptyMap())
     val importActions = rememberImportActions(graph)
     var showQuickAddMenu by remember { mutableStateOf(false) }
     var longPressedBook by remember { mutableStateOf<Book?>(null) }
@@ -124,6 +125,7 @@ fun LibraryRoute(
                     fractionByBook[id]?.takeIf { it > 0f && it < 1f && progressByBook[id]?.finished != true }
                 },
                 finishedFor = { id -> progressByBook[id]?.finished == true || (fractionByBook[id] ?: 0f) >= 1f },
+                unreadChaptersFor = { id -> unreadByBook[id] ?: 0 },
                 onCategorySelected = onCategorySelected,
                 onBookClick = { book ->
                     if (selecting) {

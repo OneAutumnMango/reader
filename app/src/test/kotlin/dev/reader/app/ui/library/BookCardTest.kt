@@ -1,5 +1,8 @@
 package dev.reader.app.ui.library
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
@@ -41,6 +44,18 @@ class BookCardTest {
 
         composeRule.onNodeWithText("My Book").assertExists()
         composeRule.onNodeWithText("Jane Doe").assertExists()
+    }
+
+    @Test
+    fun `shows how many chapters are left only when some are`() {
+        var unread by mutableIntStateOf(7)
+        composeRule.setContent { BookCard(book = book, progress = null, onClick = {}, unreadChapters = unread) }
+
+        composeRule.onNodeWithTag("book-unread-badge", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("7", useUnmergedTree = true).assertExists()
+
+        unread = 0
+        composeRule.onNodeWithTag("book-unread-badge", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test

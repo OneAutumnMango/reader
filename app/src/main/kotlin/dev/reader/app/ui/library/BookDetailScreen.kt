@@ -115,6 +115,15 @@ fun BookDetailScreen(
         ChapterSort.UNREAD_FIRST -> numbered.sortedBy { isFinished(it.chapter) }
     }
     val current = numbered.find { it.chapter.id == currentChapterId }
+    val percentRead = if (chapters.isEmpty()) {
+        0
+    } else {
+        val total = chapters.sumOf { c ->
+            val p = chapterProgress[c.id]
+            if (p == null) 0.0 else if (p.finished) 1.0 else p.position.toDouble()
+        }
+        (total / chapters.size * 100).toInt()
+    }
     val selecting = state.selected.isNotEmpty()
     fun toggle(chapter: Chapter) {
         state.selected = if (chapter.id in state.selected) state.selected - chapter.id else state.selected + chapter.id
@@ -136,7 +145,15 @@ fun BookDetailScreen(
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(state = state.listState, modifier = Modifier.fillMaxSize()) {
             item {
-                BookHeader(book, chapters.size, current?.number, bookmarks.size, onOpenBookmarks, onPdfRenderModeChange)
+                BookHeader(
+                    book,
+                    chapters.size,
+                    current?.number,
+                    percentRead,
+                    bookmarks.size,
+                    onOpenBookmarks,
+                    onPdfRenderModeChange,
+                )
             }
             if (extras.isNotEmpty()) {
                 item { BookInfoCard(extras, state.showExtras, { state.showExtras = it }, onChapterClick) }
@@ -189,6 +206,7 @@ private fun BookHeader(
     book: Book,
     chapterCount: Int,
     currentNumber: Int?,
+    percentRead: Int,
     bookmarkCount: Int,
     onOpenBookmarks: () -> Unit,
     onPdfRenderModeChange: ((PdfRenderMode) -> Unit)?,
@@ -219,7 +237,7 @@ private fun BookHeader(
             val chapterLabel = if (chapterCount == 1) "1 chapter" else "$chapterCount chapters"
             val progressLabel = currentNumber?.let { " \u00b7 on $it" }.orEmpty()
             Text(
-                "${book.format.name} \u00b7 $chapterLabel$progressLabel",
+                "${book.format.name} \u00b7 $chapterLabel$progressLabel \u00b7 $percentRead%",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp),

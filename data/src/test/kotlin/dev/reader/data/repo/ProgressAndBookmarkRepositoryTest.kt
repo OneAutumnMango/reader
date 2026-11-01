@@ -80,6 +80,7 @@ class ProgressAndBookmarkRepositoryTest {
         assertNull(progress[ChapterId("ch-2")])
         assertEquals(false, progress[ChapterId("ch-3")]?.finished)
         assertEquals((1f + 0.5f) / 4, repository.observeBookFractions().first()[book.id])
+        assertEquals(3, repository.observeUnreadChapterCounts().first()[book.id])
 
         repository.setChaptersRead(book.id, listOf(ChapterId("ch-1")), read = false, now = now)
         val unread = repository.observeChapterProgress(book.id).first()[ChapterId("ch-1")]

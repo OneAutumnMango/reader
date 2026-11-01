@@ -42,6 +42,12 @@ class ProgressRepository(private val database: ReaderDatabase) {
             rows.associate { BookId(it.bookId) to it.fraction }
         }
 
+    /** How many real chapters each book still has unread. */
+    fun observeUnreadChapterCounts(): Flow<Map<BookId, Int>> =
+        database.chapterProgress().observeUnreadCounts().map { rows ->
+            rows.associate { BookId(it.bookId) to it.unread }
+        }
+
     /** Marks [chapterIds] read (finished, at the end) or unread (back to the start). */
     suspend fun setChaptersRead(bookId: BookId, chapterIds: List<ChapterId>, read: Boolean, now: Instant) =
         database.chapterProgress().upsertAll(

@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.Flow
 /** How far through a book is, averaged over its real (non-extra) chapters; finished chapters count fully. */
 data class BookFractionRow(val bookId: String, val fraction: Float)
 
+/** How many real chapters of a book aren't finished yet. */
+data class BookUnreadRow(val bookId: String, val unread: Int)
+
 @Dao
 interface ChapterProgressDao {
 
@@ -28,6 +31,16 @@ interface ChapterProgressDao {
         """,
     )
     fun observeBookFractions(): Flow<List<BookFractionRow>>
+
+    @Query(
+        """
+        SELECT c.bookId AS bookId, SUM(CASE WHEN p.finished THEN 0 ELSE 1 END) AS unread
+        FROM chapters c LEFT JOIN chapter_progress p ON p.bookId = c.bookId AND p.chapterId = c.id
+        WHERE c.isExtra = 0
+        GROUP BY c.bookId
+        """,
+    )
+    fun observeUnreadCounts(): Flow<List<BookUnreadRow>>
 
     @Upsert
     suspend fun upsert(progress: ChapterProgressEntity)

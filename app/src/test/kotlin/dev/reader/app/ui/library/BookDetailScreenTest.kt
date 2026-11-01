@@ -119,6 +119,7 @@ class BookDetailScreenTest {
         composeRule.onNodeWithTag("chapter-ch-1", useUnmergedTree = true)
             .onChildren().filter(hasContentDescription("Read")).assertCountEquals(1)
         composeRule.onNodeWithText("40% read").assertExists()
+        composeRule.onNodeWithText("70%", substring = true).assertExists()
     }
 
     @Test
