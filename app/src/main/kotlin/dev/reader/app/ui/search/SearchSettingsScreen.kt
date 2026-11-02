@@ -72,6 +72,8 @@ fun SearchSettingsScreen(
     onClearIndex: () -> Unit,
     onExcludedChange: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
+    unindexedChapters: Int? = null,
+    onRetryUnindexed: () -> Unit = {},
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(vertical = 16.dp),
@@ -106,7 +108,14 @@ fun SearchSettingsScreen(
                 onSettingsChange { s -> s.copy(indexEnabled = it) }
             }
             if (settings.indexEnabled) {
-                IndexOptions(settings, onSettingsChange, books, sizes, onReindex, onPause, onResume, onExcludedChange)
+                IndexOptions(
+                    settings,
+                    onSettingsChange,
+                    books,
+                    sizes,
+                    IndexActions(onReindex, onPause, onResume, onRetryUnindexed, unindexedChapters),
+                    onExcludedChange,
+                )
             }
             if (!sizes.isNullOrEmpty()) {
                 OutlinedButton(
@@ -118,27 +127,33 @@ fun SearchSettingsScreen(
     }
 }
 
+private class IndexActions(
+    val onReindex: () -> Unit,
+    val onPause: () -> Unit,
+    val onResume: () -> Unit,
+    val onRetryUnindexed: () -> Unit,
+    val unindexedChapters: Int?,
+)
+
 @Composable
 private fun IndexOptions(
     settings: SearchSettings,
     onSettingsChange: ((SearchSettings) -> SearchSettings) -> Unit,
     books: List<Book>,
     sizes: List<BookIndexSize>?,
-    onReindex: () -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
+    actions: IndexActions,
     onExcludedChange: (Set<String>) -> Unit,
 ) {
     ToggleRow("Index on import", settings.indexOnImport, "search-index-on-import") {
         onSettingsChange { s -> s.copy(indexOnImport = it) }
     }
-    ReindexControls(settings.indexJob, onReindex, onPause, onResume)
+    ReindexControls(settings.indexJob, actions)
     ExcludedBooks(books, settings.indexExcludedBooks, onExcludedChange)
     IndexSize(books, sizes)
 }
 
 @Composable
-private fun ReindexControls(job: SearchIndexJob, onReindex: () -> Unit, onPause: () -> Unit, onResume: () -> Unit) {
+private fun ReindexControls(job: SearchIndexJob, actions: IndexActions) {
     MenuSubheader("Reindex")
     when {
         job.running -> {
@@ -147,7 +162,7 @@ private fun ReindexControls(job: SearchIndexJob, onReindex: () -> Unit, onPause:
                 progress = { job.done.toFloat() / job.total.coerceAtLeast(1) },
                 modifier = Modifier.fillMaxWidth().testTag("reindex-progress"),
             )
-            OutlinedButton(onClick = onPause, modifier = Modifier.fillMaxWidth().testTag("reindex-pause")) {
+            OutlinedButton(onClick = actions.onPause, modifier = Modifier.fillMaxWidth().testTag("reindex-pause")) {
                 Text("Pause")
             }
         }
@@ -157,15 +172,31 @@ private fun ReindexControls(job: SearchIndexJob, onReindex: () -> Unit, onPause:
                 progress = { job.done.toFloat() / job.total.coerceAtLeast(1) },
                 modifier = Modifier.fillMaxWidth().testTag("reindex-progress"),
             )
-            Button(onClick = onResume, modifier = Modifier.fillMaxWidth().testTag("reindex-resume")) { Text("Resume") }
+            Button(onClick = actions.onResume, modifier = Modifier.fillMaxWidth().testTag("reindex-resume")) { Text("Resume") }
         }
         else -> {
-            OutlinedButton(onClick = onReindex, modifier = Modifier.fillMaxWidth().testTag("reindex-library")) {
-                Text("Reindex library")
+            OutlinedButton(
+                onClick = actions.onReindex,
+                modifier = Modifier.fillMaxWidth().testTag("reindex-library"),
+            ) { Text("Reindex library") }
+            val missing = actions.unindexedChapters
+            OutlinedButton(
+                onClick = actions.onRetryUnindexed,
+                enabled = (missing ?: 0) > 0,
+                modifier = Modifier.fillMaxWidth().testTag("retry-unindexed"),
+            ) {
+                Text(
+                    when (missing) {
+                        null -> "Retry unindexed chapters"
+                        0 -> "Every chapter is indexed"
+                        else -> "Retry $missing unindexed chapters"
+                    },
+                )
             }
             if (job.finished) {
                 val skipped = job.unreadableChapters.takeIf { it > 0 }?.let { " $it chapters couldn't be read." }
-                Text("Indexed ${job.total} books.${skipped.orEmpty()}", modifier = Modifier.testTag("reindex-status"))
+                val verb = if (job.onlyMissing) "Retried" else "Indexed"
+                Text("$verb ${job.total} books.${skipped.orEmpty()}", modifier = Modifier.testTag("reindex-status"))
             }
         }
     }

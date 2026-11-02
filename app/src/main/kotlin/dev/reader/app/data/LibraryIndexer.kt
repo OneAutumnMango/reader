@@ -59,6 +59,26 @@ class LibraryIndexer(
         scheduleWork()
     }
 
+    /** Chapters of books that belong in the index but have no index entry, by book. */
+    suspend fun unindexedChapters(): Map<BookId, List<Chapter>> {
+        val prefs = settings.preferences.first().searchSettings
+        val indexed = search.indexedChapterIds()
+        val eligible = library.observeBooks().first().filter { it.hasSearchableText() && prefs.indexes(it.id) }
+            .map { it.id }.toSet()
+        return library.observeAllChapters().first()
+            .filter { it.bookId in eligible && it.id.value !in indexed }
+            .groupBy { it.bookId }
+    }
+
+    /** Queues just the chapters missing from the index (e.g. ones that failed to load before) to be tried again. */
+    suspend fun retryUnindexed() {
+        if (!settings.preferences.first().searchSettings.indexEnabled) return
+        val missing = unindexedChapters()
+        if (missing.isEmpty()) return
+        updateJob { SearchIndexJob(pending = missing.keys.map { it.value }, total = missing.size, onlyMissing = true) }
+        scheduleWork()
+    }
+
     suspend fun pause() {
         updateJob { it.copy(paused = true) }
         cancelWork()
@@ -102,8 +122,14 @@ class LibraryIndexer(
         val prefs = settings.preferences.first().searchSettings
         var unreadable = 0
         if (book != null && book.hasSearchableText() && prefs.indexes(id)) {
-            val (texts, failed) = loadTexts(book, library.chapters(id))
-            search.replaceBook(id, texts)
+            val all = library.chapters(id)
+            val chapters = if (current.onlyMissing) {
+                search.indexedChapterIds(id).let { indexed -> all.filter { it.id.value !in indexed } }
+            } else {
+                all
+            }
+            val (texts, failed) = loadTexts(book, chapters)
+            if (current.onlyMissing) search.addChapters(id, texts) else search.replaceBook(id, texts)
             unreadable = failed
         } else {
             search.removeBook(id)

@@ -14,6 +14,8 @@ data class SearchIndexJob(
     val total: Int = 0,
     val paused: Boolean = false,
     val unreadableChapters: Int = 0,
+    /** A retry of chapters missing from the index, rather than a rebuild of whole books. */
+    val onlyMissing: Boolean = false,
 ) {
     val done: Int get() = total - pending.size
     val running: Boolean get() = pending.isNotEmpty() && !paused

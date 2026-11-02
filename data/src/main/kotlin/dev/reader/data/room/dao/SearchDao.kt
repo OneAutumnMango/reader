@@ -13,6 +13,12 @@ interface SearchDao {
     @Query("INSERT INTO chapter_fts(chapterId, bookId, body) VALUES (:chapterId, :bookId, :body)")
     suspend fun insert(chapterId: String, bookId: String, body: String)
 
+    @Query("SELECT chapterId FROM chapter_fts")
+    suspend fun indexedChapterIds(): List<String>
+
+    @Query("SELECT chapterId FROM chapter_fts WHERE bookId = :bookId")
+    suspend fun indexedChapterIds(bookId: String): List<String>
+
     @Query("DELETE FROM chapter_fts WHERE bookId = :bookId")
     suspend fun removeBook(bookId: String)
 

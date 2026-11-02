@@ -23,6 +23,10 @@ fun SearchSettingsRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
     val sizeKeys = listOf(settings.indexEnabled, job.running, job.isPaused, job.finished)
     val sizes by produceState<List<BookIndexSize>?>(null, sizeKeys) { value = graph.search.sizes() }
 
+    val unindexed by produceState<Int?>(null, sizeKeys) {
+        value = graph.indexer.unindexedChapters().values.sumOf { it.size }
+    }
+
     SearchSettingsScreen(
         settings = settings,
         onSettingsChange = { transform ->
@@ -44,5 +48,7 @@ fun SearchSettingsRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
             }
         },
         modifier = modifier,
+        unindexedChapters = unindexed,
+        onRetryUnindexed = { scope.launch { graph.indexer.retryUnindexed() } },
     )
 }

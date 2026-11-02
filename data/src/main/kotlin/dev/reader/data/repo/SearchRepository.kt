@@ -20,6 +20,16 @@ class SearchRepository(private val database: ReaderDatabase) {
         chapters.forEach { (chapterId, text) -> database.search().insert(chapterId.value, bookId.value, text) }
     }
 
+    /** Adds [chapters] to what's already indexed for [bookId], without touching its other chapters. */
+    suspend fun addChapters(bookId: BookId, chapters: List<Pair<ChapterId, String>>) = database.withTransaction {
+        chapters.forEach { (chapterId, text) -> database.search().insert(chapterId.value, bookId.value, text) }
+    }
+
+    suspend fun indexedChapterIds(): Set<String> = database.search().indexedChapterIds().toSet()
+
+    suspend fun indexedChapterIds(bookId: BookId): Set<String> =
+        database.search().indexedChapterIds(bookId.value).toSet()
+
     suspend fun removeBook(bookId: BookId) = database.search().removeBook(bookId.value)
 
     suspend fun page(after: Int, limit: Int): List<IndexedChapter> = database.search().page(after, limit).map {

@@ -110,4 +110,19 @@ class StatsAndSearchRepositoryTest {
         repository.clear()
         assertEquals(emptyList(), repository.sizes())
     }
+
+    @Test
+    fun `chapters can be added to a book without disturbing the ones already indexed`() = runBlocking {
+        val repository = SearchRepository(database)
+        val book = BookId("book-1")
+        repository.replaceBook(book, listOf(ChapterId("a") to "alpha"))
+        repository.replaceBook(BookId("book-2"), listOf(ChapterId("z") to "zeta"))
+        val aRow = repository.page(0, 10).first { it.chapterId.value == "a" }.rowId
+
+        repository.addChapters(book, listOf(ChapterId("b") to "beta"))
+
+        assertEquals(setOf("a", "b", "z"), repository.indexedChapterIds())
+        assertEquals(setOf("a", "b"), repository.indexedChapterIds(book))
+        assertEquals(aRow, repository.page(0, 10).first { it.chapterId.value == "a" }.rowId)
+    }
 }

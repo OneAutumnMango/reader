@@ -332,4 +332,57 @@ class SearchStateTest {
         assertEquals(emptyList(), index.page(0, 10))
         assertEquals(0, job().total)
     }
+
+    @Test
+    fun `retrying indexes only the chapters that were missing and leaves the rest alone`() = runBlocking {
+        val file = File(dir, "two.txt").apply { writeText("Alpha.") }
+        val book = Book(
+            BookId("two"),
+            "Two",
+            format = BookFormat.TXT,
+            sourcePath = file.path,
+            addedAt = Instant.fromEpochSeconds(0),
+        )
+        val missingFile = File(dir, "later.txt")
+        val chapters = listOf(
+            Chapter(ChapterId("two-1"), book.id, "One", file.path, 0),
+            Chapter(ChapterId("two-2"), book.id, "Two", missingFile.path, 1),
+        )
+        library.upsertBook(book.copy(isLightNovel = true), chapters)
+        indexer.startReindex()
+        indexer.runQueue()
+        assertEquals(1, job().unreadableChapters)
+        assertEquals(listOf("two-1"), index.page(0, 10).map { it.chapterId.value })
+        val untouchedRow = index.page(0, 10).single().rowId
+        assertEquals(1, indexer.unindexedChapters().values.sumOf { it.size })
+
+        missingFile.writeText("Beta.")
+        indexer.retryUnindexed()
+        assertTrue(job().onlyMissing)
+        assertEquals(1, job().total)
+        indexer.runQueue()
+
+        val stored = index.page(0, 10)
+        assertEquals(listOf("two-1", "two-2"), stored.map { it.chapterId.value })
+        assertEquals(untouchedRow, stored.first().rowId) // the chapter that was already indexed wasn't rebuilt
+        assertEquals(0, indexer.unindexedChapters().size)
+        assertTrue(job().finished)
+    }
+
+    @Test
+    fun `retrying with nothing missing, or with indexing off, queues nothing`() = runBlocking {
+        val only = txt("only", "Alpha.")
+        libraryOf(only)
+        indexer.startReindex()
+        indexer.runQueue()
+        val before = scheduled
+
+        indexer.retryUnindexed()
+        assertEquals(before, scheduled)
+
+        index.removeBook(only.first.id)
+        settings.update { it.copy(searchSettings = it.searchSettings.copy(indexEnabled = false)) }
+        indexer.retryUnindexed()
+        assertEquals(before, scheduled)
+    }
 }

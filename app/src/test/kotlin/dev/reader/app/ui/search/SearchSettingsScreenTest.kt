@@ -1,5 +1,6 @@
 package dev.reader.app.ui.search
 
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -42,7 +43,9 @@ class SearchSettingsScreenTest {
     private var cleared = 0
     private var excluded: Set<String>? = null
 
-    private fun show(sizes: List<BookIndexSize>? = emptyList()) = composeRule.setContent {
+    private var retries = 0
+
+    private fun show(sizes: List<BookIndexSize>? = emptyList(), unindexed: Int? = null) = composeRule.setContent {
         SearchSettingsScreen(
             settings = settings,
             onSettingsChange = { transform -> settings = transform(settings) },
@@ -53,6 +56,8 @@ class SearchSettingsScreenTest {
             onResume = { resumes++ },
             onClearIndex = { cleared++ },
             onExcludedChange = { excluded = it },
+            unindexedChapters = unindexed,
+            onRetryUnindexed = { retries++ },
         )
     }
 
@@ -181,6 +186,31 @@ class SearchSettingsScreenTest {
         composeRule.onNodeWithTag("search-index-clear").performScrollTo().performClick()
 
         assertEquals(1, cleared)
+    }
+
+    @Test
+    fun `unindexed chapters can be retried, with their number shown`() {
+        show(unindexed = 7)
+
+        composeRule.onNodeWithText("Retry 7 unindexed chapters").performScrollTo().performClick()
+
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun `retry is unavailable when every chapter is indexed`() {
+        show(unindexed = 0)
+
+        composeRule.onNodeWithTag("retry-unindexed").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithText("Every chapter is indexed").assertExists()
+    }
+
+    @Test
+    fun `a finished retry says it was a retry`() {
+        settings = SearchSettings(indexJob = SearchIndexJob(total = 2, onlyMissing = true, unreadableChapters = 1))
+        show(unindexed = 1)
+
+        composeRule.onNodeWithText("Retried 2 books. 1 chapters couldn't be read.").assertExists()
     }
 
     @Test
