@@ -172,7 +172,10 @@ private fun ReindexControls(job: SearchIndexJob, actions: IndexActions) {
                 progress = { job.done.toFloat() / job.total.coerceAtLeast(1) },
                 modifier = Modifier.fillMaxWidth().testTag("reindex-progress"),
             )
-            Button(onClick = actions.onResume, modifier = Modifier.fillMaxWidth().testTag("reindex-resume")) { Text("Resume") }
+            Button(
+                onClick = actions.onResume,
+                modifier = Modifier.fillMaxWidth().testTag("reindex-resume"),
+            ) { Text("Resume") }
         }
         else -> {
             OutlinedButton(
