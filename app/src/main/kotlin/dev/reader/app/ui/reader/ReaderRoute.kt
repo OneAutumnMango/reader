@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -106,6 +107,10 @@ fun ReaderRoute(
 
     var showMenu by remember(bookId) { mutableStateOf(false) }
     var menuExpanded by remember(bookId) { mutableStateOf(false) }
+    var autoScroll by remember(bookId) { mutableStateOf(AutoScrollTaps(AutoScrollMode.OFF)) }
+    // Set by the tap that paused auto-scroll so the same tap doesn't also toggle the menu.
+    var swallowMenuTap by remember(bookId) { mutableStateOf(false) }
+    val doubleTapTimeout = LocalViewConfiguration.current.doubleTapTimeoutMillis
     // Per chapter page, so the label is right the moment a chapter is swiped in.
     val positions = remember(bookId) { mutableStateMapOf<Int, Pair<Int, Int>>() }
     // Keyed by the page it was generated for, so a stale scrub from a chapter the user has since
@@ -134,6 +139,25 @@ fun ReaderRoute(
     val pageBased = book.format == BookFormat.CBZ || book.format == BookFormat.CBR ||
         pdfRenderMode == PdfRenderMode.FIXED_PAGE
     val search = rememberBookSearch(book, chapters)
+    val autoScrollSupported = readingMode == ReadingMode.CONTINUOUS_SCROLL && !pageBased
+    LaunchedEffect(autoScrollSupported) {
+        if (!autoScrollSupported) autoScroll = AutoScrollTaps(AutoScrollMode.OFF)
+    }
+    val autoScrollRunning = autoScroll.mode == AutoScrollMode.RUNNING
+    DisposableEffect(autoScrollRunning) {
+        if (autoScrollRunning) {
+            AutoScrollVolumeKeys.onStep = { steps ->
+                scope.launch {
+                    graph.settings.update {
+                        val current = it.readerSettings
+                        val speed = stepAutoScrollSpeed(current.autoScrollSpeed, steps)
+                        it.copy(readerSettings = current.copy(autoScrollSpeed = speed))
+                    }
+                }
+            }
+        }
+        onDispose { AutoScrollVolumeKeys.onStep = null }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         // In horizontal paged modes the inner page pager scrolls first; once it hits its last/first
@@ -152,6 +176,20 @@ fun ReaderRoute(
                 settings = prefs.readerSettings,
                 theme = theme,
                 onToggleMenu = { showMenu = !showMenu },
+                consumeSwallowedTap = { swallowMenuTap.also { swallowMenuTap = false } },
+                autoScrollMode = if (page == pagerState.settledPage) autoScroll.mode else AutoScrollMode.OFF,
+                onAutoScrollDown = { swallowMenuTap = false },
+                onAutoScrollTap = { time ->
+                    if (autoScroll.mode == AutoScrollMode.RUNNING) swallowMenuTap = true
+                    autoScroll = autoScroll.onTap(time, doubleTapTimeout)
+                },
+                onAutoScrollEnd = {
+                    if (page < chapters.lastIndex) {
+                        scope.launch { pagerState.animateScrollToPage(page + 1) }
+                    } else {
+                        autoScroll = AutoScrollTaps(AutoScrollMode.OFF)
+                    }
+                },
                 onPositionChanged = { index, total -> positions[page] = index to total },
                 highlight = search.highlight ?: startHighlight,
                 jump = listOfNotNull(
@@ -271,6 +309,11 @@ private fun ChapterPage(
     settings: ReaderSettings,
     theme: ReaderTheme,
     onToggleMenu: () -> Unit,
+    consumeSwallowedTap: () -> Boolean,
+    autoScrollMode: AutoScrollMode,
+    onAutoScrollDown: () -> Unit,
+    onAutoScrollTap: (Long) -> Unit,
+    onAutoScrollEnd: () -> Unit,
     onPositionChanged: (Int, Int) -> Unit,
     highlight: Regex?,
     jump: BlockJump?,
@@ -362,6 +405,8 @@ private fun ChapterPage(
     }
 
     fun onTapAction(action: TapAction) {
+        // The tap that just paused auto-scroll is only a pause, whichever zone it landed in.
+        if (consumeSwallowedTap()) return
         when (action) {
             TapAction.OPEN_MENU -> onToggleMenu()
             TapAction.TOGGLE_BOOKMARK -> scope.launch {
@@ -451,6 +496,10 @@ private fun ChapterPage(
             jump = jump,
             onSelectionAction = ::onSelectionAction,
             onBookmarkTap = ::onBookmarkTap,
+            autoScrollMode = if (isActive) autoScrollMode else AutoScrollMode.OFF,
+            onAutoScrollDown = onAutoScrollDown,
+            onAutoScrollTap = onAutoScrollTap,
+            onAutoScrollEnd = onAutoScrollEnd,
         )
         loaded is ChapterContent.Comic && startFraction != null -> ComicReaderScreen(
             file = loaded.file,

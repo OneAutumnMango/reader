@@ -25,7 +25,10 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,6 +53,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.reader.app.ui.MenuSubheader
+import dev.reader.app.ui.appearance.AutoScrollEditor
 import dev.reader.app.ui.appearance.ReaderSettingsEditor
 import dev.reader.app.ui.appearance.ReaderThemeEditor
 import dev.reader.app.ui.appearance.ReaderZoomEditor
@@ -126,6 +130,9 @@ fun ReaderMenuOverlay(
     searchPanel: (@Composable () -> Unit)? = null,
     isNightTheme: Boolean = false,
     onToggleNightTheme: (() -> Unit)? = null,
+    autoScrollMode: AutoScrollMode? = null,
+    onAutoScrollToggle: () -> Unit = {},
+    onAutoScrollStop: () -> Unit = {},
 ) {
     val currentOnExpandedChange by rememberUpdatedState(onExpandedChange)
     var fullScreen by remember { mutableStateOf(false) }
@@ -194,6 +201,11 @@ fun ReaderMenuOverlay(
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                         MenuSubheader("Zoom", Modifier.padding(top = 0.dp))
                         ReaderZoomEditor(settings, onSettingsChange)
+                        if (autoScrollMode != null) {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                            MenuSubheader("Auto-scroll", Modifier.padding(top = 0.dp))
+                            AutoScrollEditor(settings, onSettingsChange)
+                        }
                     }
                 }
             }
@@ -212,11 +224,37 @@ fun ReaderMenuOverlay(
             Column(modifier = Modifier.navigationBarsPadding()) {
                 HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.align(Alignment.CenterStart).testTag("reader-menu-back"),
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Row(modifier = Modifier.align(Alignment.CenterStart)) {
+                        IconButton(onClick = onBack, modifier = Modifier.testTag("reader-menu-back")) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                        if (autoScrollMode != null) {
+                            IconButton(
+                                onClick = onAutoScrollToggle,
+                                modifier = Modifier.testTag("reader-menu-autoscroll"),
+                            ) {
+                                Icon(
+                                    if (autoScrollMode == AutoScrollMode.RUNNING) {
+                                        Icons.Filled.Pause
+                                    } else {
+                                        Icons.Filled.PlayArrow
+                                    },
+                                    contentDescription = when (autoScrollMode) {
+                                        AutoScrollMode.OFF -> "Start auto-scroll"
+                                        AutoScrollMode.RUNNING -> "Pause auto-scroll"
+                                        AutoScrollMode.PAUSED -> "Resume auto-scroll"
+                                    },
+                                )
+                            }
+                            if (autoScrollMode != AutoScrollMode.OFF) {
+                                IconButton(
+                                    onClick = onAutoScrollStop,
+                                    modifier = Modifier.testTag("reader-menu-autoscroll-stop"),
+                                ) {
+                                    Icon(Icons.Filled.Stop, contentDescription = "Stop auto-scroll")
+                                }
+                            }
+                        }
                     }
                     Text(
                         progressLabel,

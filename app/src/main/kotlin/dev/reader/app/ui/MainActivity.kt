@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -21,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import dev.reader.app.ReaderApplication
 import dev.reader.app.data.ContentFileCopier
 import dev.reader.app.ui.appearance.AppPaletteFactory
+import dev.reader.app.ui.reader.AutoScrollVolumeKeys
 import dev.reader.data.store.PreferencesFile
 import kotlinx.coroutines.launch
 
@@ -61,6 +63,26 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private val swallowedVolumeKeys = mutableSetOf<Int>()
+
+    // Volume keys change the auto-scroll speed while it runs; otherwise they behave as usual.
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val step = when (keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> 1
+            KeyEvent.KEYCODE_VOLUME_DOWN -> -1
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        val handler = AutoScrollVolumeKeys.onStep ?: return super.onKeyDown(keyCode, event)
+        handler(step)
+        swallowedVolumeKeys += keyCode
+        return true
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        // Only a key whose press we swallowed has its release swallowed too.
+        return if (swallowedVolumeKeys.remove(keyCode)) true else super.onKeyUp(keyCode, event)
     }
 
     override fun onNewIntent(intent: Intent) {

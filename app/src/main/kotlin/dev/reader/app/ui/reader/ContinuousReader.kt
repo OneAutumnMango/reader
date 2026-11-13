@@ -13,10 +13,14 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.ReaderSettings
@@ -27,6 +31,8 @@ import dev.reader.core.theme.ReaderTheme
 private val READER_TOP_SPACING = 48.dp
 private val READER_BOTTOM_SPACING = 24.dp
 private val READER_IMAGE_HEIGHT = 320.dp
+private const val NANOS_PER_SECOND = 1_000_000_000f
+private const val MAX_FRAME_SECONDS = 0.1f
 
 @Composable
 fun ContinuousReader(
@@ -42,6 +48,9 @@ fun ContinuousReader(
     onBlockLayout: ((Int, LayoutCoordinates, TextLayoutResult) -> Unit)? = null,
     onBlockDisposed: ((Int) -> Unit)? = null,
     onSelectionContainerLayout: ((LayoutCoordinates) -> Unit)? = null,
+    autoScrollSpeedDp: Float = 0f,
+    autoScrolling: Boolean = false,
+    onReachedEnd: () -> Unit = {},
 ) {
     val initialIndex = (initialPositionFraction * document.blocks.size)
         .toInt()
@@ -50,6 +59,26 @@ fun ContinuousReader(
     ReportReadingPosition(listState, document.blocks.size, onPositionChanged)
     LaunchedEffect(jump) {
         jump?.let { listState.scrollToItem(it.block.coerceIn(0, (document.blocks.size - 1).coerceAtLeast(0))) }
+    }
+
+    val density = LocalDensity.current
+    val currentSpeedDp by rememberUpdatedState(autoScrollSpeedDp)
+    val currentOnReachedEnd by rememberUpdatedState(onReachedEnd)
+    LaunchedEffect(autoScrolling) {
+        if (!autoScrolling) return@LaunchedEffect
+        var last = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            val seconds = ((now - last) / NANOS_PER_SECOND).coerceAtMost(MAX_FRAME_SECONDS)
+            last = now
+            // Raw delta, not scrollBy: scrollBy takes the scroll mutex, and a user drag holding it
+            // at higher priority would cancel (and so silently end) this loop. This just adds to it.
+            val consumed = listState.dispatchRawDelta(with(density) { currentSpeedDp.dp.toPx() } * seconds)
+            if (consumed == 0f && !listState.canScrollForward) {
+                currentOnReachedEnd()
+                return@LaunchedEffect
+            }
+        }
     }
 
     val content: @Composable () -> Unit = {
