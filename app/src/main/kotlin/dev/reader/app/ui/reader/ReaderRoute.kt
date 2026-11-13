@@ -180,8 +180,15 @@ fun ReaderRoute(
                 autoScrollMode = if (page == pagerState.settledPage) autoScroll.mode else AutoScrollMode.OFF,
                 onAutoScrollDown = { swallowMenuTap = false },
                 onAutoScrollTap = { time ->
-                    if (autoScroll.mode == AutoScrollMode.RUNNING) swallowMenuTap = true
+                    val before = autoScroll.mode
                     autoScroll = autoScroll.onTap(time, doubleTapTimeout)
+                    if (before == AutoScrollMode.RUNNING) swallowMenuTap = true
+                    if (before == AutoScrollMode.PAUSED && autoScroll.mode == AutoScrollMode.RUNNING) {
+                        // The first tap of the double tap may have opened the menu; resuming closes it again.
+                        showMenu = false
+                        menuExpanded = false
+                        swallowMenuTap = true
+                    }
                 },
                 onAutoScrollEnd = {
                     if (page < chapters.lastIndex) {
