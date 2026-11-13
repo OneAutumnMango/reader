@@ -7,6 +7,7 @@ import dev.reader.core.theme.LibraryLayout
 import dev.reader.core.theme.ReaderTheme
 import dev.reader.core.theme.SavedCustomTheme
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 /** Bumped when a stored shape changes in a way that needs migrating. */
 const val STORE_VERSION: Int = 1
@@ -63,6 +64,8 @@ data class PreferencesFile(
     val automaticBackupFrequency: AutomaticBackupFrequency = AutomaticBackupFrequency.DAILY,
     val automaticBackupIncludeBooks: Boolean = false,
     val searchSettings: SearchSettings = SearchSettings(),
+    /** Session count, average and longest session only consider sessions from this moment on. */
+    val sessionStatsFrom: Instant? = null,
 ) {
     /** The active preset, with its night colors swapped in for rendering when [nightThemeEnabled]. */
     val activeReaderTheme: ReaderTheme

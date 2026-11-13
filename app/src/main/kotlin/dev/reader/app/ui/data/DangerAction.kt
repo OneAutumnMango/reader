@@ -26,4 +26,13 @@ enum class DangerAction(
             "There is no way to get them back unless you have a backup.",
         confirmLabel = "Yes, reset all stats",
     ),
+    RESET_SESSION_STATS(
+        label = "Reset session stats",
+        consequence = "Only your session count, average session length and longest session go back to zero, " +
+            "and are counted afresh from now on. Reading time, words read, pages turned, streaks, insights " +
+            "and graphs are not affected, and no reading history is deleted.",
+        finalWarning = "Session count, average session and longest session will restart from zero. " +
+            "Everything else in your stats stays as it is.",
+        confirmLabel = "Yes, reset session stats",
+    ),
 }

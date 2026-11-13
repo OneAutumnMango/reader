@@ -204,6 +204,9 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
                 when (action) {
                     DangerAction.REMOVE_ALL_BOOKS -> run("Removed all books") { graph.library.removeAllBooks() }
                     DangerAction.RESET_STATS -> run("Reset all stats") { graph.stats.resetAll() }
+                    DangerAction.RESET_SESSION_STATS -> run("Reset session stats") {
+                        graph.settings.update { it.copy(sessionStatsFrom = Clock.System.now()) }
+                    }
                 }
             },
             onDismiss = { danger = null },

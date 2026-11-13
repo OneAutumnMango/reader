@@ -9,19 +9,24 @@ import dev.reader.data.room.toEntity
 import dev.reader.data.room.toEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlin.time.Instant
 
 class StatsRepository(private val database: ReaderDatabase) {
 
-    fun observeSummary(): Flow<StatsSummary> = combine(
+    /** [sessionStatsFrom] is the cutoff for session count, average and longest session. */
+    fun observeSummary(sessionStatsFrom: Flow<Instant?> = flowOf(null)): Flow<StatsSummary> = combine(
         database.sessions().observeAll(),
         database.progress().observeFinishedCount(),
         database.books().observeAll(),
-    ) { sessions, finished, books ->
+        sessionStatsFrom,
+    ) { sessions, finished, books, from ->
         StatsCalculator.summarize(
             sessions = sessions.map { it.toEvent() },
             booksFinished = finished,
             bookTitles = books.associate { BookId(it.id) to it.title },
+            sessionStatsFrom = from,
         )
     }
 

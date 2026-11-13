@@ -48,7 +48,7 @@ fun StatsScreen(
     modifier: Modifier = Modifier,
     graphs: @Composable () -> Unit = {},
 ) {
-    if (summary.sessionCount == 0 && summary.booksFinished == 0) {
+    if (summary.sessionCount == 0 && summary.totalReadingTime <= Duration.ZERO && summary.booksFinished == 0) {
         Column(
             modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

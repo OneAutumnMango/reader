@@ -56,7 +56,10 @@ object StatsCalculator {
         bookTitles: Map<BookId, String> = emptyMap(),
         timeZone: TimeZone = TimeZone.currentSystemDefault(),
         now: Instant = Clock.System.now(),
+        /** Session count, average and longest ignore sessions that started before this; everything else keeps them. */
+        sessionStatsFrom: Instant? = null,
     ): StatsSummary {
+        val counted = if (sessionStatsFrom == null) sessions else sessions.filter { it.startedAt >= sessionStatsFrom }
         val today = now.toLocalDateTime(timeZone).date
         val byDay = sessions.groupBy { it.endedAt.toLocalDateTime(timeZone).date }.mapValues { it.value.totalTime() }
         val readDays = byDay.keys.sorted()
@@ -75,9 +78,9 @@ object StatsCalculator {
             currentStreakDays = currentStreak(readDays, today),
             longestStreakDays = longestStreak(readDays),
             activeDays = readDays.size,
-            sessionCount = sessions.size,
-            averageSession = if (sessions.isEmpty()) Duration.ZERO else total / sessions.size,
-            longestSession = sessions.maxOfOrNull { it.duration() } ?: Duration.ZERO,
+            sessionCount = counted.size,
+            averageSession = if (counted.isEmpty()) Duration.ZERO else counted.totalTime() / counted.size,
+            longestSession = counted.maxOfOrNull { it.duration() } ?: Duration.ZERO,
             last7Days = (WEEK_DAYS - 1 downTo 0).map { daysAgo ->
                 val date = today.minus(daysAgo, DateTimeUnit.DAY)
                 DailyReading(date, byDay[date] ?: Duration.ZERO)

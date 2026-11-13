@@ -172,7 +172,8 @@ fun ReaderRoute(
                 scope = scope,
                 book = book,
                 chapter = chapters[page],
-                isActive = page == pagerState.settledPage && !pagerState.isScrollInProgress && isResumed,
+                // Not gated on pager scrolling: a sideways drift while scrolling vertically would split the session.
+                isActive = page == pagerState.settledPage && isResumed,
                 settings = prefs.readerSettings,
                 theme = theme,
                 onToggleMenu = { showMenu = !showMenu },

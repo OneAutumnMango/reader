@@ -3,15 +3,18 @@ package dev.reader.app.ui.stats
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import dev.reader.app.data.ReaderGraph
 import dev.reader.core.stats.StatsSummary
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 @Composable
 fun StatsRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
-    val summary by graph.stats.observeSummary().collectAsState(initial = StatsSummary())
+    val summaryFlow = remember(graph) { graph.stats.observeSummary(graph.settings.preferences.map { it.sessionStatsFrom }) }
+    val summary by summaryFlow.collectAsState(initial = StatsSummary())
     val sessions by graph.stats.observeAllSessions().collectAsState(initial = emptyList())
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())
     val chapters by graph.library.observeAllChapters().collectAsState(initial = emptyList())

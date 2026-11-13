@@ -12,7 +12,7 @@ private const val PERCENT = 100
 
 /** Plain-language observations derived from the summary, most interesting first. */
 fun statsInsights(summary: StatsSummary): List<String> = buildList {
-    if (summary.sessionCount == 0) return@buildList
+    if (summary.sessionCount == 0 && summary.totalReadingTime <= Duration.ZERO) return@buildList
     streakInsight(summary)?.let(::add)
     weekTrend(summary.thisWeekReadingTime, summary.lastWeekReadingTime)?.let(::add)
     summary.favoriteTimeOfDay?.let { add(timeOfDayInsight(it)) }

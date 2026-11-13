@@ -156,4 +156,28 @@ class StatsCalculatorTest {
 
         assertEquals(1, summary.currentStreakDays)
     }
+
+    @Test
+    fun `session stats ignore sessions before the cutoff but other stats keep them`() {
+        val sessions = listOf(
+            session("2026-01-01T10:00:00Z", "2026-01-01T10:10:00Z", 100),
+            session("2026-01-02T10:00:00Z", "2026-01-02T10:20:00Z", 200),
+            session("2026-01-03T10:00:00Z", "2026-01-03T10:30:00Z", 300),
+        )
+
+        val summary = StatsCalculator.summarize(
+            sessions,
+            booksFinished = 0,
+            timeZone = TimeZone.UTC,
+            now = instant("2026-01-03T20:00:00Z"),
+            sessionStatsFrom = instant("2026-01-03T00:00:00Z"),
+        )
+
+        assertEquals(1, summary.sessionCount)
+        assertEquals(30.minutes, summary.averageSession)
+        assertEquals(30.minutes, summary.longestSession)
+        assertEquals(60.minutes, summary.totalReadingTime)
+        assertEquals(600, summary.totalWordsRead)
+        assertEquals(3, summary.activeDays)
+    }
 }
