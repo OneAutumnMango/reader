@@ -8,8 +8,8 @@ class AutoScrollTest {
 
     @Test
     fun `speed steps and clamps to the allowed range`() {
-        assertEquals(50f, stepAutoScrollSpeed(40f, 1))
-        assertEquals(30f, stepAutoScrollSpeed(40f, -1))
+        assertEquals(45f, stepAutoScrollSpeed(40f, 1))
+        assertEquals(35f, stepAutoScrollSpeed(40f, -1))
         assertEquals(AUTO_SCROLL_MIN_SPEED, stepAutoScrollSpeed(AUTO_SCROLL_MIN_SPEED, -1))
         assertEquals(AUTO_SCROLL_MAX_SPEED, stepAutoScrollSpeed(AUTO_SCROLL_MAX_SPEED, 1))
     }

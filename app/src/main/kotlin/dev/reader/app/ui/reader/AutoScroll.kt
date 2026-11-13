@@ -8,7 +8,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 
 const val AUTO_SCROLL_MIN_SPEED = 10f
 const val AUTO_SCROLL_MAX_SPEED = 300f
-const val AUTO_SCROLL_STEP = 10f
+const val AUTO_SCROLL_STEP = 5f
 
 /** OFF until the user presses the menu's play button; then RUNNING or PAUSED until stopped. */
 enum class AutoScrollMode { OFF, RUNNING, PAUSED }
