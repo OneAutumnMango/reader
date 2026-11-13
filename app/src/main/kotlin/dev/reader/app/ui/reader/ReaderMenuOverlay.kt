@@ -29,10 +29,12 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -130,6 +132,7 @@ fun ReaderMenuOverlay(
     searchPanel: (@Composable () -> Unit)? = null,
     isNightTheme: Boolean = false,
     onToggleNightTheme: (() -> Unit)? = null,
+    onToggleSelectableText: (() -> Unit)? = null,
     autoScrollMode: AutoScrollMode? = null,
     onAutoScrollToggle: () -> Unit = {},
     onAutoScrollStop: () -> Unit = {},
@@ -253,6 +256,18 @@ fun ReaderMenuOverlay(
                                 ) {
                                     Icon(Icons.Filled.Stop, contentDescription = "Stop auto-scroll")
                                 }
+                            }
+                        }
+                        if (onToggleSelectableText != null) {
+                            IconButton(
+                                onClick = onToggleSelectableText,
+                                modifier = Modifier.testTag("reader-menu-selectable-toggle"),
+                            ) {
+                                Icon(
+                                    Icons.Filled.TextFields,
+                                    contentDescription = if (settings.selectableText) "Disable selectable text" else "Enable selectable text",
+                                    tint = LocalContentColor.current.copy(alpha = if (settings.selectableText) 1f else 0.4f),
+                                )
                             }
                         }
                     }

@@ -226,6 +226,24 @@ fun ReaderRoute(
                 onToggleNightTheme = {
                     scope.launch { graph.settings.update { it.copy(nightThemeEnabled = !it.nightThemeEnabled) } }
                 },
+                onToggleSelectableText = {
+                    scope.launch {
+                        graph.settings.update {
+                            it.copy(readerSettings = it.readerSettings.copy(selectableText = !it.readerSettings.selectableText))
+                        }
+                    }
+                },
+                autoScrollMode = if (autoScrollSupported) autoScroll.mode else null,
+                onAutoScrollToggle = {
+                    if (autoScroll.mode == AutoScrollMode.RUNNING) {
+                        autoScroll = AutoScrollTaps(AutoScrollMode.PAUSED)
+                    } else {
+                        autoScroll = AutoScrollTaps(AutoScrollMode.RUNNING)
+                        showMenu = false
+                        menuExpanded = false
+                    }
+                },
+                onAutoScrollStop = { autoScroll = AutoScrollTaps(AutoScrollMode.OFF) },
                 settings = prefs.readerSettings,
                 onSettingsChange = { updated ->
                     scope.launch { graph.settings.update { it.copy(readerSettings = updated) } }
