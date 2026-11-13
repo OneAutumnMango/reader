@@ -14,6 +14,7 @@ import dev.reader.data.room.toCategory
 import dev.reader.data.room.toChapter
 import dev.reader.data.room.toEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.File
@@ -21,7 +22,7 @@ import java.io.File
 @Suppress("TooManyFunctions")
 class LibraryRepository(private val database: ReaderDatabase) {
 
-    fun observeBooks(): Flow<List<Book>> = database.books().observeAll().map { it.toBooks() }
+    fun observeBooks(): Flow<List<Book>> = combine(database.books().observeAll(), database.books().observeCategoryRefs()) { books, _ -> books.toBooks() }
 
     fun observeBooksInCategory(categoryId: CategoryId): Flow<List<Book>> =
         database.books().observeByCategory(categoryId.value).map { it.toBooks() }

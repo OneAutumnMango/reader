@@ -37,6 +37,10 @@ interface BookDao {
     @Delete
     suspend fun delete(book: BookEntity)
 
+    /** Only here so book lists re-emit when category links change (the books table doesn't). */
+    @Query("SELECT * FROM book_categories")
+    fun observeCategoryRefs(): Flow<List<BookCategoryCrossRef>>
+
     @Query("SELECT categoryId FROM book_categories WHERE bookId = :bookId")
     suspend fun categoryIdsFor(bookId: String): List<String>
 
