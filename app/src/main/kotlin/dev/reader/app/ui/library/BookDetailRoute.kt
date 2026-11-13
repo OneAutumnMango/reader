@@ -61,6 +61,7 @@ fun BookDetailRoute(
     val progress by graph.progress.observe(bookId).collectAsState(initial = null)
     val chapterProgress by graph.progress.observeChapterProgress(bookId).collectAsState(initial = emptyMap())
     val categories by graph.library.observeCategories().collectAsState(initial = emptyList())
+    val preferences by graph.settings.preferences.collectAsState(initial = null)
     val currentChapter = chapters.find { it.id == progress?.chapterId }
     var showMenu by remember { mutableStateOf(false) }
     var showChapterDetect by remember { mutableStateOf(false) }
@@ -119,8 +120,14 @@ fun BookDetailRoute(
             categories = categories,
             allRead = allRead,
             onChangeCategories = { ids ->
-                scope.launch { graph.library.updateCategories(book.id, ids) }
+                scope.launch {
+                    graph.library.updateCategories(
+                        book.id,
+                        if (preferences?.singleCategoryPerBook == true) ids.take(1).toSet() else ids,
+                    )
+                }
             },
+            singleCategoryPerBook = preferences?.singleCategoryPerBook == true,
             onRename = { newTitle ->
                 scope.launch { graph.library.updateBookDetails(book.copy(title = newTitle)) }
             },
