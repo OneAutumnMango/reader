@@ -1,6 +1,7 @@
 package dev.reader.app.data
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import dev.reader.core.model.BookFormat
 import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.RichDocument
@@ -17,16 +18,34 @@ internal object BookImages {
         RichDocument(
             document.blocks.map { block ->
                 if (block is Block.Image) {
-                    block.copy(
-                        path = runCatching { resolvePath(context, source, format, block.path) }
-                            .onFailure { AppLog.warn("Illustration resolution failed for $format", "BookImages", it) }
-                            .getOrDefault(block.path),
-                    )
+                    val path = runCatching { resolvePath(context, source, format, block.path) }
+                        .onFailure { AppLog.warn("Illustration resolution failed for $format", "BookImages", it) }
+                        .getOrDefault(block.path)
+                    val (width, height) = naturalSize(path)
+                    block.copy(path = path, width = width, height = height)
                 } else {
                     block
                 }
             },
         )
+
+    /** Pixel size of a cached image file, or 0x0 when it isn't a readable local file. */
+    private fun naturalSize(path: String): Pair<Int, Int> = runCatching {
+        val file = File(path).takeIf { it.isFile } ?: return 0 to 0
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        if (bounds.outWidth > 0 && bounds.outHeight > 0) return bounds.outWidth to bounds.outHeight
+        // Not a raster: try an SVG's width/height attributes.
+        val head = file.inputStream().use { it.readNBytes(SVG_HEAD_BYTES) }.decodeToString()
+        val tag = SVG_TAG.find(head)?.value ?: return 0 to 0
+        val w = SVG_SIZE("width").find(tag)?.groupValues?.get(1)?.toFloatOrNull() ?: return 0 to 0
+        val h = SVG_SIZE("height").find(tag)?.groupValues?.get(1)?.toFloatOrNull() ?: return 0 to 0
+        if (w > 0 && h > 0) w.toInt() to h.toInt() else 0 to 0
+    }.getOrDefault(0 to 0)
+
+    private const val SVG_HEAD_BYTES = 2048
+    private val SVG_TAG = Regex("<svg\\b[^>]*>")
+    private fun SVG_SIZE(name: String) = Regex("\\b$name\\s*=\\s*\"([0-9.]+)(?:px)?\"")
 
     private fun resolvePath(context: Context, source: File, format: BookFormat, path: String): String {
         if (path.isBlank()) return path

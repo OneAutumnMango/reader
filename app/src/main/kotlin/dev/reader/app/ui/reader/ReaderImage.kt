@@ -33,3 +33,13 @@ internal fun ReaderImage(image: Block.Image, modifier: Modifier = Modifier) {
         if (failed) Text(image.alt.ifBlank { "Image unavailable" })
     }
 }
+
+/**
+ * Height in px an image takes when drawn at its natural size, shrunk to fit [maxWidthPx] x
+ * [maxHeightPx]. Images with unknown size keep the old fixed slot of [fallbackHeightPx].
+ */
+internal fun Block.Image.fittedHeightPx(maxWidthPx: Float, maxHeightPx: Float, fallbackHeightPx: Float): Float {
+    if (width <= 0 || height <= 0) return fallbackHeightPx
+    val scale = minOf(1f, maxWidthPx / width, maxHeightPx / height)
+    return height * scale
+}

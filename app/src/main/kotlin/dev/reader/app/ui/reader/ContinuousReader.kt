@@ -1,10 +1,14 @@
 package dev.reader.app.ui.reader
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -158,9 +162,18 @@ private fun ReaderBlock(
             onBookmarkTap = onBookmarkTap,
             onLayout = onLayout,
         )
-        is Block.Image -> ReaderImage(
-            block,
-            Modifier.fillMaxWidth().height(READER_IMAGE_HEIGHT).padding(horizontal = 16.dp),
-        )
+        is Block.Image -> if (block.width > 0 && block.height > 0) {
+            // Natural size, centred, shrunk to the column width; never upscaled.
+            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                ReaderImage(
+                    block,
+                    Modifier.widthIn(max = with(LocalDensity.current) { block.width.toDp() })
+                        .fillMaxWidth()
+                        .aspectRatio(block.width.toFloat() / block.height),
+                )
+            }
+        } else {
+            ReaderImage(block, Modifier.fillMaxWidth().height(READER_IMAGE_HEIGHT).padding(horizontal = 16.dp))
+        }
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
@@ -68,7 +69,14 @@ fun PagedReader(
                 items = document.blocks.withIndex().toList(),
                 pageHeight = pageHeightPx,
                 spacing = spacingPx,
-                measure = { if (it.value is Block.Image) pageHeightPx else layout(it.value).size.height.toFloat() },
+                measure = {
+                    val block = it.value
+                    if (block is Block.Image) {
+                        block.fittedHeightPx(textWidthPx.toFloat(), pageHeightPx, pageHeightPx)
+                    } else {
+                        layout(block).size.height.toFloat()
+                    }
+                },
                 split = { item, available ->
                     splitBlock(item.value, available, ::layout)
                         ?.let { (head, tail) -> IndexedValue(item.index, head) to IndexedValue(item.index, tail) }
@@ -99,7 +107,7 @@ fun PagedReader(
             ) {
                 val content: @Composable () -> Unit = {
                     Column(verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp)) {
-                        pages.getOrNull(index)?.forEach { PagedReaderBlock(it.value, theme, useBookStyling, highlight, onBookmarkTap) }
+                        pages.getOrNull(index)?.forEach { PagedReaderBlock(it.value, theme, useBookStyling, highlight, onBookmarkTap, textWidthPx.toFloat(), pageHeightPx) }
                     }
                 }
                 if (settings.selectableText) SelectionContainer { content() } else content()
@@ -183,9 +191,11 @@ private fun Block.styleOf(theme: ReaderTheme, useBookStyling: Boolean) = when (t
 }
 
 @Composable
-private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean, highlight: Regex?, onBookmarkTap: ((String) -> Unit)?) {
+private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean, highlight: Regex?, onBookmarkTap: ((String) -> Unit)?, textWidthPx: Float, pageHeightPx: Float) {
     if (block is Block.Image) {
-        ReaderImage(block, Modifier.fillMaxSize())
+        // Known-size images take their natural height (the pager measured the same value); unknown ones fill the page.
+        val heightPx = block.fittedHeightPx(textWidthPx, pageHeightPx, pageHeightPx)
+        ReaderImage(block, Modifier.fillMaxWidth().height(with(LocalDensity.current) { heightPx.toDp() }))
     } else {
         BookmarkAwareText(
             text = block.annotated(theme, useBookStyling).highlighted(highlight),

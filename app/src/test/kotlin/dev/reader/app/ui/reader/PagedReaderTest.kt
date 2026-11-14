@@ -79,4 +79,12 @@ class PagedReaderTest {
         composeRule.onNodeWithText("Paragraph 40").assertExists()
         assertTrue(page > 0)
     }
+
+    @Test
+    fun `small images keep their natural height and unknown sizes keep the fallback`() {
+        assertEquals(40f, Block.Image("a", width = 200, height = 40).fittedHeightPx(300f, 500f, 500f))
+        assertEquals(150f, Block.Image("a", width = 600, height = 300).fittedHeightPx(300f, 500f, 500f))
+        assertEquals(500f, Block.Image("a", width = 100, height = 2000).fittedHeightPx(300f, 500f, 500f))
+        assertEquals(500f, Block.Image("a").fittedHeightPx(300f, 500f, 500f))
+    }
 }
