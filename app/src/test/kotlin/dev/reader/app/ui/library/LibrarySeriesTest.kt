@@ -66,4 +66,13 @@ class LibrarySeriesTest {
         val b = book("b", "S")
         assertEquals(listOf(LibraryItem.Series("S", listOf(a, b))), groupBySeries(listOf(a, b)))
     }
+
+    @Test
+    fun `grouping runs on the category page's books, after filtering`() {
+        val cat = dev.reader.core.model.Category(dev.reader.core.model.CategoryId("c"), "C", 0)
+        val s1 = book("s1", "S").copy(categoryIds = setOf(cat.id))
+        val s2 = book("s2", "S")
+        val page = groupBooksByCategory(listOf(s1, s2), listOf(cat)).getValue(cat.id)
+        assertEquals(listOf(LibraryItem.Single(s1)), groupBySeries(page))
+    }
 }

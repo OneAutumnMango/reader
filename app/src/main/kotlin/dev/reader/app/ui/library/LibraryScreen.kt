@@ -43,6 +43,8 @@ fun LibraryScreen(
     showAllCategory: Boolean = true,
     gridStateFor: (CategoryId?) -> LazyGridState? = { null },
     selectedBookIds: Set<BookId> = emptySet(),
+    groupBySeries: Boolean = false,
+    onSeriesClick: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // "All" can only be hidden when there's another category to show instead.
@@ -72,6 +74,7 @@ fun LibraryScreen(
         ) { page ->
             val category = pages.getOrNull(page)
             val pageBooks = if (category == null) books else booksByCategory[category].orEmpty()
+            val groupedItems = remember(pageBooks, groupBySeries) { if (groupBySeries) groupBySeries(pageBooks) else emptyList() }
             LazyVerticalGrid(
                 state = gridStateFor(category) ?: rememberLazyGridState(),
                 columns = GridCells.Fixed(layout.columns),
@@ -80,7 +83,7 @@ fun LibraryScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize().testTag("library-grid"),
             ) {
-                items(pageBooks, key = { it.id.value }) { book ->
+                val bookCard: @Composable (Book) -> Unit = { book ->
                     BookCard(
                         book = book,
                         progress = progressFor(book.id),
@@ -91,6 +94,16 @@ fun LibraryScreen(
                         showAuthor = layout == LibraryLayout.LARGE,
                         unreadChapters = unreadChaptersFor(book.id),
                     )
+                }
+                if (groupBySeries) {
+                    items(groupedItems, key = { if (it is LibraryItem.Series) "series:${it.name}" else (it as LibraryItem.Single).book.id.value }) { item ->
+                        when (item) {
+                            is LibraryItem.Single -> bookCard(item.book)
+                            is LibraryItem.Series -> SeriesCard(item.name, item.books, onClick = { onSeriesClick(item.name) })
+                        }
+                    }
+                } else {
+                    items(pageBooks, key = { it.id.value }) { book -> bookCard(book) }
                 }
             }
         }

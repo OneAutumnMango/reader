@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -13,6 +15,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -40,6 +43,7 @@ import dev.reader.core.model.BookId
 import dev.reader.core.model.Category
 import dev.reader.core.model.CategoryId
 import dev.reader.core.theme.LibraryLayout
+import dev.reader.core.util.NaturalSortComparator
 import dev.reader.data.store.LibrarySort
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -71,6 +75,8 @@ fun LibraryRoute(
     var selectedBooks by remember { mutableStateOf<Set<BookId>>(emptySet()) }
     val selecting = selectedBooks.isNotEmpty()
     BackHandler(enabled = selecting) { selectedBooks = emptySet() }
+    var openSeries by remember { mutableStateOf<String?>(null) }
+    BackHandler(enabled = openSeries != null) { openSeries = null }
     var chapterDetectBook by remember { mutableStateOf<Book?>(null) }
     var coverTargetBook by remember { mutableStateOf<Book?>(null) }
     var coverSearchBook by remember { mutableStateOf<Book?>(null) }
@@ -98,6 +104,8 @@ fun LibraryRoute(
     val sortedBooks = remember(books, sort, descending, progressByBook, fractionByBook) {
         sortBooks(books, sort, descending, { progressByBook[it]?.updatedAt }, { fractionByBook[it] })
     }
+    val grouping = preferences?.groupBySeries == true
+    LaunchedEffect(grouping) { if (!grouping) openSeries = null }
     ScreenTopBar(title = null) {
         LibrarySortMenu(sort, descending) { newSort, newDescending ->
             scope.launch {
@@ -127,8 +135,20 @@ fun LibraryRoute(
                 }
             },
         ) {
+            Column {
+            openSeries?.let { name ->
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text(name, style = MaterialTheme.typography.titleMedium)
+                    Text(SERIES_EXPLANATION, style = MaterialTheme.typography.bodySmall)
+                }
+            }
             LibraryScreen(
-                books = sortedBooks,
+                modifier = Modifier.weight(1f),
+                groupBySeries = grouping && openSeries == null,
+                onSeriesClick = { openSeries = it },
+                books = openSeries?.let { name ->
+                    sortedBooks.filter { it.series == name }.sortedWith(compareBy(NaturalSortComparator) { it.title })
+                } ?: sortedBooks,
                 categories = categories,
                 selectedCategory = selectedCategory,
                 progressFor = { id ->
@@ -168,6 +188,7 @@ fun LibraryRoute(
                 showAllCategory = showAllCategory,
                 gridStateFor = gridStateFor,
             )
+            }
         }
 
         longPressedBook?.let { book ->
