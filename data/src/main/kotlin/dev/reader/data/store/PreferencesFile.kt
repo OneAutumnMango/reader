@@ -56,6 +56,8 @@ data class PreferencesFile(
     val showAllCategory: Boolean = true,
     val librarySort: LibrarySort = LibrarySort.ADDED,
     val librarySortDescending: Boolean = true,
+    /** Fold books from the same folder into one series entry in the library. */
+    val groupBySeries: Boolean = false,
     val statsGraphs: List<StatsGraph> = emptyList(),
     val customAppThemes: List<SavedCustomTheme> = emptyList(),
     val singleCategoryPerBook: Boolean = false,

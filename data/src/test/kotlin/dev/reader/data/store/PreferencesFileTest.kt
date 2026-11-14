@@ -52,6 +52,13 @@ class PreferencesFileTest {
     }
 
     @Test
+    fun `old preferences without groupBySeries decode with it off`() {
+        val decoded = STORE_JSON.decodeFromString(PreferencesFile.serializer(), """{"version":1}""")
+
+        assertEquals(false, decoded.groupBySeries)
+    }
+
+    @Test
     fun `customAppThemes is empty by default`() {
         assertEquals(emptyList(), PreferencesFile().customAppThemes)
     }

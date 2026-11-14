@@ -104,6 +104,16 @@ fun LibraryRoute(
                 graph.settings.update { it.copy(librarySort = newSort, librarySortDescending = newDescending) }
             }
         }
+        LibrarySeriesMenu(
+            groupBySeries = preferences?.groupBySeries == true,
+            onToggle = { on -> scope.launch { graph.settings.update { it.copy(groupBySeries = on) } } },
+            onDetect = {
+                scope.launch {
+                    graph.rootFolderScanner.tagSeries()
+                    snackbarHostState.showSnackbar("Series updated")
+                }
+            },
+        )
     }
 
     Box(modifier = modifier.fillMaxSize()) {
