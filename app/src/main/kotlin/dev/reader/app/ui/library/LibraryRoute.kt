@@ -106,6 +106,10 @@ fun LibraryRoute(
     }
     val grouping = preferences?.groupBySeries == true
     LaunchedEffect(grouping) { if (!grouping) openSeries = null }
+    // Drop a stale opened series (fewer than 2 books left after a re-detect or delete).
+    LaunchedEffect(openSeries, sortedBooks) {
+        if (openSeries != null && sortedBooks.count { it.series == openSeries } < 2) openSeries = null
+    }
     ScreenTopBar(title = null) {
         LibrarySortMenu(sort, descending) { newSort, newDescending ->
             scope.launch {
@@ -136,58 +140,58 @@ fun LibraryRoute(
             },
         ) {
             Column {
-            openSeries?.let { name ->
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text(name, style = MaterialTheme.typography.titleMedium)
-                    Text(SERIES_EXPLANATION, style = MaterialTheme.typography.bodySmall)
+                openSeries?.let { name ->
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Text(name, style = MaterialTheme.typography.titleMedium)
+                        Text(SERIES_EXPLANATION, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
-            }
-            LibraryScreen(
-                modifier = Modifier.weight(1f),
-                groupBySeries = grouping && openSeries == null,
-                onSeriesClick = { openSeries = it },
-                books = openSeries?.let { name ->
-                    sortedBooks.filter { it.series == name }.sortedWith(compareBy(NaturalSortComparator) { it.title })
-                } ?: sortedBooks,
-                categories = categories,
-                selectedCategory = selectedCategory,
-                progressFor = { id ->
-                    fractionByBook[id]?.takeIf { it > 0f && it < 1f && progressByBook[id]?.finished != true }
-                },
-                finishedFor = { id -> progressByBook[id]?.finished == true || (fractionByBook[id] ?: 0f) >= 1f },
-                unreadChaptersFor = { id -> unreadByBook[id] ?: 0 },
-                onCategorySelected = onCategorySelected,
-                onBookClick = { book ->
-                    if (selecting) {
-                        selectedBooks = if (book.id in selectedBooks) {
-                            selectedBooks - book.id
+                LibraryScreen(
+                    modifier = Modifier.weight(1f),
+                    groupBySeries = grouping && openSeries == null,
+                    onSeriesClick = { openSeries = it },
+                    books = openSeries?.let { name ->
+                        sortedBooks.filter { it.series == name }.sortedWith(compareBy(NaturalSortComparator) { it.title })
+                    } ?: sortedBooks,
+                    categories = categories,
+                    selectedCategory = selectedCategory,
+                    progressFor = { id ->
+                        fractionByBook[id]?.takeIf { it > 0f && it < 1f && progressByBook[id]?.finished != true }
+                    },
+                    finishedFor = { id -> progressByBook[id]?.finished == true || (fractionByBook[id] ?: 0f) >= 1f },
+                    unreadChaptersFor = { id -> unreadByBook[id] ?: 0 },
+                    onCategorySelected = onCategorySelected,
+                    onBookClick = { book ->
+                        if (selecting) {
+                            selectedBooks = if (book.id in selectedBooks) {
+                                selectedBooks - book.id
+                            } else {
+                                selectedBooks + book.id
+                            }
                         } else {
-                            selectedBooks + book.id
+                            onOpenBook(book)
                         }
-                    } else {
-                        onOpenBook(book)
-                    }
-                },
-                onBookLongClick = { book ->
-                    selectedBooks = selectedBooks + book.id
-                },
-                selectedBookIds = selectedBooks,
-                onSearchClick = onSearchClick,
-                onAddCategory = { name ->
-                    scope.launch {
-                        graph.library.upsertCategory(
-                            Category(
-                                id = CategoryId(UUID.randomUUID().toString()),
-                                name = name.trim(),
-                                orderIndex = (categories.maxOfOrNull { it.orderIndex } ?: -1) + 1,
-                            ),
-                        )
-                    }
-                },
-                layout = preferences?.libraryLayout ?: LibraryLayout.MEDIUM,
-                showAllCategory = showAllCategory,
-                gridStateFor = gridStateFor,
-            )
+                    },
+                    onBookLongClick = { book ->
+                        selectedBooks = selectedBooks + book.id
+                    },
+                    selectedBookIds = selectedBooks,
+                    onSearchClick = onSearchClick,
+                    onAddCategory = { name ->
+                        scope.launch {
+                            graph.library.upsertCategory(
+                                Category(
+                                    id = CategoryId(UUID.randomUUID().toString()),
+                                    name = name.trim(),
+                                    orderIndex = (categories.maxOfOrNull { it.orderIndex } ?: -1) + 1,
+                                ),
+                            )
+                        }
+                    },
+                    layout = preferences?.libraryLayout ?: LibraryLayout.MEDIUM,
+                    showAllCategory = showAllCategory,
+                    gridStateFor = gridStateFor,
+                )
             }
         }
 
