@@ -19,6 +19,7 @@ data class BookEntity(
     val chapterPattern: String? = null,
     val chapterExcludedLines: String? = null,
     val originUri: String? = null,
+    val series: String? = null,
 )
 
 @Entity(tableName = "chapters")

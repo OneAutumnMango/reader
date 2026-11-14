@@ -22,6 +22,9 @@ interface BookDao {
     )
     fun observeByCategory(categoryId: String): Flow<List<BookEntity>>
 
+    @Query("UPDATE books SET series = :series WHERE id = :id")
+    suspend fun setSeries(id: String, series: String?)
+
     @Query("SELECT * FROM books WHERE id = :id")
     suspend fun getById(id: String): BookEntity?
 

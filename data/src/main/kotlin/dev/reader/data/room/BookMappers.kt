@@ -28,6 +28,7 @@ fun BookEntity.toBook(categoryIds: List<String>) = Book(
     chapterPattern = chapterPattern,
     chapterExcludedLines = chapterExcludedLines.orEmpty().split(',').mapNotNull { it.toIntOrNull() }.toSet(),
     originUri = originUri,
+    series = series,
 )
 
 fun Book.toEntity() = BookEntity(
@@ -44,6 +45,7 @@ fun Book.toEntity() = BookEntity(
     chapterPattern = chapterPattern,
     chapterExcludedLines = chapterExcludedLines.takeIf { it.isNotEmpty() }?.joinToString(","),
     originUri = originUri,
+    series = series,
 )
 
 fun ChapterEntity.toChapter() = Chapter(

@@ -141,6 +141,23 @@ class LibraryRepositoryTest {
     }
 
     @Test
+    fun `setSeries sets and clears a book's series`() = runBlocking {
+        val book = Book(
+            id = BookId("book-1"),
+            title = "T",
+            format = BookFormat.TXT,
+            sourcePath = "/books/t.txt",
+            addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+        repository.upsertBook(book, emptyList())
+
+        repository.setSeries(book.id, "Saga")
+        assertEquals("Saga", repository.findById(book.id)!!.series)
+        repository.setSeries(book.id, null)
+        assertEquals(null, repository.findById(book.id)!!.series)
+    }
+
+    @Test
     fun `updateCategories replaces a book's category links`() = runBlocking {
         val novels = CategoryId("novels")
         val comics = CategoryId("comics")

@@ -67,6 +67,7 @@ class BookImporter(
             chapterPattern = existing?.chapterPattern,
             chapterExcludedLines = existing?.chapterExcludedLines.orEmpty(),
             originUri = originUri ?: existing?.originUri,
+            series = existing?.series,
         )
         val chapterIds = existingChapterIds(existing)
         val chapters = parsed.chapters.mapIndexed { index, chapter ->
@@ -175,6 +176,7 @@ class BookImporter(
             addedAt = existing?.addedAt ?: now(),
             contentHash = hash,
             originUri = originUri ?: existing?.originUri,
+            series = existing?.series,
         )
         library.upsertBook(book, chapters)
         indexBook(book, texts)

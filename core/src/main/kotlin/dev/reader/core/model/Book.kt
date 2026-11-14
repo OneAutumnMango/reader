@@ -28,6 +28,8 @@ data class Book(
     val chapterExcludedLines: Set<Int> = emptySet(),
     /** Where on the device the book was picked from (a content:// URI), when known. */
     val originUri: String? = null,
+    /** Folder name the book sits in, set by series detection; null = standalone. */
+    val series: String? = null,
 )
 
 @Serializable

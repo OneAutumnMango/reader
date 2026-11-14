@@ -44,6 +44,7 @@ class ReaderGraph(context: Context) {
         ReaderDatabase.MIGRATION_4_5,
         ReaderDatabase.MIGRATION_5_6,
         ReaderDatabase.MIGRATION_6_7,
+        ReaderDatabase.MIGRATION_7_8,
     )
         // No destructive fallback: a missing or broken migration should crash loudly, not
         // silently drop the user's whole library, progress and stats.

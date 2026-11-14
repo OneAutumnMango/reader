@@ -165,6 +165,22 @@ class BookImporterTest {
     }
 
     @Test
+    fun `re-importing an existing book keeps its series`() = runBlocking {
+        val library = LibraryRepository(database)
+        val file = File(tempDir, "My Story.txt").apply { writeText("First paragraph.") }
+        val book = importer.importFile(file)
+        library.setSeries(book.id, "Saga")
+
+        assertEquals("Saga", importer.importFile(file, target = library.findById(book.id)).series)
+
+        val folder = File(tempDir, "Light Novel").apply { mkdirs() }
+        File(folder, "1.txt").writeText("One.")
+        val novel = importer.importLightNovelFolder(folder)
+        library.setSeries(novel.id, "Saga")
+        assertEquals("Saga", importer.importLightNovelFolder(folder).series)
+    }
+
+    @Test
     fun `cleanTitle strips a leading numeric id but keeps ordinary titles`() {
         assertEquals("Mother of Learning", cleanTitle("1791901.....-Mother of Learning"))
         assertEquals("Mother of Learning", cleanTitle("1791901_-_Mother_of_Learning"))

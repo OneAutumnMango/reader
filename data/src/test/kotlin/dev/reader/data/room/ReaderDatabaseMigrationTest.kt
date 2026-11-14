@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 class ReaderDatabaseMigrationTest {
 
     @Test
-    fun `migrations 1 through 7 run in sequence and add every expected column`() {
+    fun `migrations 1 through 8 run in sequence and add every expected column`() {
         val dir = createTempDirectory("migration-test").toFile()
         try {
             val db = openVersion1Database(File(dir, "test.db"))
@@ -33,6 +33,7 @@ class ReaderDatabaseMigrationTest {
                 ReaderDatabase.MIGRATION_4_5,
                 ReaderDatabase.MIGRATION_5_6,
                 ReaderDatabase.MIGRATION_6_7,
+                ReaderDatabase.MIGRATION_7_8,
             ).forEach { it.migrate(db) }
 
             assertTrue(
@@ -44,6 +45,7 @@ class ReaderDatabaseMigrationTest {
                 db.columnsOf("books")
                     .containsAll(listOf("contentHash", "chapterPattern", "chapterExcludedLines", "originUri")),
             )
+            assertTrue(db.columnsOf("books").contains("series"))
             assertTrue(db.columnsOf("chapters").contains("isExtra"))
             db.close()
         } finally {
