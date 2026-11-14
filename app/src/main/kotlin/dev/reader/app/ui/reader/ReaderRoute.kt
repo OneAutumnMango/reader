@@ -191,13 +191,7 @@ fun ReaderRoute(
                         swallowMenuTap = true
                     }
                 },
-                onAutoScrollEnd = {
-                    if (page < chapters.lastIndex) {
-                        scope.launch { pagerState.animateScrollToPage(page + 1) }
-                    } else {
-                        autoScroll = AutoScrollTaps(AutoScrollMode.OFF)
-                    }
-                },
+                onAutoScrollEnd = { autoScroll = AutoScrollTaps(AutoScrollMode.OFF) },
                 onPositionChanged = { index, total -> positions[page] = index to total },
                 highlight = search.highlight ?: startHighlight,
                 jump = listOfNotNull(
