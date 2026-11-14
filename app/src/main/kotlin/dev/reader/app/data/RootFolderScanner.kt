@@ -45,6 +45,7 @@ class RootFolderScanner(
                     .onFailure { AppLog.error("Couldn't scan library folder", "LibraryScan", it) }
             }
             AppLog.info("Library folder scan imported $imported new item(s)", "LibraryScan")
+            runCatching { tagSeries() }.onFailure { AppLog.error("Couldn't tag series", "LibraryScan", it) }
             val missing = library.observeBooks().first().filterNot { File(it.sourcePath).exists() }
             if (missing.isNotEmpty()) {
                 AppLog.warn("${missing.size} book(s) in the library have a missing source file", "LibraryScan")
@@ -110,6 +111,33 @@ class RootFolderScanner(
         return imports.size
     }
 
+    /**
+     * Sets each book's series from the folder it sits in, for FILES-kind roots. If any root can't be
+     * read, books are only tagged, never cleared, so an unmounted drive doesn't wipe series.
+     */
+    internal suspend fun tagSeries(
+        openRoot: (String) -> DocumentFile? = { runCatching { DocumentFile.fromTreeUri(context, Uri.parse(it)) }.getOrNull() },
+    ) {
+        val prefs = settings.preferences.first()
+        val desired = mutableMapOf<String, String>()
+        var allRead = true
+        for (rootUri in prefs.rootFolders) {
+            if (prefs.rootFolderKinds[rootUri] != CollectionKind.FILES) continue
+            val root = openRoot(rootUri)
+            if (root == null || !root.canRead()) { allRead = false; continue }
+            collectSeriesFolders(root).forEach { (uri, name) ->
+                prefs.rootEntryBooks[uri]?.let { desired[it] = name }
+            }
+        }
+        var changed = 0
+        for (book in library.observeBooks().first()) {
+            val wanted = desired[book.sourcePath]
+            if (wanted == null && !allRead) continue
+            if (book.series != wanted) { library.setSeries(book.id, wanted); changed++ }
+        }
+        AppLog.info("Series tagging updated $changed book(s) from ${desired.size} grouped file(s)", "LibraryScan")
+    }
+
     private suspend fun importEntry(entry: DocumentFile): Book? {
         if (entry.isDirectory) {
             return importer.importLightNovelFolder(
@@ -147,5 +175,31 @@ internal suspend fun collectBookFiles(folder: DocumentFile, depth: Int = 0): Lis
                 }
             }
         }.awaitAll().flatten()
+    }
+}
+
+/**
+ * Maps each book file's URI under [root] to the name of its immediate parent folder. Files directly in
+ * [root] and under hidden folders are absent. The parent name is tracked during the walk because
+ * DocumentFile.parentFile is unreliable on SAF tree Uris.
+ */
+internal suspend fun collectSeriesFolders(
+    root: DocumentFile,
+    parentName: String? = null,
+    depth: Int = 0,
+): Map<String, String> {
+    if (depth > MAX_FOLDER_DEPTH) return emptyMap()
+    return coroutineScope {
+        root.listFiles().map { entry ->
+            async(Dispatchers.IO) {
+                val name = entry.name.orEmpty()
+                when {
+                    entry.isDirectory && !name.startsWith(".") -> collectSeriesFolders(entry, name, depth + 1)
+                    entry.isFile && !parentName.isNullOrBlank() && BookFormat.fromFileName(name) != null ->
+                        mapOf(entry.uri.toString() to parentName)
+                    else -> emptyMap()
+                }
+            }
+        }.awaitAll().fold(emptyMap()) { acc, m -> acc + m }
     }
 }

@@ -78,4 +78,74 @@ class RootFolderScannerTest {
             settingsDir.deleteRecursively()
         }
     }
+
+    @Test
+    fun `collectSeriesFolders maps nested files to their immediate parent folder`() = runBlocking {
+        val root = createTempDirectory("library-series").toFile()
+        try {
+            fun touch(path: String) = File(root, path).apply { parentFile?.mkdirs() }.writeText("x")
+            touch("top.epub")
+            touch("Series/Book 1.txt")
+            touch("Series/Volume 2/Book 2.pdf")
+            touch(".thumbnails/x.epub")
+
+            val found = collectSeriesFolders(DocumentFile.fromFile(root))
+                .mapKeys { File(java.net.URI(it.key)).name }
+
+            assertEquals(mapOf("Book 1.txt" to "Series", "Book 2.pdf" to "Volume 2"), found)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `tagSeries sets series from folder, clears it for a book moved to the root, and leaves books alone when a root cannot be read`() =
+        runBlocking {
+            val root = createTempDirectory("library-tag").toFile()
+            val settingsDir = createTempDirectory("library-tag-settings").toFile()
+            val scope = CoroutineScope(Job())
+            val appContext = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val database = Room.inMemoryDatabaseBuilder(appContext, ReaderDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
+            try {
+                File(root, "Saga").mkdirs()
+                File(root, "Saga/A.txt").writeText("Chapter 1\n\nAlpha.")
+                File(root, "Saga/B.txt").writeText("Chapter 1\n\nBeta.")
+                val library = LibraryRepository(database)
+                val settings = SettingsRepository(ReaderStores(FileSystem.SYSTEM, settingsDir.path.toPath(), scope))
+                val scanner = RootFolderScanner(appContext, settings, library, BookImporter(library))
+                val rootKey = root.path
+                val resolve = { key: String -> File(key).takeIf { it.isDirectory }?.let { DocumentFile.fromFile(it) } }
+                scanner.scanEntries(DocumentFile.fromFile(root), CollectionKind.FILES)
+                settings.update {
+                    it.copy(rootFolders = listOf(rootKey), rootFolderKinds = mapOf(rootKey to CollectionKind.FILES))
+                }
+
+                scanner.tagSeries(resolve)
+                assertEquals(listOf("Saga", "Saga"), library.observeBooks().first().map { it.series })
+
+                // A missing root: nothing is cleared, even though the books are no longer found.
+                val missing = "$rootKey-missing"
+                settings.update {
+                    it.copy(
+                        rootFolders = listOf(rootKey, missing),
+                        rootFolderKinds = mapOf(rootKey to CollectionKind.FILES, missing to CollectionKind.FILES),
+                    )
+                }
+                File(root, "Saga").deleteRecursively()
+                scanner.tagSeries(resolve)
+                assertEquals(listOf("Saga", "Saga"), library.observeBooks().first().map { it.series })
+
+                // Readable roots: the file is gone from its folder, so the series is cleared.
+                settings.update { it.copy(rootFolders = listOf(rootKey)) }
+                scanner.tagSeries(resolve)
+                assertEquals(listOf(null, null), library.observeBooks().first().map { it.series })
+            } finally {
+                database.close()
+                scope.cancel()
+                root.deleteRecursively()
+                settingsDir.deleteRecursively()
+            }
+        }
 }
