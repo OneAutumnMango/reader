@@ -2,8 +2,10 @@ package dev.reader.app.ui.library
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,7 +24,7 @@ import dev.reader.core.model.Book
 
 private val CARD_SHAPE = RoundedCornerShape(LIBRARY_CARD_CORNER_RADIUS)
 
-/** A library tile for a series: the first book's cover, a count badge and the series name. */
+/** A library tile for a series: a 2x2 grid of its first four covers (empty slots if fewer), a count badge and the name. */
 @Composable
 fun SeriesCard(name: String, books: List<Book>, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(
@@ -33,7 +35,26 @@ fun SeriesCard(name: String, books: List<Book>, onClick: () -> Unit, modifier: M
             .testTag("series-card-$name"),
     ) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(0.7f)) {
-            BookCover(books.first(), modifier = Modifier.fillMaxSize())
+            Column(
+                modifier = Modifier.fillMaxSize().padding(3.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                books.take(4).let { it + List(4 - it.size) { null } }.chunked(2).forEach { pair ->
+                    Row(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        pair.forEach { book ->
+                            val cell = Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(4.dp))
+                            if (book != null) {
+                                BookCover(book, modifier = cell)
+                            } else {
+                                Box(cell.background(MaterialTheme.colorScheme.surfaceContainerHighest))
+                            }
+                        }
+                    }
+                }
+            }
             Text(
                 "${books.size}",
                 style = MaterialTheme.typography.labelSmall,
