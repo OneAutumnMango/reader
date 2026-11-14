@@ -54,7 +54,6 @@ fun ContinuousReader(
     onSelectionContainerLayout: ((LayoutCoordinates) -> Unit)? = null,
     autoScrollSpeedDp: Float = 0f,
     autoScrolling: Boolean = false,
-    onReachedEnd: () -> Unit = {},
 ) {
     val initialIndex = (initialPositionFraction * document.blocks.size)
         .toInt()
@@ -67,7 +66,6 @@ fun ContinuousReader(
 
     val density = LocalDensity.current
     val currentSpeedDp by rememberUpdatedState(autoScrollSpeedDp)
-    val currentOnReachedEnd by rememberUpdatedState(onReachedEnd)
     LaunchedEffect(autoScrolling) {
         if (!autoScrolling) return@LaunchedEffect
         var last = withFrameNanos { it }
@@ -77,11 +75,8 @@ fun ContinuousReader(
             last = now
             // Raw delta, not scrollBy: scrollBy takes the scroll mutex, and a user drag holding it
             // at higher priority would cancel (and so silently end) this loop. This just adds to it.
-            val consumed = listState.dispatchRawDelta(with(density) { currentSpeedDp.dp.toPx() } * seconds)
-            if (consumed == 0f && !listState.canScrollForward) {
-                currentOnReachedEnd()
-                return@LaunchedEffect
-            }
+            // At the chapter's end this consumes nothing and idles; the next chapter is the user's to open.
+            listState.dispatchRawDelta(with(density) { currentSpeedDp.dp.toPx() } * seconds)
         }
     }
 

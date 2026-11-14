@@ -133,9 +133,8 @@ class ContinuousReaderTest {
     private val longDoc = RichDocument((1..30).map { Block.Paragraph(listOf(Span("Paragraph $it"))) })
 
     @Test
-    fun `auto-scrolling moves the list on and reports the end once`() {
+    fun `auto-scrolling moves the list on and stays put at the end`() {
         var firstVisible = 0
-        var ended = 0
         composeRule.mainClock.autoAdvance = false // the loop requests a frame forever
         composeRule.setContent {
             ContinuousReader(
@@ -146,13 +145,14 @@ class ContinuousReaderTest {
                 onPositionChanged = { index, _ -> firstVisible = index },
                 autoScrollSpeedDp = 5000f,
                 autoScrolling = true,
-                onReachedEnd = { ended++ },
             )
         }
         composeRule.mainClock.advanceTimeBy(5_000)
 
         assert(firstVisible > 0) { "list never moved" }
-        assertEquals(1, ended)
+        val atEnd = firstVisible
+        composeRule.mainClock.advanceTimeBy(1_000)
+        assertEquals(atEnd, firstVisible)
     }
 
     @Test

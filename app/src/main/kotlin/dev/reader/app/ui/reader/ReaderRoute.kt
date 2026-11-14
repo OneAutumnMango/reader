@@ -191,7 +191,6 @@ fun ReaderRoute(
                         swallowMenuTap = true
                     }
                 },
-                onAutoScrollEnd = { autoScroll = AutoScrollTaps(AutoScrollMode.OFF) },
                 onPositionChanged = { index, total -> positions[page] = index to total },
                 highlight = search.highlight ?: startHighlight,
                 jump = listOfNotNull(
@@ -333,7 +332,6 @@ private fun ChapterPage(
     autoScrollMode: AutoScrollMode,
     onAutoScrollDown: () -> Unit,
     onAutoScrollTap: (Long) -> Unit,
-    onAutoScrollEnd: () -> Unit,
     onPositionChanged: (Int, Int) -> Unit,
     highlight: Regex?,
     jump: BlockJump?,
@@ -519,7 +517,6 @@ private fun ChapterPage(
             autoScrollMode = if (isActive) autoScrollMode else AutoScrollMode.OFF,
             onAutoScrollDown = onAutoScrollDown,
             onAutoScrollTap = onAutoScrollTap,
-            onAutoScrollEnd = onAutoScrollEnd,
         )
         loaded is ChapterContent.Comic && startFraction != null -> ComicReaderScreen(
             file = loaded.file,

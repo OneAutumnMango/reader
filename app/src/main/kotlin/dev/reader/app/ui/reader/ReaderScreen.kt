@@ -51,7 +51,6 @@ fun ReaderScreen(
     autoScrollMode: AutoScrollMode = AutoScrollMode.OFF,
     onAutoScrollDown: () -> Unit = {},
     onAutoScrollTap: (Long) -> Unit = {},
-    onAutoScrollEnd: () -> Unit = {},
 ) {
     KeepScreenAwakeEffect(settings.keepScreenAwake)
     val selectionToolbar = remember { ReaderSelectionToolbar() }
@@ -109,7 +108,6 @@ fun ReaderScreen(
                             onSelectionContainerLayout = { selectionContainerCoordinates = it },
                             autoScrollSpeedDp = settings.autoScrollSpeed,
                             autoScrolling = inAutoScroll && autoScrollMode == AutoScrollMode.RUNNING && !holding,
-                            onReachedEnd = onAutoScrollEnd,
                         )
                         else -> PagedReader(
                             document,
