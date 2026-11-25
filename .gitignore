@@ -26,3 +26,7 @@ scripts/env.sh
 
 # Local planning notes (specs/plans) — not part of repo history
 docs/
+
+# AI assistant artifacts
+context-snapshot.json
+session-log.md
