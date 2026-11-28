@@ -191,6 +191,23 @@ class MergeRulesTest {
     }
 
     @Test
+    fun `unversioned defaults keep local`() {
+        val local = item(null)
+        assertEquals(Decision.Keep(local), decideA(local, from("B", pos(2, 0f), v())))
+    }
+
+    @Test
+    fun `only one choice takes the superseded local value`() {
+        val decision = decideA(
+            item(pos(1, .506f), v("A" to 1L)),
+            from("B", pos(1, .500f), v("A" to 1L, "B" to 1L)),
+            from("C", pos(1, .512f), v("A" to 1L, "C" to 1L)),
+        )
+        val values = assertIs<Decision.Ask>(decision).choices.map { it.item.value }
+        assertEquals(listOf<ItemValue?>(pos(1, .506f), pos(1, .512f)), values)
+    }
+
+    @Test
     fun `leaving a finished chapter for a later one is forward`() {
         assertFalse(isBackward(pos(3, 1f, true), pos(4, 0f)))
     }

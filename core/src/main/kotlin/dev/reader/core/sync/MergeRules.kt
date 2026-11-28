@@ -63,6 +63,8 @@ fun decide(localId: String, local: Versioned, others: List<Candidate>, oneCatego
     val localCandidate = Candidate(localId, local)
     val all = listOf(localCandidate) + others
     val live = all.filter { c -> all.none { isLater(it.item.version, c.item.version) } }
+    // With no changes counted anywhere, every value is some form of untouched, so there is nothing to ask.
+    if (live.all { c -> c.item.version.values.all { it == 0L } }) return Decision.Keep(local)
 
     // The local candidate is first, so when it survives its group is first and keeps the local value.
     val buckets = mutableListOf<MutableList<Candidate>>()
@@ -70,11 +72,12 @@ fun decide(localId: String, local: Versioned, others: List<Candidate>, oneCatego
         val bucket = buckets.find { sameValue(it.first().item.value, candidate.item.value) }
         if (bucket != null) bucket.add(candidate) else buckets.add(mutableListOf(candidate))
     }
-    val groups = buckets.map { members ->
-        val matchesLocal = sameValue(local.value, members.first().item.value)
-        Group(members, if (matchesLocal) local.value else members.first().item.value)
+    // Within the tolerance several buckets can match local; only the first takes the local value.
+    val localIndex = buckets.indexOfFirst { sameValue(local.value, it.first().item.value) }
+    val groups = buckets.mapIndexed { index, members ->
+        Group(members, if (index == localIndex) local.value else members.first().item.value)
     }
-    val localGroup = groups.find { sameValue(local.value, it.item.value) }
+    val localGroup = groups.getOrNull(localIndex)
 
     fun ask(reason: AskReason): Decision.Ask {
         // The local value is always offered, even when a later version has superseded it.
