@@ -334,7 +334,7 @@ class SyncEngine(
 
     /**
      * Writes what [merge] applies, saves the outcome and returns the changes and items that took effect.
-     * [undoFallback] stays the undo data if there are no changes.
+     * If there are no changes, the undo data is [undoFallback] without the items that took effect.
      */
     private suspend fun write(
         state: SyncState,
@@ -349,7 +349,8 @@ class SyncEngine(
             intent.copy(
                 records = (merge.records + done).toRecords(),
                 pending = state.pending,
-                lastChanges = changes.ifEmpty { undoFallback },
+                // An item just picked must not be undone to what it was before an earlier change.
+                lastChanges = changes.ifEmpty { undoFallback.filter { it.key !in done } },
                 lastSyncAt = syncedAt,
                 questionCount = merge.questions.count { it.key !in done },
             ),

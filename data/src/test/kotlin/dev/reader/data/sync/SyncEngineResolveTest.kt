@@ -359,6 +359,27 @@ class SyncEngineResolveTest {
     }
 
     @Test
+    fun `undo leaves a value kept after the sync that changed it`() = runBlocking {
+        val a = Device("aaaaaa")
+        val b = Device("bbbbbb")
+        a.read(1, 0.5f, 10)
+        a.setCategories("New")
+        a.engine.publish(folder)
+        val synced = b.engine.sync(folder).applied
+        a.read(0, 0.2f, 20)
+        a.engine.publish(folder)
+        val question = b.engine.check(folder).questions.single()
+        assertEquals(POSITION, question.key)
+
+        b.engine.apply(folder, listOf(Pick(question, question.local.value)))
+        val result = b.engine.undo(folder)
+
+        assertEquals(UndoResult(synced.filter { it.key == CATEGORIES }, emptyList()), result)
+        assertEquals("a-1" to 0.5f, b.progress())
+        assertEquals(emptySet<String>(), b.categories())
+    }
+
+    @Test
     fun `undo restores values as a new version`() = runBlocking {
         val a = Device("aaaaaa")
         val b = Device("bbbbbb")
