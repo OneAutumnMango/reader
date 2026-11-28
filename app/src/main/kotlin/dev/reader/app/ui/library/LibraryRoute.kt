@@ -98,6 +98,8 @@ fun LibraryRoute(
     // Shown once, from this composition's scope: if the library has gone by then, the result is dropped.
     fun showSyncMessage(message: String, action: String? = null) {
         scope.launch {
+            // A newer result replaces whatever is on show instead of queueing behind it.
+            snackbarHostState.currentSnackbarData?.dismiss()
             // With an action the default is to stay until dismissed, which would hold back later messages.
             val result = snackbarHostState.showSnackbar(message, action, duration = SnackbarDuration.Long)
             if (result == SnackbarResult.ActionPerformed) {
@@ -369,7 +371,10 @@ fun LibraryRoute(
                 }
             }
         }
-        // After the add button, so that the button cannot cover the message's action.
-        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+        // Drawn after the add button but kept above it (56dp button, 16dp margin), so neither covers the other.
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = if (selecting) 0.dp else 72.dp),
+        )
     }
 }
