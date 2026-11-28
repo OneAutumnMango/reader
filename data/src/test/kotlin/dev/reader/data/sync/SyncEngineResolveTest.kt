@@ -282,6 +282,83 @@ class SyncEngineResolveTest {
     }
 
     @Test
+    fun `an apply that changes nothing keeps the undo data`() = runBlocking {
+        val a = Device("aaaaaa")
+        val b = Device("bbbbbb")
+        a.read(1, 0.5f, 10)
+        a.setCategories("One")
+        b.setCategories("Two")
+        a.engine.publish(folder)
+        val report = b.engine.sync(folder)
+        val synced = report.applied
+        val question = report.questions.single()
+        assertEquals(listOf(POSITION), synced.map { it.key })
+
+        val stale = b.engine.apply(folder, listOf(Pick(question.copy(local = Versioned(null)), null)))
+
+        assertEquals(1, stale.stale.size)
+        assertEquals(synced, b.store.load().lastChanges)
+        b.engine.apply(folder, emptyList())
+        assertEquals(synced, b.store.load().lastChanges)
+
+        val kept = b.engine.apply(folder, listOf(Pick(question, question.local.value)))
+
+        assertEquals(emptyList(), kept.stale)
+        assertEquals(synced, b.store.load().lastChanges)
+        assertEquals(synced, b.engine.undo(folder).restored)
+    }
+
+    @Test
+    fun `a keep that fails to write keeps the undo data`() = runBlocking {
+        val a = Device("aaaaaa")
+        val b = Device("bbbbbb")
+        a.read(1, 0.5f, 10)
+        a.setCategories("One")
+        b.setCategories("Two")
+        a.engine.publish(folder)
+        val report = b.engine.sync(folder)
+        val question = report.questions.single()
+        // Dropping the table makes the library write throw after the intent is saved.
+        b.database.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER fail BEFORE INSERT ON book_categories BEGIN SELECT RAISE(ABORT, 'boom'); END",
+        )
+
+        assertTrue(runCatching { b.engine.apply(folder, listOf(Pick(question, question.local.value))) }.isFailure)
+
+        assertEquals(report.applied, b.store.load().lastChanges)
+    }
+
+    @Test
+    fun `the last of two picks for one item counts`() = runBlocking {
+        val a = Device("aaaaaa")
+        val b = Device("bbbbbb")
+        val question = backwardsQuestion(a, b)
+
+        val result = a.engine.apply(
+            folder,
+            listOf(Pick(question, question.choices[1].item.value), Pick(question, question.local.value)),
+        )
+
+        assertEquals(emptyList(), result.stale)
+        assertEquals(emptyList(), result.applied)
+        assertEquals(emptyList(), a.store.load().lastChanges.filter { it.after == question.choices[1].item.value })
+        assertEquals("a-1" to 0.8f, a.progress())
+    }
+
+    @Test
+    fun `a position that was not offered is not applied`() = runBlocking {
+        val a = Device("aaaaaa")
+        val b = Device("bbbbbb")
+        val question = backwardsQuestion(a, b)
+        for (value in listOf(PositionValue(1, 0.1f, false, 1), CategoriesValue(listOf("x")))) {
+            val result = a.engine.apply(folder, listOf(Pick(question, value)))
+
+            assertEquals(listOf(question), result.stale)
+            assertEquals("a-1" to 0.8f, a.progress())
+        }
+    }
+
+    @Test
     fun `undo restores values as a new version`() = runBlocking {
         val a = Device("aaaaaa")
         val b = Device("bbbbbb")

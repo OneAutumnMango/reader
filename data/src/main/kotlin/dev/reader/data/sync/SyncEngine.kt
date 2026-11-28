@@ -106,6 +106,9 @@ private class Merge(
     fun chosen(pick: Pick, snapshot: LibrarySnapshot, deviceId: String, oneCategory: Boolean): Versioned? {
         val key = pick.question.key
         val question = questions.find { it.key == key }?.takeIf { unchanged(pick.question, it) } ?: return null
+        // A position cannot be made up or ticked together, so it has to be one that was shown.
+        val offered = pick.question.choices.map { it.item.value } + pick.question.local.value
+        if (key.kind != ItemKind.CATEGORIES && pick.value !in offered) return null
         val value = readable(key, snapshot.books.getValue(key.bookHash), Versioned(pick.value)) ?: return null
         if (oneCategory && ((value.value as? CategoriesValue)?.names?.size ?: 0) > 1) return null
         val all = listOf(question.local) + candidates.getValue(key).map { it.item }
@@ -271,7 +274,8 @@ class SyncEngine(
 
         val resolved = mutableMapOf<ItemKey, Versioned>()
         val changes = mutableListOf<Change>()
-        for (pick in picks) {
+        val latest = picks.associateBy { it.question.key }.values
+        for (pick in latest) {
             val item = merge.chosen(pick, snapshot, state.deviceId, single) ?: continue
             val key = pick.question.key
             val before = pick.question.local.value
@@ -284,11 +288,12 @@ class SyncEngine(
         }
         // Safe changes found while re-reading are not picks, so they wait for the next sync.
         val intended = Merge(merge.records, resolved, changes, merge.questions, merge.skipped, merge.candidates)
-        val (applied, done) = write(state, intended, syncedAt = state.lastSyncAt)
+        // An apply that changes nothing leaves the earlier changes undoable.
+        val (applied, done) = write(state, intended, syncedAt = state.lastSyncAt, undoFallback = state.lastChanges)
 
         ApplyResult(
             applied = applied,
-            stale = picks.map { it.question }.filter { it.key !in done },
+            stale = latest.map { it.question }.filter { it.key !in done },
             publishError = publishAfterWriting(folder, pulled.files),
         )
     }
@@ -327,16 +332,24 @@ class SyncEngine(
         e.message ?: "Could not publish"
     }
 
-    /** Writes what [merge] applies, saves the outcome and returns the changes and items that took effect. */
-    private suspend fun write(state: SyncState, merge: Merge, syncedAt: Long?): Pair<List<Change>, Set<ItemKey>> {
+    /**
+     * Writes what [merge] applies, saves the outcome and returns the changes and items that took effect.
+     * [undoFallback] stays the undo data if there are no changes.
+     */
+    private suspend fun write(
+        state: SyncState,
+        merge: Merge,
+        syncedAt: Long?,
+        undoFallback: List<Change> = emptyList(),
+    ): Pair<List<Change>, Set<ItemKey>> {
         // One transaction, so the user cannot change an item between the check that it is unchanged and the write.
-        val (intent, done) = library.transaction { writeUnchanged(state, merge) }
-        val changes = intent.lastChanges.filter { it.key in done }
+        val (intent, done) = library.transaction { writeUnchanged(state, merge, undoFallback) }
+        val changes = merge.changes.filter { it.key in done }
         store.save(
             intent.copy(
                 records = (merge.records + done).toRecords(),
                 pending = state.pending,
-                lastChanges = changes,
+                lastChanges = changes.ifEmpty { undoFallback },
                 lastSyncAt = syncedAt,
                 questionCount = merge.questions.count { it.key !in done },
             ),
@@ -345,7 +358,11 @@ class SyncEngine(
     }
 
     /** Returns the state saved before writing and the records of the writes that took effect. */
-    private suspend fun writeUnchanged(state: SyncState, merge: Merge): Pair<SyncState, Map<ItemKey, Versioned>> {
+    private suspend fun writeUnchanged(
+        state: SyncState,
+        merge: Merge,
+        undoFallback: List<Change> = emptyList(),
+    ): Pair<SyncState, Map<ItemKey, Versioned>> {
         // The user may have moved on since the merge was decided; those items wait for the next sync.
         val fresh = library.snapshot()
         val current = fresh.items()
@@ -355,7 +372,7 @@ class SyncEngine(
         // Intended records are saved first so that dying mid-apply cannot turn them into local changes.
         val intent = state.copy(
             pending = state.pending + due.toRecords(),
-            lastChanges = merge.changes.filter { it.key in due },
+            lastChanges = merge.changes.filter { it.key in due }.ifEmpty { undoFallback },
         )
         store.save(intent)
         if (due.isEmpty()) return intent to due
