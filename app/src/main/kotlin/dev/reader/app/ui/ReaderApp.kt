@@ -63,6 +63,7 @@ import dev.reader.app.ui.settings.LibrarySettingsRoute
 import dev.reader.app.ui.settings.LogHistoryRoute
 import dev.reader.app.ui.settings.SettingsRoute
 import dev.reader.app.ui.stats.StatsRoute
+import dev.reader.app.ui.sync.MergeRoute
 import dev.reader.app.ui.sync.OnlineSyncRoute
 import dev.reader.core.model.BookId
 import dev.reader.core.model.CategoryId
@@ -284,7 +285,7 @@ fun ReaderApp(graph: ReaderGraph) {
                         onMerge = { navigator.push(Destination.Merge) },
                         modifier = content,
                     )
-                    Destination.Merge -> Unit // the Merge screen is not built yet
+                    Destination.Merge -> MergeRoute(graph, content)
                     is Destination.BookDetail -> BookDetailRoute(
                         graph,
                         destination.bookId,

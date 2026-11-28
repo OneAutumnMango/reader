@@ -214,7 +214,7 @@ private fun LazyListScope.lastSync(state: SyncUiState, onUndo: () -> Unit) {
 
 /** Titles, device names and file names come from other devices, so their length is bounded. */
 @Composable
-private fun Bounded(text: String, lines: Int = 2, error: Boolean = false) {
+internal fun Bounded(text: String, lines: Int = 2, error: Boolean = false) {
     Text(
         text,
         maxLines = lines,
@@ -224,7 +224,7 @@ private fun Bounded(text: String, lines: Int = 2, error: Boolean = false) {
 }
 
 @Composable
-private fun Detail(text: String) {
+internal fun Detail(text: String) {
     Text(text, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
 }
 

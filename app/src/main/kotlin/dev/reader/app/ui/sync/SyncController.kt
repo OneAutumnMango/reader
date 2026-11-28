@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 
 private const val UNNAMED_FOLDER = "Sync folder"
-private const val DISCARDED = "Sync was reset while this was running. Sync again."
+internal const val DISCARDED = "Sync was reset while this was running. Sync again."
 
 data class SyncUiState(
     val folderName: String? = null,
