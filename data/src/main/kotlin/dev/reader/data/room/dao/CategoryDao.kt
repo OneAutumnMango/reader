@@ -13,6 +13,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY orderIndex")
     fun observeAll(): Flow<List<CategoryEntity>>
 
+    @Query("SELECT * FROM categories ORDER BY orderIndex")
+    suspend fun all(): List<CategoryEntity>
+
     @Upsert
     suspend fun upsert(category: CategoryEntity)
 

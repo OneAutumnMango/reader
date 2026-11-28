@@ -15,6 +15,9 @@ interface ProgressDao {
     @Query("SELECT * FROM progress")
     fun observeAll(): Flow<List<ProgressEntity>>
 
+    @Query("DELETE FROM progress WHERE bookId = :bookId")
+    suspend fun delete(bookId: String)
+
     @Upsert
     suspend fun upsert(progress: ProgressEntity)
 
