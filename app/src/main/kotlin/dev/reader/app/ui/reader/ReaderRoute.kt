@@ -60,6 +60,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 private val MIN_SESSION = 5.seconds
 
@@ -307,15 +308,14 @@ fun ReaderRoute(
         if (currentChapter.isExtra) return@LaunchedEffect
         // Keep the book-level "last opened" pointer up to date as chapters are swiped through.
         val existing = graph.progress.observe(bookId).first()
-        graph.progress.update(
-            Progress(
-                bookId = bookId,
-                chapterId = currentChapter.id,
-                position = existing?.takeIf { it.chapterId == currentChapter.id }?.position ?: 0f,
-                updatedAt = Clock.System.now(),
-            ),
-        )
+        graph.progress.update(openedProgress(existing, bookId, currentChapter.id, Clock.System.now()))
     }
+}
+
+/** The book-level "last opened" row; reopening the same chapter must not lose its place or finished state. */
+internal fun openedProgress(existing: Progress?, bookId: BookId, chapterId: ChapterId, now: Instant): Progress {
+    val same = existing?.takeIf { it.chapterId == chapterId }
+    return Progress(bookId, chapterId, same?.position ?: 0f, updatedAt = now, finished = same?.finished ?: false)
 }
 
 /** What one view of a chapter has reported so far. */
