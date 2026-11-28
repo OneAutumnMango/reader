@@ -185,4 +185,28 @@ class SyncFileTest {
         assertFalse(isSyncFileName(".syncthing.reader-sync-tab-a3f9c2.json.tmp"))
         assertFalse(isSyncFileName("reader-sync-tab-a3f9c2.json.tmp"))
     }
+
+    private fun decodedNames(vararg names: String): CategoriesValue {
+        val categories = Versioned(CategoriesValue(names.toList()), mapOf("d" to 3L))
+        val bytes = SyncFileCodec.encode(file.copy(books = listOf(book.copy(categories = categories))))
+        val decoded = SyncFileCodec.decode(bytes).books.single().categories!!
+        assertEquals(categories.version, decoded.version)
+        return decoded.value as CategoriesValue
+    }
+
+    @Test
+    fun `decode drops invisible and repeated category names`() {
+        assertEquals(CategoriesValue(listOf("A")), decodedNames("", "A", " a "))
+        assertEquals(CategoriesValue(emptyList()), decodedNames("", "  ", "\u0000", "\u200B"))
+    }
+
+    @Test
+    fun `decode strips control characters and caps category names`() {
+        val long = "x".repeat(99)
+
+        assertEquals(CategoriesValue(listOf("AB", "${long}y")), decodedNames(" A\u0000\nB ", "${long}yz"))
+        // Neither a trailing space nor half a surrogate pair survives the cut.
+        assertEquals(CategoriesValue(listOf(long)), decodedNames("$long z"))
+        assertEquals(CategoriesValue(listOf(long)), decodedNames("$long\uD83D\uDE00"))
+    }
 }

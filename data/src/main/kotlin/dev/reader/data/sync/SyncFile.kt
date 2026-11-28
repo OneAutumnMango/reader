@@ -17,6 +17,7 @@ private const val FILE_SUFFIX = ".json"
 private const val MAX_DEVICE_NAME = 40
 private const val SHORT_ID_LENGTH = 6
 private const val MAX_ERROR_LENGTH = 200
+private const val MAX_CATEGORY_NAME = 100
 
 @Serializable
 data class SyncChapter(val index: Int, val item: Versioned)
@@ -72,7 +73,14 @@ object SyncFileCodec {
         return file.copy(
             deviceName = sanitizeDeviceName(file.deviceName),
             devices = file.devices.mapValues { sanitizeDeviceName(it.value) },
+            books = file.books.map(::normalizeCategories),
         )
+    }
+
+    private fun normalizeCategories(book: SyncBook): SyncBook {
+        val categories = book.categories ?: return book
+        val value = categories.value as? CategoriesValue ?: return book
+        return book.copy(categories = categories.copy(value = CategoriesValue(normalizeCategoryNames(value.names))))
     }
 
     private fun validate(file: SyncFile) {
@@ -106,6 +114,21 @@ object SyncFileCodec {
         require(item.version.values.all { it in 0..MAX_VERSION_COUNT }) { "Change count out of range" }
     }
 }
+
+/** A category name without control characters or outer spaces, at most [MAX_CATEGORY_NAME] characters. */
+internal fun cleanCategoryName(raw: String): String {
+    var name = raw.filterNot { it.isISOControl() }.trim().take(MAX_CATEGORY_NAME)
+    if (name.lastOrNull()?.isHighSurrogate() == true) name = name.dropLast(1)
+    return name.trim()
+}
+
+/** False for names that would show as empty: only spaces, control or invisible format characters. */
+internal fun isVisibleName(name: String) =
+    name.any { !it.isWhitespace() && !it.isISOControl() && it.category != CharCategory.FORMAT }
+
+/** The visible [names], cleaned, with only the first of those differing by case. */
+internal fun normalizeCategoryNames(names: List<String>): List<String> =
+    names.map(::cleanCategoryName).filter(::isVisibleName).distinctBy { it.lowercase() }
 
 /** A device name that is safe to display: no control characters, at most 40 characters, never blank. */
 fun sanitizeDeviceName(raw: String): String {

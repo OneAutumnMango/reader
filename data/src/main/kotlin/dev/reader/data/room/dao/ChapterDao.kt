@@ -15,6 +15,9 @@ interface ChapterDao {
     @Query("SELECT * FROM chapters ORDER BY bookId, orderIndex, id")
     fun observeAll(): Flow<List<ChapterEntity>>
 
+    @Query("SELECT * FROM chapters ORDER BY bookId, orderIndex, id")
+    suspend fun all(): List<ChapterEntity>
+
     @Query("SELECT * FROM chapters WHERE bookId = :bookId ORDER BY orderIndex")
     suspend fun getByBook(bookId: String): List<ChapterEntity>
 

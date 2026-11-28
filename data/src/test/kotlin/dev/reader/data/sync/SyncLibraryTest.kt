@@ -1,6 +1,7 @@
 package dev.reader.data.sync
 
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookFormat
@@ -19,6 +20,7 @@ import dev.reader.data.room.entity.ChapterProgressEntity
 import dev.reader.data.room.entity.ProgressEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -269,5 +271,56 @@ class SyncLibraryTest {
         assertNull(database.progress().observe("a").first())
         assertEquals(listOf("Old"), categoryNames())
         assertEquals(listOf("c1"), database.books().categoryIdsFor("a"))
+    }
+
+    @Test
+    fun `local category names are normalized the same way as a peer's`() = runBlocking {
+        val long = "n".repeat(120)
+        addCategory("c1", " Sci\u0001Fi ")
+        addCategory("c2", long, 1)
+        addBook("a", "hash-a", "c1", "c2")
+
+        val published = library.snapshot().books.getValue("hash-a").categories
+        assertEquals(CategoriesValue(listOf("SciFi", "n".repeat(100))), published)
+
+        library.write(library.snapshot(), mapOf(categoriesKey("a") to published))
+
+        assertEquals(listOf(" Sci\u0001Fi ", long), categoryNames())
+        assertEquals(setOf("c1", "c2"), database.books().categoryIdsFor("a").toSet())
+        assertEquals(published, library.snapshot().books.getValue("hash-a").categories)
+    }
+
+    @Test
+    fun `write creates a normalized category name`() = runBlocking {
+        addBook("a")
+
+        library.write(
+            library.snapshot(),
+            mapOf(categoriesKey("a") to CategoriesValue(listOf(" Ne\u0001w ", "m".repeat(120)))),
+        )
+
+        assertEquals(listOf("New", "m".repeat(100)), categoryNames())
+    }
+
+    @Test
+    fun `local names that normalize alike are ambiguous`() = runBlocking {
+        addCategory("c1", "AB")
+        addCategory("c2", "a\u0001b", 1)
+        addBook("a", "hash-a", "c1")
+
+        assertNull(library.snapshot().books.getValue("hash-a").categories)
+    }
+
+    // Reading through a Flow would hang here or miss the transaction's own writes.
+    @Test
+    fun `snapshot reads within the surrounding transaction`() = runBlocking {
+        withTimeout(10_000) {
+            database.withTransaction {
+                addBook("a")
+                database.progress().upsert(ProgressEntity("a", "a-1", 0.5f, 10, false))
+
+                assertEquals(PositionValue(1, 0.5f, false, 10), library.snapshot().books.getValue("hash-a").position)
+            }
+        }
     }
 }

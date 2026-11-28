@@ -15,7 +15,6 @@ import dev.reader.data.room.entity.CategoryEntity
 import dev.reader.data.room.entity.ChapterProgressEntity
 import dev.reader.data.room.entity.ProgressEntity
 import dev.reader.data.room.toChapter
-import kotlinx.coroutines.flow.first
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -40,14 +39,11 @@ fun chapterSignature(chapters: List<Chapter>): String {
     return MessageDigest.getInstance("SHA-256").digest(text.encodeToByteArray()).joinToString("") { "%02x".format(it) }
 }
 
-private fun normalized(name: String) = name.trim().lowercase()
-
-/** False for names that would show as empty: only spaces, control or invisible format characters. */
-private fun isVisibleName(name: String) =
-    name.any { !it.isWhitespace() && !it.isISOControl() && it.category != CharCategory.FORMAT }
+private fun matchKey(name: String) = cleanCategoryName(name).lowercase()
 
 /** The categories sync can see, grouped by the name they match on; a group of two or more is ambiguous. */
-private fun List<CategoryEntity>.byName() = filter { isVisibleName(it.name) }.groupBy { normalized(it.name) }
+private fun List<CategoryEntity>.byName() =
+    filter { isVisibleName(cleanCategoryName(it.name)) }.groupBy { matchKey(it.name) }
 
 // A bad stored number would make other devices reject this install's whole file.
 private fun position(chapter: Int, position: Float, finished: Boolean, updatedAt: Long) = PositionValue(
@@ -62,14 +58,15 @@ class SyncLibrary(
     private val database: ReaderDatabase,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
-    suspend fun snapshot(): LibrarySnapshot {
-        val entities = database.books().observeAll().first()
-        val chapters = database.chapters().observeAll().first().map { it.toChapter() }.groupBy { it.bookId.value }
-        val progress = database.progress().observeAll().first().associateBy { it.bookId }
+    suspend fun snapshot(): LibrarySnapshot = database.withTransaction {
+        val entities = database.books().all()
+        val chapters = database.chapters().all().map { it.toChapter() }.groupBy { it.bookId.value }
+        val progress = database.progress().all().associateBy { it.bookId }
         val chapterProgress = database.chapterProgress().all().associateBy { it.bookId to it.chapterId }
         val categories = database.categories().all()
         val categoriesById = categories.associateBy { it.id }
         val byName = categories.byName()
+        val visible = byName.values.flatten().map { it.id }.toSet()
         val copies = entities.groupingBy { it.contentHash }.eachCount()
 
         val books = mutableMapOf<String, LocalBook>()
@@ -92,9 +89,9 @@ class SyncLibrary(
             }
             val used = database.books().categoryIdsFor(book.id)
                 .mapNotNull { categoriesById[it] }
-                .filter { isVisibleName(it.name) }
+                .filter { it.id in visible }
                 .sortedBy { it.orderIndex }
-            val ambiguous = used.any { byName.getValue(normalized(it.name)).size > 1 }
+            val ambiguous = used.any { byName.getValue(matchKey(it.name)).size > 1 }
             books[hash] = LocalBook(
                 bookId = BookId(book.id),
                 hash = hash,
@@ -110,10 +107,10 @@ class SyncLibrary(
                         position(chapter.orderIndex, row.position, row.finished, row.updatedAt)
                     }
                 },
-                categories = if (ambiguous) null else CategoriesValue(used.map { it.name.trim() }),
+                categories = if (ambiguous) null else CategoriesValue(used.map { cleanCategoryName(it.name) }),
             )
         }
-        return LibrarySnapshot(books, skipped)
+        LibrarySnapshot(books, skipped)
     }
 
     /** Applies [changes] in one transaction. Anything naming an unknown book or chapter is ignored. */
@@ -153,13 +150,13 @@ class SyncLibrary(
         val visible = byName.values.flatten().associateBy { it.id }
         val (used, hidden) = database.books().categoryIdsFor(bookId).partition { it in visible }
         // Membership cannot be told apart by name, so leave it alone.
-        if (used.any { byName.getValue(normalized(visible.getValue(it).name)).size > 1 }) return
+        if (used.any { byName.getValue(matchKey(visible.getValue(it).name)).size > 1 }) return
 
         var nextOrder = (all.maxOfOrNull { it.orderIndex } ?: -1) + 1
-        val names = value?.names.orEmpty().filter(::isVisibleName).distinctBy(::normalized)
+        val names = normalizeCategoryNames(value?.names.orEmpty())
         val ids = names.map { name ->
-            byName[normalized(name)]?.first()?.id
-                ?: CategoryEntity(newId(), name.trim(), nextOrder++, isDefault = false)
+            byName[name.lowercase()]?.first()?.id
+                ?: CategoryEntity(newId(), name, nextOrder++, isDefault = false)
                     .also { database.categories().upsert(it) }
                     .id
         }

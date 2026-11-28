@@ -9,7 +9,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.io.IOException
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class SyncStateStoreTest {
 
@@ -73,5 +76,26 @@ class SyncStateStoreTest {
 
         assertEquals(SyncState("id-2", "Phone"), store(file).load())
         assertEquals("id-2", store(file).load().deviceId)
+    }
+
+    @Test
+    fun `an unreadable state file keeps its identity`() {
+        val file = folder.newFolder("state.json")
+
+        assertFailsWith<IOException> { store(file).load() }
+
+        assertEquals(0, ids)
+        assertTrue(file.isDirectory)
+    }
+
+    @Test
+    fun `a failed save leaves the old file intact`() {
+        val file = File(folder.root, "state.json")
+        val saved = store(file).load()
+        folder.newFolder("state.json.tmp")
+
+        assertFailsWith<IOException> { store(file).save(saved.copy(deviceName = "Other")) }
+
+        assertEquals(saved, store(file).load())
     }
 }
