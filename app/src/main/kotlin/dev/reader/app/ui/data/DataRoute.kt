@@ -180,6 +180,8 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
             onMerge = {
                 pendingRestore = null
                 read(pending.uri, "Backup merged") { input ->
+                    // A new sync identity first, so restored data never reuses old change counts.
+                    graph.sync.reset()
                     graph.backups.restore(input, merge = true)
                     graph.refreshMissingCovers()
                 }
@@ -187,6 +189,7 @@ fun DataRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
             onReplace = {
                 pendingRestore = null
                 read(pending.uri, "Backup applied") { input ->
+                    graph.sync.reset()
                     graph.backups.restore(input)
                     graph.refreshMissingCovers()
                 }

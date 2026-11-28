@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.lifecycleScope
 import dev.reader.app.ReaderApplication
 import dev.reader.app.data.ContentFileCopier
+import dev.reader.app.data.SyncPublishScheduler
 import dev.reader.app.ui.appearance.AppPaletteFactory
 import dev.reader.app.ui.reader.AutoScrollVolumeKeys
 import dev.reader.data.store.PreferencesFile
@@ -63,6 +64,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) SyncPublishScheduler.schedule(this)
     }
 
     private val swallowedVolumeKeys = mutableSetOf<Int>()

@@ -2,7 +2,10 @@ package dev.reader.app.data
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import androidx.documentfile.provider.DocumentFile
 import androidx.room.Room
+import dev.reader.app.ui.sync.SyncController
 import dev.reader.core.model.Book
 import dev.reader.core.model.Progress
 import dev.reader.core.stats.ReadingSessionEvent
@@ -17,11 +20,15 @@ import dev.reader.data.repo.SettingsRepository
 import dev.reader.data.repo.StatsRepository
 import dev.reader.data.room.ReaderDatabase
 import dev.reader.data.store.ReaderStores
+import dev.reader.data.sync.SyncEngine
+import dev.reader.data.sync.SyncLibrary
+import dev.reader.data.sync.SyncStateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okio.FileSystem
 import okio.Path.Companion.toPath
 import java.io.File
@@ -79,6 +86,26 @@ class ReaderGraph(context: Context) {
             settings.preferences.first().searchSettings.let { it.indexOnImport && it.indexes(book.id) }
         },
     )
+    private val syncStore = SyncStateStore(File(appContext.noBackupFilesDir, "sync-state.json"), Build.MODEL)
+
+    /** The only instance, since its lock is what keeps the controller and the publish worker apart. */
+    private val syncEngine = SyncEngine(
+        SyncLibrary(database),
+        syncStore,
+        oneCategory = { settings.preferences.first().singleCategoryPerBook },
+    )
+    val sync by lazy {
+        SyncController(
+            syncEngine,
+            syncStore,
+            openFolder = { SafSyncFolder.open(appContext, it) },
+            folderName = { uri ->
+                runCatching { DocumentFile.fromTreeUri(appContext, Uri.parse(uri))?.name }.getOrNull()
+                    ?.takeIf(String::isNotBlank)
+            },
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+        )
+    }
     val coverSearch = CoverSearchService()
     val rootFolderScanner = RootFolderScanner(context.applicationContext, settings, library, importer)
 
@@ -112,6 +139,17 @@ class ReaderGraph(context: Context) {
             ?: book.originUri?.let { uri ->
                 runCatching { ContentFileCopier.copyToCache(appContext, Uri.parse(uri)) }.getOrNull()
             }
+    }
+
+    /**
+     * Publishes this install's sync file, if a folder is chosen. False if that folder is missing or permission
+     * to it was lost; throws IOException if publishing fails otherwise.
+     */
+    suspend fun publishSync(): Boolean = withContext(Dispatchers.IO) {
+        val uri = syncEngine.state().folderUri ?: return@withContext true
+        val folder = SafSyncFolder.open(appContext, uri) ?: return@withContext false
+        syncEngine.publish(folder)
+        true
     }
 
     fun saveChapterProgress(progress: Progress) {
