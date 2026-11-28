@@ -32,7 +32,8 @@ fun isDefaultValue(kind: ItemKind, value: ItemValue?): Boolean = value == null |
 
 private fun Version.count(deviceId: String): Long = this[deviceId] ?: 0
 
-private fun Version.bumped(deviceId: String): Version = this + (deviceId to count(deviceId) + 1)
+private fun Version.bumped(deviceId: String): Version =
+    this + (deviceId to minOf(count(deviceId) + 1, MAX_VERSION_COUNT))
 
 private fun maxVersion(versions: List<Version>): Version =
     versions.flatMap { it.keys }.toSet().associateWith { id -> versions.maxOf { it.count(id) } }

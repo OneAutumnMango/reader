@@ -1,6 +1,7 @@
 package dev.reader.data.sync
 
 import dev.reader.core.sync.CategoriesValue
+import dev.reader.core.sync.MAX_VERSION_COUNT
 import dev.reader.core.sync.PositionValue
 import dev.reader.core.sync.Versioned
 import org.junit.Assert.assertEquals
@@ -61,7 +62,7 @@ class SyncFileTest {
     fun outputIsIndentedWithAFormatAndNoLocalPaths() {
         val output = text(file)
         assertTrue(output.contains("\n"))
-        assertTrue(output.contains("\"format\": 1"))
+        assertTrue(output.startsWith("{\n \"format\": 1,"))
         assertFalse(output.contains("sourcePath"))
     }
 
@@ -107,6 +108,44 @@ class SyncFileTest {
         assertRejected(book.copy(categories = categories.copy(version = mapOf("a" to -1L))))
         assertRejected(book.copy(position = item(updatedAt = -1)))
         assertRejected(file.copy(publishedAt = -1))
+    }
+
+    @Test
+    fun acceptsChangeCountsOnlyUpToTheMaximum() {
+        val atMaximum = file.copy(books = listOf(book.copy(position = item(count = MAX_VERSION_COUNT))))
+        assertEquals(atMaximum, SyncFileCodec.decode(SyncFileCodec.encode(atMaximum)))
+        val over = item(count = MAX_VERSION_COUNT + 1)
+        assertRejected(book.copy(position = over))
+        assertRejected(book.copy(chapters = listOf(SyncChapter(0, over))))
+        assertRejected(book.copy(categories = categories.copy(version = over.version)))
+    }
+
+    /** Pins the type tags and property names that other installs depend on. */
+    @Test
+    fun decodesALiteralFile() {
+        val literal = """
+            {"format":1,"deviceId":"a3f9c2ffff","deviceName":"Tab","devices":{"a3f9c2ffff":"Tab"},"publishedAt":100,
+             "books":[{"contentHash":"hash","title":"Title","signature":"sig",
+              "position":{"value":{"type":"position","chapter":2,"position":0.5,"finished":false,"updatedAt":10},
+               "version":{"a3f9c2ffff":1},"rewound":true},
+              "chapters":[{"index":0,"item":{"value":null}}],
+              "categories":{"value":{"type":"categories","names":["Fantasy"]},"version":{"a3f9c2ffff":1}}}]}
+        """
+        val expected = file.copy(
+            books = listOf(
+                book.copy(position = item().copy(rewound = true), chapters = listOf(SyncChapter(0, Versioned(null)))),
+            ),
+        )
+        assertEquals(expected, SyncFileCodec.decode(literal.encodeToByteArray()))
+    }
+
+    @Test
+    fun errorMessagesAreShortAndWithoutControlCharacters() {
+        val hostile = edited("\"Title\"", "\"Title\", \"\\u001b\u001b\u0007" + "k".repeat(1000) + "\": 1")
+        val error = assertThrows(SyncFileException::class.java) { SyncFileCodec.decode(hostile.encodeToByteArray()) }
+        val message = error.message.orEmpty()
+        assertTrue(message, message.length <= 200)
+        assertTrue(message, message.none { it.isISOControl() })
     }
 
     @Test

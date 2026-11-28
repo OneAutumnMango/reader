@@ -257,4 +257,12 @@ class MergeRulesTest {
         val c = decide("C", start, listOf(Candidate("B", b), Candidate("A", start)), false)
         assertEquals(advanced.value, assertIs<Decision.Apply>(c).item.value)
     }
+
+    @Test
+    fun `change counts stop at the maximum`() {
+        val full = v("A" to MAX_VERSION_COUNT)
+        val recorded = record(ItemKind.BOOK_POSITION, item(pos(1, 0f), full), pos(2, 0f), "A")
+        assertEquals(full, recorded.version)
+        assertEquals(full, resolve(recorded, listOf(recorded), "A", manual = true).version)
+    }
 }

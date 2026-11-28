@@ -1,6 +1,7 @@
 package dev.reader.data.sync
 
 import dev.reader.core.sync.CategoriesValue
+import dev.reader.core.sync.MAX_VERSION_COUNT
 import dev.reader.core.sync.PositionValue
 import dev.reader.core.sync.Versioned
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -15,6 +16,7 @@ private const val FILE_PREFIX = "reader-sync-"
 private const val FILE_SUFFIX = ".json"
 private const val MAX_DEVICE_NAME = 40
 private const val SHORT_ID_LENGTH = 6
+private const val MAX_ERROR_LENGTH = 200
 
 @Serializable
 data class SyncChapter(val index: Int, val item: Versioned)
@@ -45,19 +47,27 @@ class SyncFileException(message: String) : Exception(message)
 
 /** Sync files come from a shared folder, so [decode] treats every byte as untrusted. */
 object SyncFileCodec {
-    private val json = Json { prettyPrint = true }
+    @OptIn(ExperimentalSerializationApi::class)
+    private val json = Json {
+        prettyPrint = true
+        prettyPrintIndent = " "
+    }
 
     fun encode(file: SyncFile): ByteArray = json.encodeToString(SyncFile.serializer(), file).encodeToByteArray()
 
+    @Suppress("ThrowsCount") // every failure at this boundary becomes a SyncFileException
     fun decode(bytes: ByteArray): SyncFile {
         if (bytes.size > MAX_SYNC_FILE_BYTES) throw SyncFileException("File is too large")
         val file = try {
             json.decodeFromString(SyncFile.serializer(), bytes.decodeToString(throwOnInvalidSequence = true))
                 .also(::validate)
         } catch (e: Exception) {
-            throw SyncFileException("File cannot be read: ${e.message}")
+            val message = "File cannot be read: ${e.message}".filterNot { it.isISOControl() }
+            throw SyncFileException(message.take(MAX_ERROR_LENGTH))
         } catch (e: StackOverflowError) {
             throw SyncFileException("File is nested too deeply")
+        } catch (e: OutOfMemoryError) {
+            throw SyncFileException("File needs too much memory to read")
         }
         return file.copy(
             deviceName = sanitizeDeviceName(file.deviceName),
@@ -93,7 +103,7 @@ object SyncFileCodec {
     }
 
     private fun checkVersion(item: Versioned) {
-        require(item.version.values.all { it >= 0 }) { "Negative change count" }
+        require(item.version.values.all { it in 0..MAX_VERSION_COUNT }) { "Change count out of range" }
     }
 }
 

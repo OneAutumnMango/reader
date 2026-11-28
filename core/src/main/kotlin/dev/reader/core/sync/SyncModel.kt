@@ -1,9 +1,13 @@
 package dev.reader.core.sync
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** Change count per device ID. A missing ID counts as zero. */
 typealias Version = Map<String, Long>
+
+/** Highest change count; counting stops here so a hostile file cannot make it overflow. */
+const val MAX_VERSION_COUNT = 1L shl 48
 
 @Serializable
 enum class ItemKind { BOOK_POSITION, CHAPTER, CATEGORIES }
@@ -16,9 +20,11 @@ data class ItemKey(val bookHash: String, val kind: ItemKind, val chapter: Int = 
 sealed interface ItemValue
 
 @Serializable
+@SerialName("position")
 data class PositionValue(val chapter: Int, val position: Float, val finished: Boolean, val updatedAt: Long) : ItemValue
 
 @Serializable
+@SerialName("categories")
 data class CategoriesValue(val names: List<String>) : ItemValue
 
 /** [rewound] marks an unresolved backward move, which blocks automatic resolution. */
