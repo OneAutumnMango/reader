@@ -293,4 +293,32 @@ class ContinuousReaderTest {
         composeRule.waitForIdle()
         assertEquals(listOf(Triple<Int, Int, Boolean?>(0, 1, null)), reports)
     }
+
+    @Test
+    fun `a single tall block is saved only once the user scrolls to its end`() {
+        val gate = PageSaveGate()
+        val reports = mutableListOf<Triple<Int, Int, Boolean?>>()
+        val saved = mutableListOf<Int>()
+        composeRule.setContent {
+            ContinuousReader(
+                RichDocument(listOf(Block.Image("/missing.png", "Tall"))),
+                ReaderTheme.Default,
+                ReaderSettings(),
+                Modifier.size(300.dp, 200.dp).testTag("list"),
+                onPositionChanged = { index, total, userScrolled ->
+                    reports += Triple(index, total, userScrolled)
+                    if (gate.onReport(index, total, true, false, userScrolled)) saved += index
+                },
+            )
+        }
+        composeRule.waitForIdle()
+        assertEquals(listOf(Triple<Int, Int, Boolean?>(0, 2, false)), reports)
+        assertEquals(emptyList(), saved)
+
+        composeRule.onNodeWithTag("list").performTouchInput { swipe(Offset(150f, 190f), Offset(150f, 5f), 500) }
+        composeRule.onNodeWithTag("list").performTouchInput { swipe(Offset(150f, 190f), Offset(150f, 5f), 500) }
+        composeRule.waitForIdle()
+        assertEquals(Triple<Int, Int, Boolean?>(1, 2, true), reports.last())
+        assertEquals(listOf(1), saved)
+    }
 }

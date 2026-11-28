@@ -92,7 +92,13 @@ private fun ComicPageImage(
         )
         loaded != null -> Image(bitmap = loaded, contentDescription = null, modifier = Modifier.fillMaxSize())
         else -> Box(
-            modifier = if (continuous) Modifier.fillMaxWidth().height(PLACEHOLDER_HEIGHT) else Modifier.fillMaxSize(),
+            modifier = if (continuous) {
+                // A failed page keeps the placeholder's height for good.
+                Modifier.fillMaxWidth().height(PLACEHOLDER_HEIGHT)
+                    .then(if (bitmap?.isFailure == true) finalHeight else Modifier)
+            } else {
+                Modifier.fillMaxSize()
+            },
             contentAlignment = Alignment.Center,
         ) {
             if (bitmap?.isFailure == true) Text("Couldn't load this page.") else CircularProgressIndicator()

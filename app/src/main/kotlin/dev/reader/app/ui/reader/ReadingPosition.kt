@@ -39,6 +39,9 @@ internal fun ReportReadingPosition(
         snapshotFlow {
             val report = when {
                 state.layoutInfo.totalItemsCount == 0 -> null
+                // A lone item never changes index, so its end counts as a second page.
+                total == 1 && (state.canScrollForward || state.canScrollBackward) ->
+                    ReadingReport(if (state.canScrollForward) 0 else 1, 2, false)
                 state.canScrollForward || state.canScrollBackward -> ReadingReport(state.readingIndex(), total, false)
                 currentHeightsFinal() -> ReadingReport(0, 1, true)
                 else -> null

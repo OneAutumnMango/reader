@@ -318,6 +318,12 @@ fun ReaderRoute(
     }
 }
 
+/** What one view of a chapter has reported so far. */
+private class SaveView {
+    val gate = PageSaveGate()
+    var lastReport: Triple<Int, Int, Boolean?>? = null
+}
+
 @Composable
 private fun ChapterPage(
     graph: ReaderGraph,
@@ -344,9 +350,11 @@ private fun ChapterPage(
     var initialPositionFraction by remember(chapter.id) { mutableStateOf<Float?>(null) }
     var finished by remember(chapter.id) { mutableStateOf(false) }
     var savedFinished by remember(chapter.id) { mutableStateOf(false) }
-    // A new view of the chapter starts with a new baseline.
-    val saveGate = remember(chapter.id, book.pdfRenderMode, settings.readingMode) { PageSaveGate() }
-    var lastReport by remember(saveGate) { mutableStateOf<Triple<Int, Int, Boolean?>?>(null) }
+    // A new view of the chapter starts with a new baseline. Switching between paged modes keeps the
+    // same pager, which reports nothing new, so only continuous versus paged counts. Read through
+    // State so that an older onPageChanged still reaches the current view.
+    val continuous = settings.readingMode == ReadingMode.CONTINUOUS_SCROLL
+    val saveView by rememberUpdatedState(remember(chapter.id, book.pdfRenderMode, continuous) { SaveView() })
     // The pagers hold on to an older onPageChanged, which must still see the current value.
     val activeNow by rememberUpdatedState(isActive)
     var lastFraction by remember(chapter.id) { mutableStateOf(0f) }
@@ -439,7 +447,7 @@ private fun ChapterPage(
     }
 
     fun saveIfRead(index: Int, pageCount: Int, userScrolled: Boolean?) {
-        if (!saveGate.onReport(index, pageCount, activeNow, savedFinished, userScrolled)) return
+        if (!saveView.gate.onReport(index, pageCount, activeNow, savedFinished, userScrolled)) return
         if (index >= pageCount - 1) finished = true
         graph.saveChapterProgress(
             Progress(
@@ -454,7 +462,7 @@ private fun ChapterPage(
 
     // A one-page chapter loaded off screen reports nothing new when it's swiped in.
     LaunchedEffect(isActive) {
-        if (isActive) lastReport?.takeIf { it.second == 1 }?.let { saveIfRead(it.first, it.second, it.third) }
+        if (isActive) saveView.lastReport?.takeIf { it.second == 1 }?.let { saveIfRead(it.first, it.second, it.third) }
     }
 
     fun onPageChanged(index: Int, pageCount: Int, userScrolled: Boolean?) {
@@ -463,7 +471,7 @@ private fun ChapterPage(
         lastIndex = index
         if (pageCount > 0) {
             lastFraction = if (index >= pageCount - 1) 1f else index.toFloat() / pageCount
-            lastReport = Triple(index, pageCount, userScrolled)
+            saveView.lastReport = Triple(index, pageCount, userScrolled)
             saveIfRead(index, pageCount, userScrolled)
         }
     }
