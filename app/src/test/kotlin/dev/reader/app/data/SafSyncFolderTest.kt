@@ -1,5 +1,7 @@
 package dev.reader.app.data
 
+import android.content.Context
+import android.content.Intent
 import android.content.pm.ProviderInfo
 import android.database.Cursor
 import android.database.MatrixCursor
@@ -22,6 +24,7 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 private const val AUTHORITY = "dev.reader.test.documents"
@@ -33,8 +36,10 @@ class FakeDocument(val name: String, val file: File, val modified: Long)
 /** One flat folder. It reports no sizes, and renames a new file if told that the name is taken. */
 class FakeDocumentsProvider : DocumentsProvider() {
     val documents = linkedMapOf<String, FakeDocument>()
-    var failure: RuntimeException? = null
+    var failure: Exception? = null
     var missing = false
+    var rootType = Document.MIME_TYPE_DIR
+    var noCursor = false
 
     /** Appears just before the next create, as if another writer made it. */
     var appearsOnCreate: String? = null
@@ -53,10 +58,11 @@ class FakeDocumentsProvider : DocumentsProvider() {
 
     override fun queryRoots(projection: Array<out String>?): Cursor = MatrixCursor(arrayOf("root_id"))
 
-    override fun queryDocument(documentId: String, projection: Array<out String>?): Cursor {
+    override fun queryDocument(documentId: String, projection: Array<out String>?): Cursor? {
         failure?.let { throw it }
+        if (noCursor) return null
         val cursor = MatrixCursor(projection!!)
-        if (documentId == ROOT && !missing) cursor.addRow(arrayOf<Any>(Document.MIME_TYPE_DIR))
+        if (documentId == ROOT && !missing) cursor.addRow(arrayOf<Any>(rootType))
         return cursor
     }
 
@@ -158,7 +164,42 @@ class SafSyncFolderTest {
         assertFailsWith<IOException> { folder.list() }
     }
 
+    private fun open() = SafSyncFolder.open(ApplicationProvider.getApplicationContext(), treeUri.toString())
+
+    private fun grant() = ApplicationProvider.getApplicationContext<Context>().contentResolver
+        .takePersistableUriPermission(
+            treeUri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+        )
+
     @Test fun `open needs a persisted permission`() {
-        assertNull(SafSyncFolder.open(ApplicationProvider.getApplicationContext(), treeUri.toString()))
+        assertNull(open())
+        grant()
+        assertNotNull(open())
+    }
+
+    @Test fun `open reports only a definitely lost folder as missing`() {
+        grant()
+        for (lost in listOf(SecurityException("revoked"), IllegalArgumentException("deleted"))) {
+            provider.failure = lost
+            assertNull(open(), "$lost")
+        }
+        provider.failure = null
+        provider.missing = true
+        assertNull(open())
+        provider.missing = false
+        provider.rootType = "text/plain"
+        assertNull(open())
+    }
+
+    @Test fun `open throws for an error that may pass`() {
+        grant()
+        for (passing in listOf(IllegalStateException("busy"), UnsupportedOperationException("starting"))) {
+            provider.failure = passing
+            assertFailsWith<IOException>("$passing") { open() }
+        }
+        provider.failure = null
+        provider.noCursor = true
+        assertFailsWith<IOException> { open() }
     }
 }

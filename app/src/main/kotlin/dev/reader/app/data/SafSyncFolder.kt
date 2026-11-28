@@ -15,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
 
@@ -143,21 +144,44 @@ class SafSyncFolder(context: Context, private val treeUri: Uri) : SyncFolder {
         fun persistPermission(context: Context, treeUri: Uri) =
             context.contentResolver.takePersistableUriPermission(treeUri, ACCESS)
 
-        /** The folder at [uri], or null if permission to read and write it is gone or it no longer exists. */
-        fun open(context: Context, uri: String): SafSyncFolder? = runCatching {
+        /**
+         * The folder at [uri], or null if it is lost for good: no permission to read and write it, or it is no
+         * longer a folder. Throws [IOException] for any other failure, which may pass.
+         */
+        @Suppress("SwallowedException", "ThrowsCount") // these exceptions are how a lost folder is reported
+        fun open(context: Context, uri: String): SafSyncFolder? = try {
             val treeUri = Uri.parse(uri)
             val resolver = context.contentResolver
             val permitted = resolver.persistedUriPermissions
                 .any { it.uri == treeUri && it.isReadPermission && it.isWritePermission }
             if (permitted && isDirectory(resolver, treeUri)) SafSyncFolder(context, treeUri) else null
-        }.getOrNull()
+        } catch (e: SecurityException) {
+            null
+        } catch (e: FileNotFoundException) {
+            null
+        } catch (e: IllegalArgumentException) { // how providers report a deleted tree
+            null
+        } catch (e: IOException) {
+            throw e
+        } catch (e: Exception) {
+            throw IOException("Could not open the sync folder: ${e.message}", e)
+        }
     }
 }
 
+/** False if the provider says there is no such folder; throws [IOException] if it cannot say. */
 private fun isDirectory(resolver: ContentResolver, treeUri: Uri): Boolean {
     val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))
-    return resolver.query(uri, arrayOf(Document.COLUMN_MIME_TYPE), null, null)
-        ?.use { it.moveToFirst() && it.getString(0) == Document.MIME_TYPE_DIR } == true
+    val cursor = resolver.query(uri, arrayOf(Document.COLUMN_MIME_TYPE), null, null)
+        ?: throw IOException("Sync folder is unavailable")
+    return cursor.use {
+        val found = it.moveToFirst()
+        val unsure = it.extras?.run {
+            containsKey(DocumentsContract.EXTRA_ERROR) || getBoolean(DocumentsContract.EXTRA_LOADING)
+        } == true
+        if (!found && unsure) throw IOException("Sync folder is unavailable")
+        found && it.getString(0) == Document.MIME_TYPE_DIR
+    }
 }
 
 private fun readLimited(input: InputStream, limit: Int): ByteArray {

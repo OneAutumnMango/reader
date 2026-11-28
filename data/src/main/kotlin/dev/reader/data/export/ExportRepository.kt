@@ -77,7 +77,7 @@ class ExportRepository(
     }
 
     /** Upserts [bundle] into the current data without deleting anything first — a merge restore. */
-    suspend fun mergeAll(bundle: ExportBundle) = apply(bundle)
+    suspend fun mergeAll(bundle: ExportBundle) = database.withTransaction { apply(bundle) }
 
     private suspend fun withLibrary(bundle: ExportBundle): ExportBundle {
         val bookEntities = database.books().observeAll().first()

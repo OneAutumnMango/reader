@@ -264,8 +264,14 @@ class SyncEngine(
         report(state, pulled, merge).copy(applied = applied, publishError = publishError)
     }
 
-    /** Applies the choices that still hold, and publishes. */
-    suspend fun apply(folder: SyncFolder, picks: List<Pick>): ApplyResult = locked {
+    /**
+     * Applies the choices that still hold, and publishes. [deviceId] is this install's ID when they were made:
+     * after a reset, an untouched item can look just as it did before, so only the ID shows the picks are old.
+     */
+    suspend fun apply(folder: SyncFolder, picks: List<Pick>, deviceId: String? = null): ApplyResult = locked {
+        if (deviceId != null && deviceId != store.load().deviceId) {
+            throw IOException("Sync was reset, so nothing was applied")
+        }
         val pulled = pull(folder)
         val snapshot = library.snapshot()
         val state = recorded(store.load(), snapshot)
@@ -393,6 +399,15 @@ class SyncEngine(
     }
 
     suspend fun reset() = locked { store.reset() }
+
+    /**
+     * Resets, then runs [block] before letting go of the lock, so that nothing publishes, syncs or applies in
+     * between. [block] must not call this engine, which would never return.
+     */
+    suspend fun <T> resetAndRun(block: suspend () -> T): T = locked {
+        store.reset()
+        block()
+    }
 
     private fun report(state: SyncState, pulled: Pulled, merge: Merge) = SyncReport(
         questions = merge.questions,

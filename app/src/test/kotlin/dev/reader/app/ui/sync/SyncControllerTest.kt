@@ -12,6 +12,7 @@ import dev.reader.core.sync.Versioned
 import dev.reader.data.repo.LibraryRepository
 import dev.reader.data.room.ReaderDatabase
 import dev.reader.data.sync.ApplyResult
+import dev.reader.data.sync.Pick
 import dev.reader.data.sync.SyncBook
 import dev.reader.data.sync.SyncDocument
 import dev.reader.data.sync.SyncEngine
@@ -39,6 +40,7 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.io.IOException
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -49,6 +51,7 @@ import kotlin.time.Instant
 private class FakeFolder : SyncFolder {
     val files = mutableMapOf<String, ByteArray>()
     var listFails = false
+    var writeFails = false
     var lists = 0
     var writes = 0
     var listGate: CompletableDeferred<Unit>? = null
@@ -65,6 +68,7 @@ private class FakeFolder : SyncFolder {
     override suspend fun read(name: String) = files[name] ?: throw IOException("Gone")
 
     override suspend fun write(name: String, bytes: ByteArray) {
+        if (writeFails) throw IOException("Write refused")
         writes++
         files[name] = bytes
     }
@@ -128,15 +132,156 @@ class SyncControllerTest {
         )
         LibraryRepository(database).upsertBook(book, listOf(chapter))
         val signature = library.snapshot().books.getValue(HASH).signature
-        val position = Versioned(PositionValue(0, 0.5f, false, 1), mapOf("peer-id" to 1L))
-        val file = SyncFile(
-            deviceId = "peer-id",
-            deviceName = "Peer",
-            devices = emptyMap(),
-            publishedAt = 1,
-            books = listOf(SyncBook(HASH, "Title", signature, position, emptyList(), null)),
+        folder.files[PEER] = peerFile("peer-id", 0.5f, signature)
+    }
+
+    private fun peerFile(id: String, fraction: Float, signature: String): ByteArray {
+        val position = Versioned(PositionValue(0, fraction, false, 1), mapOf(id to 1L))
+        return SyncFileCodec.encode(
+            SyncFile(
+                deviceId = id,
+                deviceName = id,
+                devices = emptyMap(),
+                publishedAt = 1,
+                books = listOf(SyncBook(HASH, "Title", signature, position, emptyList(), null)),
+            ),
         )
-        folder.files[PEER] = SyncFileCodec.encode(file)
+    }
+
+    /** Two unrelated peers disagree about a book never opened here, which stays so across a reset. */
+    private suspend fun question(): Pick {
+        peerIsAhead()
+        val signature = library.snapshot().books.getValue(HASH).signature
+        folder.files["reader-sync-other-other-.json"] = peerFile("other-id", 0.8f, signature)
+        chooseFolder()
+        val asked = finish { controller.syncNow(it) }.report.questions.single()
+        return Pick(asked, asked.choices.last().item.value)
+    }
+
+    @Test fun `a failed sync, pull or push drops the earlier results`() = runBlocking<Unit> {
+        peerIsAhead()
+        chooseFolder()
+        folder.writeFails = true
+        val first = finish { controller.syncNow(it) }
+        assertEquals("Write refused", first.report.publishError)
+        assertEquals(1, first.report.applied.size)
+
+        folder.listFails = true
+        for (start in listOf(controller::syncNow, controller::pullOnly)) {
+            val failed = finish { start(it) }
+            assertEquals("Folder unavailable", failed.error)
+            assertNull(failed.report.publishError)
+            assertTrue(failed.report.applied.isEmpty())
+            assertEquals(1, failed.lastChanges.size)
+        }
+
+        folder.listFails = false
+        finish { controller.syncNow(it) }
+        val pushed = finish { controller.pushOnly(it) }
+        assertEquals("Write refused", pushed.error)
+        assertNull(pushed.report.publishError)
+        assertTrue(pushed.report.applied.isEmpty())
+    }
+
+    @Test fun `a failed check, apply or undo keeps changes and drops the old publish error`() = runBlocking<Unit> {
+        peerIsAhead()
+        chooseFolder()
+        folder.writeFails = true
+        val starts = listOf<() -> Unit>(
+            { controller.check() },
+            { controller.apply(emptyList()) {} },
+            { controller.undo {} },
+        )
+        for (start in starts) {
+            folder.listFails = false
+            available = true
+            finish { controller.syncNow(it) }
+            val before = controller.state.value
+            assertEquals("Write refused", before.report.publishError)
+            available = false
+            start()
+            val after = until { !it.running }
+            assertEquals("Sync folder is missing or permission was lost", after.error)
+            assertNull(after.report.publishError)
+            assertEquals(before.report.applied, after.report.applied)
+            assertEquals(before.lastChanges, after.lastChanges)
+        }
+    }
+
+    @Test fun `a successful check keeps the last error`() = runBlocking<Unit> {
+        peerIsAhead()
+        chooseFolder()
+        folder.writeFails = true
+        finish { controller.syncNow(it) }
+
+        val lists = folder.lists
+        controller.check()
+        val checked = until { !it.running }
+
+        assertTrue(folder.lists > lists)
+        assertEquals("Write refused", checked.error)
+        assertEquals("Write refused", checked.report.publishError)
+    }
+
+    @Test fun `nothing syncs while a restore runs`() = runBlocking<Unit> {
+        chooseFolder()
+        val before = engine.state().deviceId
+        val restoring = CompletableDeferred<Unit>()
+        val finishRestore = CompletableDeferred<Unit>()
+        val restore = scope.async {
+            controller.resetAndRun {
+                restoring.complete(Unit)
+                finishRestore.await()
+                "restored"
+            }
+        }
+        restoring.await()
+        val done = CompletableDeferred<SyncUiState>()
+        controller.syncNow { done.complete(it) }
+        delay(200)
+        assertEquals(0, folder.lists)
+
+        finishRestore.complete(Unit)
+
+        assertEquals("restored", withTimeout(10_000) { restore.await() })
+        // Started before the restore finished resetting, or after it: either way it ran after the restore.
+        withTimeout(10_000) { done.await() }
+        assertNotEquals(before, engine.state().deviceId)
+    }
+
+    @Test fun `picks queued behind a restore are not applied`() = runBlocking<Unit> {
+        val pick = question()
+        val restoring = CompletableDeferred<Unit>()
+        val finishRestore = CompletableDeferred<Unit>()
+        val restore = scope.async {
+            controller.resetAndRun {
+                restoring.complete(Unit)
+                finishRestore.await()
+            }
+        }
+        restoring.await()
+        val done = CompletableDeferred<ApplyResult>()
+        controller.apply(listOf(pick)) { done.complete(it) }
+        delay(200)
+
+        finishRestore.complete(Unit)
+        withTimeout(10_000) { restore.await() }
+        val result = withTimeout(10_000) { done.await() }
+
+        assertTrue(result.applied.isEmpty())
+        assertNotNull(result.publishError)
+        assertNull(position())
+    }
+
+    @Test fun `a failed restore throws and still shows the reset`() = runBlocking<Unit> {
+        peerIsAhead()
+        chooseFolder()
+        finish { controller.syncNow(it) }
+
+        assertFailsWith<IOException> { controller.resetAndRun { throw IOException("Bad backup") } }
+
+        assertTrue(controller.state.value.lastChanges.isEmpty())
+        assertTrue(controller.state.value.report.applied.isEmpty())
     }
 
     private suspend fun position() = library.snapshot().books.getValue(HASH).position
@@ -246,10 +391,11 @@ class SyncControllerTest {
         delay(200)
         assertFalse(reset.isCompleted)
         folder.listGate!!.complete(Unit)
-        withTimeout(10_000) {
+        val finished = withTimeout(10_000) {
             reset.await()
             done.await()
         }
+        assertNotNull(finished.error)
 
         val after = engine.state()
         assertNotEquals(before, after.deviceId)

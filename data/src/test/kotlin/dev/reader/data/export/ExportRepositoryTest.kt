@@ -35,6 +35,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -65,6 +66,26 @@ class ExportRepositoryTest {
 
     @After
     fun tearDown() = database.close()
+
+    @Test
+    fun `a merge that fails partway changes nothing`() = runBlocking<Unit> {
+        val book = Book(
+            id = BookId("book-1"),
+            title = "My Book",
+            format = BookFormat.TXT,
+            sourcePath = "/books/my-book.txt",
+            addedAt = Instant.parse("2026-01-01T00:00:00Z"),
+        )
+        val chapter = Chapter(ChapterId("ch-1"), book.id, "One", "", 0)
+        val bundle = ExportBundle(books = listOf(book), chapters = listOf(chapter))
+        database.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER fail_chapters BEFORE INSERT ON chapters BEGIN SELECT RAISE(ABORT, 'boom'); END",
+        )
+
+        assertFails { exporter.mergeAll(bundle) }
+
+        assertTrue(LibraryRepository(database).observeBooks().first().isEmpty())
+    }
 
     @Test
     fun `export then import on a fresh database restores everything`() = runBlocking {
