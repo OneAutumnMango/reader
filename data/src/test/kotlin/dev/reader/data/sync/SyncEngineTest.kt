@@ -652,6 +652,18 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `conflict copies are the first to be left out by the limits`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        repeat(50) { folder.files["reader-sync-a.sync-conflict-$it.json"] = ByteArray(1) }
+        folder.files["reader-sync-z.json"] = ByteArray(1)
+
+        a.engine.sync(folder, publish = false)
+
+        assertEquals("reader-sync-z.json", folder.reads.first())
+    }
+
+    @Test
     fun `failing to remove an old file is not a publish failure`() = runBlocking {
         val folder = FakeSyncFolder()
         val a = Device("aaaaaa")

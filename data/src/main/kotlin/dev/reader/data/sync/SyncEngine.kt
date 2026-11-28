@@ -59,6 +59,14 @@ data class SyncReport(
     val publishError: String? = null,
 )
 
+/** [value] is one of the question's choices, a combined set or a hand-ticked set. */
+data class Pick(val question: Question, val value: ItemValue?)
+
+/** [stale] picks were not applied. [applied] leaves out picks that kept this device's value. */
+data class ApplyResult(val applied: List<Change>, val stale: List<Question>, val publishError: String? = null)
+
+data class UndoResult(val restored: List<Change>, val skipped: List<Change>, val publishError: String? = null)
+
 /** [files] hold only books in this library; the rest are listed in [skipped]. */
 private class Pulled(
     val files: List<SyncFile>,
@@ -92,7 +100,25 @@ private class Merge(
     val changes: List<Change>,
     val questions: List<Question>,
     val skipped: List<SkippedBook>,
-)
+    val candidates: Map<ItemKey, List<Candidate>>,
+) {
+    /** What to record for [pick], or null if it is stale or cannot be applied. */
+    fun chosen(pick: Pick, snapshot: LibrarySnapshot, deviceId: String, oneCategory: Boolean): Versioned? {
+        val key = pick.question.key
+        val question = questions.find { it.key == key }?.takeIf { unchanged(pick.question, it) } ?: return null
+        val value = readable(key, snapshot.books.getValue(key.bookHash), Versioned(pick.value)) ?: return null
+        if (oneCategory && ((value.value as? CategoriesValue)?.names?.size ?: 0) > 1) return null
+        val all = listOf(question.local) + candidates.getValue(key).map { it.item }
+        return resolve(value, all, deviceId, manual = true).takeIf { publishable(it, deviceId) }
+    }
+
+    /** Whether [now] still offers what [shown] did. */
+    private fun unchanged(shown: Question, now: Question): Boolean {
+        fun same(a: Versioned, b: Versioned) = a.version == b.version && sameValue(a.value, b.value)
+        return same(shown.local, now.local) && shown.choices.size == now.choices.size &&
+            shown.choices.all { old -> now.choices.any { same(old.item, it.item) } }
+    }
+}
 
 private fun LibrarySnapshot.items(): Map<ItemKey, ItemValue?> = buildMap {
     for (book in books.values) {
@@ -201,7 +227,7 @@ private fun merge(state: SyncState, snapshot: LibrarySnapshot, files: List<SyncF
             is Decision.Ask -> questions += Question(key, title, decision.reason, decision.choices, local)
         }
     }
-    return Merge(records, applied, changes, questions, snapshot.skipped + offers.skipped + tooLong)
+    return Merge(records, applied, changes, questions, snapshot.skipped + offers.skipped + tooLong, offers.candidates)
 }
 
 /** Publishes this install's sync file and merges the others into the library. */
@@ -229,23 +255,80 @@ class SyncEngine(
         val state = recorded(store.load(), snapshot)
         val merge = merge(state, snapshot, pulled.files, oneCategory())
 
-        val applied = write(state, merge)
+        val (applied, _) = write(state, merge, syncedAt = now())
 
-        var publishError: String? = null
-        if (publish) {
-            try {
-                publishFile(folder, pulled.files.associate { it.deviceId to it.deviceName })
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) { // the changes are applied, so any failure here must still be reported with them
-                publishError = e.message ?: "Could not publish"
-            }
-        }
+        val publishError = if (publish) publishAfterWriting(folder, pulled.files) else null
         report(state, pulled, merge).copy(applied = applied, publishError = publishError)
     }
 
-    /** Writes what [merge] decided to apply, saves the outcome and returns the changes that took effect. */
-    private suspend fun write(state: SyncState, merge: Merge): List<Change> {
+    /** Applies the choices that still hold, and publishes. */
+    suspend fun apply(folder: SyncFolder, picks: List<Pick>): ApplyResult = locked {
+        val pulled = pull(folder)
+        val snapshot = library.snapshot()
+        val state = recorded(store.load(), snapshot)
+        val single = oneCategory()
+        val merge = merge(state, snapshot, pulled.files, single)
+
+        val resolved = mutableMapOf<ItemKey, Versioned>()
+        val changes = mutableListOf<Change>()
+        for (pick in picks) {
+            val item = merge.chosen(pick, snapshot, state.deviceId, single) ?: continue
+            val key = pick.question.key
+            val before = pick.question.local.value
+            resolved[key] = item
+            if (!sameValue(before, item.value)) {
+                // The first non-local choice holding the value, if any, is where it came from.
+                val source = pick.question.choices.drop(1).find { sameValue(it.item.value, item.value) }
+                changes += Change(key, pick.question.title, before, item.value, source?.deviceIds?.first())
+            }
+        }
+        // Safe changes found while re-reading are not picks, so they wait for the next sync.
+        val intended = Merge(merge.records, resolved, changes, merge.questions, merge.skipped, merge.candidates)
+        val (applied, done) = write(state, intended, syncedAt = state.lastSyncAt)
+
+        ApplyResult(
+            applied = applied,
+            stale = picks.map { it.question }.filter { it.key !in done },
+            publishError = publishAfterWriting(folder, pulled.files),
+        )
+    }
+
+    /** Puts back what the last sync or apply changed, where it has not been changed since, and publishes. */
+    suspend fun undo(folder: SyncFolder): UndoResult = locked {
+        val loaded = store.load()
+        if (loaded.lastChanges.isEmpty()) return@locked UndoResult(emptyList(), emptyList())
+        val snapshot = library.snapshot()
+        val state = recorded(loaded, snapshot)
+        val current = snapshot.items()
+        val records = state.records.byKey()
+        // A listed change may never have happened (a failed write), so only the current value counts.
+        val due = loaded.lastChanges.filter { it.key in current && sameValue(current[it.key], it.after) }
+        val restoring = due.associate {
+            it.key to record(it.key.kind, records.getValue(it.key), it.before, state.deviceId)
+        }
+        val intended = Merge(records, restoring, due, emptyList(), emptyList(), emptyMap())
+
+        val (intent, done) = library.transaction { writeUnchanged(state, intended) }
+        store.save(
+            intent.copy(records = (records + done).toRecords(), pending = state.pending, lastChanges = emptyList()),
+        )
+
+        val (restored, skipped) = loaded.lastChanges.partition { it.key in done }
+        UndoResult(restored, skipped, publishAfterWriting(folder, emptyList()))
+    }
+
+    /** Returns why publishing failed, if it did. */
+    private suspend fun publishAfterWriting(folder: SyncFolder, peers: List<SyncFile>): String? = try {
+        publishFile(folder, peers.associate { it.deviceId to it.deviceName })
+        null
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) { // the changes are applied, so any failure here must still be reported with them
+        e.message ?: "Could not publish"
+    }
+
+    /** Writes what [merge] applies, saves the outcome and returns the changes and items that took effect. */
+    private suspend fun write(state: SyncState, merge: Merge, syncedAt: Long?): Pair<List<Change>, Set<ItemKey>> {
         // One transaction, so the user cannot change an item between the check that it is unchanged and the write.
         val (intent, done) = library.transaction { writeUnchanged(state, merge) }
         val changes = intent.lastChanges.filter { it.key in done }
@@ -254,11 +337,11 @@ class SyncEngine(
                 records = (merge.records + done).toRecords(),
                 pending = state.pending,
                 lastChanges = changes,
-                lastSyncAt = now(),
-                questionCount = merge.questions.size,
+                lastSyncAt = syncedAt,
+                questionCount = merge.questions.count { it.key !in done },
             ),
         )
-        return changes
+        return changes to done.keys
     }
 
     /** Returns the state saved before writing and the records of the writes that took effect. */
@@ -313,7 +396,11 @@ class SyncEngine(
         val rejected = mutableListOf<RejectedFile>()
         val skipped = linkedSetOf<SkippedBook>()
         val limit = PullLimit()
-        for (document in folder.list().filter { isSyncFileName(it.name) && it.name != ownName }) {
+        // Sorted so that, if the limits are reached, conflict copies are the first left out.
+        val documents = folder.list()
+            .filter { isSyncFileName(it.name) && it.name != ownName }
+            .sortedWith(compareBy({ CONFLICT_MARKER in it.name }, { it.name }))
+        for (document in documents) {
             try {
                 val file = SyncFileCodec.decode(limit.read(folder, document))
                 // Other books are dropped now so that they do not stay in memory.
