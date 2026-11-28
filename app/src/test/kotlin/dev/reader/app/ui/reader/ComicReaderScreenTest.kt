@@ -2,9 +2,9 @@ package dev.reader.app.ui.reader
 
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.dp
 import dev.reader.core.model.BookFormat
 import dev.reader.core.reader.ReaderSettings
 import dev.reader.core.reader.ReadingMode

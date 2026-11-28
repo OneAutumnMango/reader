@@ -1,3 +1,6 @@
+// The merge rules are small helpers that are read together.
+@file:Suppress("TooManyFunctions")
+
 package dev.reader.core.sync
 
 import kotlin.math.abs
@@ -51,7 +54,8 @@ fun record(kind: ItemKind, previous: Versioned?, current: ItemValue?, deviceId: 
         return Versioned(current, version)
     }
     if (sameValue(previous.value, current)) return previous
-    return Versioned(current, previous.version.bumped(deviceId), previous.rewound || isBackward(previous.value, current))
+    val rewound = previous.rewound || isBackward(previous.value, current)
+    return Versioned(current, previous.version.bumped(deviceId), rewound)
 }
 
 private class Group(val members: List<Candidate>, value: ItemValue?) {
@@ -60,6 +64,8 @@ private class Group(val members: List<Candidate>, value: ItemValue?) {
     val updatedAt = members.maxOf { (it.item.value as? PositionValue)?.updatedAt ?: Long.MIN_VALUE }
 }
 
+// Each rule returns in priority order; splitting them up would risk changing that order.
+@Suppress("ReturnCount", "CyclomaticComplexMethod")
 fun decide(localId: String, local: Versioned, others: List<Candidate>, oneCategory: Boolean): Decision {
     val localCandidate = Candidate(localId, local)
     val all = listOf(localCandidate) + others
@@ -87,7 +93,8 @@ fun decide(localId: String, local: Versioned, others: List<Candidate>, oneCatego
         } else {
             Choice(localGroup.item, (listOf(localId) + localGroup.deviceIds).distinct())
         }
-        return Decision.Ask(reason, listOf(first) + groups.filter { it !== localGroup }.map { Choice(it.item, it.deviceIds) })
+        val rest = groups.filter { it !== localGroup }.map { Choice(it.item, it.deviceIds) }
+        return Decision.Ask(reason, listOf(first) + rest)
     }
 
     val sameVersionConflict = live.any { a ->
@@ -113,7 +120,8 @@ fun decide(localId: String, local: Versioned, others: List<Candidate>, oneCatego
         return apply(only)
     }
 
-    val sharedHistory = groups.flatMap { it.item.version.keys }.any { id -> groups.all { it.item.version.count(id) > 0 } }
+    val sharedHistory = groups.flatMap { it.item.version.keys }
+        .any { id -> groups.all { it.item.version.count(id) > 0 } }
     if (groups.any { it.item.value is CategoriesValue }) return ask(AskReason.SEPARATE)
     if (!sharedHistory) return ask(AskReason.FIRST_CONTACT)
 
