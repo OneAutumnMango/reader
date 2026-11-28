@@ -80,14 +80,17 @@ fun summarize(picks: List<Pick>) = ReviewSummary(
 )
 
 /** Every pick comes back stale when applying fails, so then they are worth keeping. */
-internal fun nothingApplied(picked: Int, result: ApplyResult) =
+internal fun applyFailed(picked: Int, result: ApplyResult) =
     result.publishError != null && result.publishError != DISCARDED && result.stale.size >= picked
 
 /** [picked] is the number of distinct items sent. Kept values are accepted without being listed as applied. */
 internal fun describeApply(picked: Int, result: ApplyResult): String {
     val error = result.publishError
     if (error == DISCARDED) return error
-    if (nothingApplied(picked, result)) return "Nothing was applied: $error"
+    // The library may have been changed before the failure, so this must not say that nothing was.
+    if (applyFailed(picked, result)) {
+        return "Could not finish applying: ${error.orEmpty().trimEnd('.')}. Check the list."
+    }
     val accepted = picked - result.stale.size
     val parts = mutableListOf("Applied $accepted ${if (accepted == 1) "choice" else "choices"}.")
     if (result.stale.isNotEmpty()) {

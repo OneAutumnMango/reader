@@ -3,6 +3,11 @@ package dev.reader.app.ui.sync
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -14,6 +19,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.TextLayoutResult
+import dev.reader.core.sync.CategoriesValue
 import dev.reader.core.sync.ItemKind
 import dev.reader.data.sync.ApplyResult
 import dev.reader.data.sync.Pick
@@ -23,10 +32,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w400dp-h2000dp")
+@GraphicsMode(GraphicsMode.Mode.NATIVE) // real text layout, to see whether text is cut off
 class MergeScreenTest {
 
     @get:Rule
@@ -35,6 +48,7 @@ class MergeScreenTest {
     private val applied = mutableListOf<List<Pick>>()
     private var onDone: ((ApplyResult) -> Unit)? = null
     private var checks = 0
+    private var checksAgain = 0
     private var state by mutableStateOf(SyncUiState())
 
     private val dune = question("Dune", position(4, 0.5f), position(1, 0.25f) to listOf("tab"))
@@ -63,6 +77,7 @@ class MergeScreenTest {
                     onDone = done
                 },
                 onCheck = { checks++ },
+                onCheckAgain = { checksAgain++ },
             )
         }
     }
@@ -209,7 +224,7 @@ class MergeScreenTest {
 
         composeRule.runOnIdle { onDone!!(ApplyResult(emptyList(), listOf(dune), "offline")) }
 
-        composeRule.onNodeWithText("Nothing was applied: offline").assertExists()
+        composeRule.onNodeWithText("Could not finish applying: offline. Check the list.").assertExists()
         click("OK")
         composeRule.onNodeWithText("Review and apply (1)").assertIsEnabled()
         assertEquals(1, checks)
@@ -245,7 +260,7 @@ class MergeScreenTest {
             ),
         )
         composeRule.onNodeWithText("Review and apply (0)").assertExists()
-        node("1 pick was dropped because the item changed.")
+        composeRule.onNodeWithText("1 pick was dropped because the item changed.").assertExists()
     }
 
     @Test
@@ -273,6 +288,103 @@ class MergeScreenTest {
         row("[tab] This device", "Ch. 2, 25%, not finished").assertExists()
     }
 
+    private fun assertShownInFull(text: String) {
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule.onNode(hasText(text), useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertTrue(layouts.single().lineCount > 2, "expected a long text")
+        assertFalse(layouts.single().hasVisualOverflow, "cut off: $text")
+    }
+
+    @Test
+    fun `no removal is cut off however many and long the names`() {
+        val kept = List(25) { "Shelf number $it ${"long ".repeat(12)}" }.map { it.trim() }
+        val local = CategoriesValue(kept + "Last one")
+        setContent(stateOf(question("Dune", local, CategoriesValue(listOf("New")) to listOf("tab"))))
+        val everything = local.names.joinToString()
+        val removes = "Removes: $everything"
+
+        row("Tablet", "New", "Adds: New", removes).performClick()
+        assertShownInFull(removes)
+
+        click("Review and apply (1)")
+        composeRule.onNode(hasText(removes)).assertExists()
+        composeRule.onNode(hasText("Was: $everything", substring = true)).assertExists()
+    }
+
+    @Test
+    fun `the manual dialog shows every removal`() {
+        val local = CategoriesValue(List(25) { "c$it" })
+        setContent(stateOf(question("Dune", local, categories("New") to listOf("tab"))))
+
+        node("Choose manually").performClick()
+        composeRule.onNode(isToggleable() and hasText("c0")).performClick()
+        composeRule.onNodeWithTag("manual-list").performScrollToNode(hasText("Removes: c0"))
+        composeRule.onNodeWithText("Chosen: ${local.names.drop(1).joinToString()}").assertExists()
+    }
+
+    @Test
+    fun `an unpickable starting set must be changed before it is used`() {
+        setContent(
+            stateOf(question("Dune", categories("a", "b"), categories("c") to listOf("tab"))),
+            oneCategory = true,
+        )
+
+        node("Choose manually").performClick()
+        composeRule.onNodeWithText("Use these").assertIsNotEnabled()
+        composeRule.onNode(isToggleable() and hasText("a")).performClick()
+        composeRule.onNodeWithText("Use these").assertIsEnabled()
+    }
+
+    @Test
+    fun `bulk buttons act only on the filtered list`() {
+        val emma = question("Emma", position(4, 0.5f), position(1, 0.25f) to listOf("tab"))
+        setContent(stateOf(dune, emma))
+        composeRule.onNodeWithText("Search by title").performTextInput("emm")
+
+        node("Use all from Tablet").performClick()
+
+        composeRule.onNodeWithText("Picked 1 of 1 listed.").assertExists()
+        click("Review and apply (1)")
+        click("Apply")
+        assertEquals(listOf(emma), applied.single().map { it.question })
+    }
+
+    @Test
+    fun `the bulk notice is announced and cleared by later changes`() {
+        setContent(stateOf(dune))
+        val notice = "Picked 1 of 1 listed."
+        fun bulk() {
+            node("Keep all from this device").performClick()
+            composeRule.onNodeWithText(notice)
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        }
+
+        bulk()
+        node("Positions").performClick()
+        absent(notice)
+        bulk()
+        node("Search by title").performTextInput("D")
+        absent(notice)
+        bulk()
+        node("Decide later").performClick()
+        absent(notice)
+    }
+
+    @Test
+    fun `a collapsed group says what differs`() {
+        fun chapter(index: Int) = question(
+            "Dune",
+            position(index),
+            position(index, 0.5f) to listOf("tab"),
+            kind = ItemKind.CHAPTER,
+            chapter = index,
+        )
+        setContent(stateOf(dune, chapter(2), chapter(6)))
+
+        node("Reading position: Ch. 5, 50% / Ch. 2, 25%. Chapters: 3, 7")
+    }
+
     @Test
     fun `a failed check shows the error instead of nothing to merge`() {
         setContent(SyncUiState(folderName = "Shared", error = "Folder is missing"))
@@ -280,7 +392,8 @@ class MergeScreenTest {
         node("Folder is missing")
         absent("Nothing to merge.")
         node("Check again").performClick()
-        assertEquals(1, checks)
+        assertEquals(1, checksAgain)
+        assertEquals(0, checks)
     }
 
     @Test

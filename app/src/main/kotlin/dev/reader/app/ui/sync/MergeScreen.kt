@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -37,9 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,6 +82,7 @@ fun MergeScreen(
     loadBook: suspend (String) -> MergeBook?,
     onApply: (List<Pick>, (ApplyResult) -> Unit) -> Unit,
     onCheck: () -> Unit,
+    onCheckAgain: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // A new device ID means sync was reset, so earlier picks no longer apply.
@@ -103,7 +108,7 @@ fun MergeScreen(
                 val sent = picks
                 onApply(sent) { result ->
                     // Only [result] is read: after a reset, the controller's state may be older than it.
-                    if (!nothingApplied(sent.size, result)) sent.forEach { merge.staged.remove(it.question.key) }
+                    if (!applyFailed(sent.size, result)) sent.forEach { merge.staged.remove(it.question.key) }
                     message = describeApply(sent.size, result)
                     merge.reviewing = false
                     onCheck()
@@ -114,7 +119,13 @@ fun MergeScreen(
     } else {
         val context = CardContext(merge, state.running, oneCategory, devices, books, loadBook)
         Column(modifier.fillMaxSize()) {
-            QuestionList(context, state, checked, onCheck, Modifier.weight(1f))
+            QuestionList(context, state, checked, onCheckAgain, Modifier.weight(1f))
+            // Always present, so that a new result is announced. It stays in sight wherever the list is scrolled.
+            Text(
+                merge.notice.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
             Button(
                 onClick = {
                     merge.notice = null
@@ -153,6 +164,12 @@ private class MergeState {
 
     fun pick(question: Question, value: ItemValue?) {
         staged[question.key] = Pick(question, value)
+        notice = null
+    }
+
+    fun decideLater(questions: List<Question>) {
+        questions.forEach { staged.remove(it.key) }
+        notice = null
     }
 
     /** Stages [picks], leaving the other [listed] items as they were. */
@@ -222,7 +239,7 @@ private fun QuestionList(
     context: CardContext,
     state: SyncUiState,
     checked: Boolean,
-    onCheck: () -> Unit,
+    onCheckAgain: () -> Unit,
     modifier: Modifier,
 ) {
     val merge = context.merge
@@ -238,11 +255,10 @@ private fun QuestionList(
             item {
                 Column {
                     Bounded(error, lines = 4, error = true)
-                    OutlinedButton(onClick = onCheck, enabled = !state.running) { Text("Check again") }
+                    OutlinedButton(onClick = onCheckAgain, enabled = !state.running) { Text("Check again") }
                 }
             }
         }
-        merge.notice?.let { item { Text(it) } }
         if (questions.isEmpty()) {
             if (state.running || !checked) {
                 item { Text("Checking for differences…") }
@@ -287,7 +303,8 @@ private fun BookHeader(context: CardContext, hash: String, title: String) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            book?.let { BookCover(it.book, Modifier.size(width = 48.dp, height = 68.dp)) }
+            // The title is beside it, so the cover is not read out as well.
+            book?.let { BookCover(it.book, Modifier.size(width = 48.dp, height = 68.dp).clearAndSetSemantics {}) }
             Text(
                 title,
                 maxLines = 2,
@@ -306,14 +323,20 @@ private fun Filters(merge: MergeState) {
             MergeFilter.entries.forEach { filter ->
                 FilterChip(
                     selected = merge.filter == filter,
-                    onClick = { merge.filter = filter },
+                    onClick = {
+                        merge.filter = filter
+                        merge.notice = null
+                    },
                     label = { Text(filter.name.lowercase().replaceFirstChar { it.uppercase() }) },
                 )
             }
         }
         OutlinedTextField(
             value = merge.search,
-            onValueChange = { merge.search = it },
+            onValueChange = {
+                merge.search = it
+                merge.notice = null
+            },
             label = { Text("Search by title") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -353,18 +376,29 @@ private fun Group(context: CardContext, hash: String, questions: List<Question>)
     val enabled = !context.running
     Column {
         Text("Position differences: ${questions.size}. Picked: $picked.")
+        if (!expanded) Bounded(describeDifferences(questions), lines = 3)
         Action("Keep this device for this book", enabled) { stage(keepMine(questions)) }
         context.devices.peers(questions).forEach { id ->
             Action("Use ${context.devices.name(id)} for this book", enabled) { stage(useDevice(questions, id)) }
         }
         Action("Keep furthest for this book", enabled) { stage(keepFurthest(questions)) }
-        TextButton(onClick = { questions.forEach { merge.staged.remove(it.key) } }, enabled = enabled) {
+        TextButton(onClick = { merge.decideLater(questions) }, enabled = enabled) {
             Text("Decide later for this book")
         }
         TextButton(onClick = { merge.expanded[hash] = !expanded }) {
             Text(if (expanded) "Hide items" else "Show each item")
         }
     }
+}
+
+/** One line for a collapsed group: the book position's choices, then the chapters that differ. */
+private fun describeDifferences(questions: List<Question>): String {
+    val (chapters, book) = questions.partition { it.key.kind == ItemKind.CHAPTER }
+    val positions = book.map { question ->
+        "Reading position: " + question.choices.joinToString(" / ", limit = 5) { describeValue(it.item.value) }
+    }
+    val numbers = chapters.map { it.key.chapter }.sorted().joinToString(limit = 10) { "${it + 1}" }
+    return (positions + listOfNotNull("Chapters: $numbers".takeIf { chapters.isNotEmpty() })).joinToString(". ")
 }
 
 @Composable
@@ -374,8 +408,9 @@ private fun QuestionCard(context: CardContext, question: Question) {
     val picked = merge.pickFor(question, context.oneCategory)
     val localNames = categoryNames(question.local.value)
     val chosen = picked?.let { pick -> question.choices.indexOfFirst { it.item.value == pick.value } }
-    Column {
-        Subject(question, book)
+    val categories = question.key.kind == ItemKind.CATEGORIES
+    Column(Modifier.selectableGroup()) {
+        Subject(question, book, Modifier.semantics { heading() })
         Detail("Why: ${describeReason(question.reason)}")
         question.choices.forEachIndexed { index, choice ->
             val value = choice.item.value
@@ -386,14 +421,16 @@ private fun QuestionCard(context: CardContext, question: Question) {
                 lines,
                 selected = chosen == index,
                 enabled = allowed && !context.running,
+                full = categories,
             ) { merge.pick(question, value) }
         }
-        if (question.key.kind == ItemKind.CATEGORIES) {
+        if (categories) {
             val combined = combinedCategories(question)
             val combine = isPickable(combined, context.oneCategory)
             val usingCombined = combine && chosen == -1 && picked.value == combined
             if (combine) {
-                Option("Combine", describeChoice(combined, localNames, book), usingCombined, !context.running) {
+                val lines = describeChoice(combined, localNames, book)
+                Option("Combine", lines, usingCombined, !context.running, full = true) {
                     merge.pick(question, combined)
                 }
             }
@@ -403,21 +440,40 @@ private fun QuestionCard(context: CardContext, question: Question) {
                 if (manual) describeChoice(picked.value, localNames, book) else emptyList(),
                 manual,
                 !context.running,
+                full = true,
             ) { merge.choosing = question.key }
         }
-        Option("Decide later", emptyList(), picked == null, !context.running) { merge.staged.remove(question.key) }
+        Option("Decide later", emptyList(), picked == null, !context.running) { merge.decideLater(listOf(question)) }
     }
 }
 
 /** What differs: the item, and for a chapter its title. */
 @Composable
-private fun Subject(question: Question, book: MergeBook?) {
+private fun Subject(question: Question, book: MergeBook?, modifier: Modifier = Modifier) {
     val title = book?.chapters?.get(question.key.chapter)
-    Bounded(describeItem(question.key) + title?.let { ": $it" }.orEmpty())
+    Text(
+        describeItem(question.key) + title?.let { ": $it" }.orEmpty(),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}
+
+/** Category lines are never cut off, since that could hide a removal. */
+@Composable
+private fun Line(text: String, full: Boolean) {
+    if (full) Text(text, style = MaterialTheme.typography.bodySmall) else Detail(text)
 }
 
 @Composable
-private fun Option(title: String, lines: List<String>, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun Option(
+    title: String,
+    lines: List<String>,
+    selected: Boolean,
+    enabled: Boolean,
+    full: Boolean = false,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -430,7 +486,7 @@ private fun Option(title: String, lines: List<String>, selected: Boolean, enable
         RadioButton(selected = selected, onClick = null, enabled = enabled)
         Column {
             Bounded(title, lines = 3)
-            lines.forEach { Detail(it) }
+            lines.forEach { Line(it, full) }
         }
     }
 }
@@ -456,14 +512,17 @@ private fun categoryChanges(value: ItemValue?, localNames: List<String>): List<S
     val added = namesMissingFrom(names, localNames)
     val removed = namesMissingFrom(localNames, names)
     return listOfNotNull(
-        added.takeIf { it.isNotEmpty() }?.let { "Adds: ${it.joinToString(limit = 20)}" },
-        removed.takeIf { it.isNotEmpty() }?.let { "Removes: ${it.joinToString(limit = 20)}" },
+        added.takeIf { it.isNotEmpty() }?.let { "Adds: ${it.joinToString()}" },
+        removed.takeIf { it.isNotEmpty() }?.let { "Removes: ${it.joinToString()}" },
     )
 }
 
+/** Unlike [describeValue], names every category. */
+private fun describeSet(value: ItemValue?) = categoryNames(value).joinToString().ifEmpty { "No categories" }
+
 private fun describeChoice(value: ItemValue?, localNames: List<String>, book: MergeBook?): List<String> =
     when (value) {
-        is CategoriesValue -> listOf(describeValue(value)) + categoryChanges(value, localNames)
+        is CategoriesValue -> listOf(describeSet(value)) + categoryChanges(value, localNames)
         is PositionValue -> listOfNotNull(
             describePosition(value),
             book?.chapters?.get(value.chapter),
@@ -483,21 +542,26 @@ private fun ManualDialog(
     running: Boolean,
 ) {
     val names = distinctNames(question.choices.flatMap { categoryNames(it.item.value) } + localNames)
-    var ticked by remember(question) {
-        val start = merge.pickFor(question, oneCategory)?.value ?: question.local.value
-        mutableStateOf(if (isPickable(start, oneCategory)) categoryNames(start) else emptyList())
-    }
+    val start = merge.pickFor(question, oneCategory)?.value ?: question.local.value
+    val startPickable = isPickable(start, oneCategory)
+    var ticked by remember(question) { mutableStateOf(if (startPickable) categoryNames(start) else emptyList()) }
+    // With nothing ticked to start from, using that untouched would remove every category by accident.
+    var toggled by remember(question) { mutableStateOf(false) }
+    val localSet = categoryNames(question.local.value)
     AlertDialog(
         onDismissRequest = { merge.choosing = null },
         title = { Text(if (oneCategory) "Choose one category" else "Choose categories") },
         text = {
-            LazyColumn(Modifier.heightIn(max = 360.dp)) {
+            LazyColumn(Modifier.heightIn(max = 360.dp).testTag("manual-list")) {
+                item { Line("Chosen: ${describeSet(CategoriesValue(ticked))}", full = true) }
+                items(categoryChanges(CategoriesValue(ticked), localSet)) { Line(it, full = true) }
                 items(names) { name ->
                     val on = hasName(ticked, name)
                     Row(
                         Modifier
                             .fillMaxWidth()
                             .toggleable(value = on, role = Role.Checkbox) { tick ->
+                                toggled = true
                                 ticked = when {
                                     !tick -> namesMissingFrom(ticked, listOf(name))
                                     oneCategory -> listOf(name)
@@ -509,7 +573,7 @@ private fun ManualDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(checked = on, onCheckedChange = null)
-                        Bounded(name)
+                        Text(name)
                     }
                 }
             }
@@ -520,7 +584,7 @@ private fun ManualDialog(
                     merge.pick(question, CategoriesValue(ticked))
                     merge.choosing = null
                 },
-                enabled = !running,
+                enabled = !running && (startPickable || toggled),
             ) { Text("Use these") }
         },
         dismissButton = { TextButton(onClick = { merge.choosing = null }) { Text("Cancel") } },
@@ -569,7 +633,7 @@ private fun ReviewItem(pick: Pick, book: MergeBook?) {
     val before = pick.question.local.value
     val categories = pick.question.key.kind == ItemKind.CATEGORIES
     fun describe(value: ItemValue?): String {
-        if (categories) return describeValue(value)
+        if (categories) return describeSet(value)
         val position = value as? PositionValue
         return describePosition(position) + book?.chapters?.get(position?.chapter)?.let { " ($it)" }.orEmpty()
     }
@@ -579,11 +643,11 @@ private fun ReviewItem(pick: Pick, book: MergeBook?) {
         Subject(pick.question, book)
         // sameValue ignores jitter and spelling, which is what the engine treats as keeping the value.
         if (sameValue(before, pick.value)) {
-            Detail("Keeps this device's value: ${describe(before)}")
+            Line("Keeps this device's value: ${describe(before)}", categories)
         } else {
-            Detail("Was: ${describe(before)}")
-            Detail("Now: ${describe(pick.value)}")
-            if (categories) categoryChanges(pick.value, categoryNames(before)).forEach { Detail(it) }
+            Line("Was: ${describe(before)}", categories)
+            Line("Now: ${describe(pick.value)}", categories)
+            if (categories) categoryChanges(pick.value, categoryNames(before)).forEach { Line(it, full = true) }
             val warnings = listOfNotNull(
                 "Goes backwards".takeIf { goesBackwards(pick) },
                 "Becomes unfinished".takeIf { becomesUnfinished(pick) },

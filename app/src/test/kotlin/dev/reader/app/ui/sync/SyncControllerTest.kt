@@ -224,6 +224,23 @@ class SyncControllerTest {
         assertEquals("Write refused", checked.report.publishError)
     }
 
+    @Test fun `check again clears a stale error but keeps a publish error`() = runBlocking<Unit> {
+        peerIsAhead()
+        chooseFolder()
+        folder.listFails = true
+        finish { controller.syncNow(it) }
+        folder.listFails = false
+        controller.check(clearError = true)
+        assertNull(until { !it.running }.error)
+
+        folder.writeFails = true
+        finish { controller.syncNow(it) }
+        controller.check(clearError = true)
+        val checked = until { !it.running }
+        assertEquals("Write refused", checked.error)
+        assertEquals("Write refused", checked.report.publishError)
+    }
+
     @Test fun `nothing syncs while a restore runs`() = runBlocking<Unit> {
         chooseFolder()
         val before = engine.state().deviceId

@@ -141,7 +141,10 @@ class MergeSelectionTest {
             "Applied 1 choice. Not published: offline",
             describeApply(1, ApplyResult(emptyList(), emptyList(), "offline")),
         )
-        assertEquals("Nothing was applied: gone", describeApply(1, ApplyResult(emptyList(), listOf(stale), "gone")))
+        assertEquals(
+            "Could not finish applying: gone. Check the list.",
+            describeApply(1, ApplyResult(emptyList(), listOf(stale), "gone.")),
+        )
         assertEquals(
             "Applied 1 choice. Not applied: 1. Any still waiting are listed; check them and choose again.",
             describeApply(2, ApplyResult(emptyList(), listOf(stale))),

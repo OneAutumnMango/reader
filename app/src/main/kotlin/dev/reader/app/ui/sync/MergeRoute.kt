@@ -36,7 +36,8 @@ fun MergeRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
         checked = checked,
         loadBook = { loadBook(graph, it) },
         onApply = graph.sync::apply,
-        onCheck = graph.sync::check,
+        onCheck = { graph.sync.check() },
+        onCheckAgain = { graph.sync.check(clearError = true) },
         modifier = modifier,
     )
 }

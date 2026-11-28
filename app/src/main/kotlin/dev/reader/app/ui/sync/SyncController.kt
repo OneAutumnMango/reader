@@ -142,14 +142,18 @@ class SyncController(
         return@operation { copy(report = report.copy(publishError = null), error = null) }
     }
 
-    /** Recalculates the open questions, keeping the last error on show. Does nothing without a folder. */
-    fun check() = operation(onFailure = dropPublishError) {
+    /**
+     * Recalculates the open questions. The last error stays on show unless [clearError], which a successful check
+     * obeys, leaving only an earlier publish error. Does nothing without a folder.
+     */
+    fun check(clearError: Boolean = false) = operation(onFailure = dropPublishError) {
         if (engine.state().folderUri == null) return@operation { this }
         val checked = engine.check(folder())
         return@operation {
             copy(
                 report = checked.copy(applied = report.applied, publishError = report.publishError),
                 questionCount = checked.questions.size,
+                error = if (clearError) report.publishError else error,
             )
         }
     }
