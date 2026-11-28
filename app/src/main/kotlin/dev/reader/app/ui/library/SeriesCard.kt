@@ -24,7 +24,10 @@ import dev.reader.core.model.Book
 
 private val CARD_SHAPE = RoundedCornerShape(LIBRARY_CARD_CORNER_RADIUS)
 
-/** A library tile for a series: a 2x2 grid of its first four covers (empty slots if fewer), a count badge and the name. */
+/**
+ * A library tile for a series: a 2x2 grid of its first four covers (empty slots if fewer),
+ * a count badge and the name.
+ */
 @Composable
 fun SeriesCard(name: String, books: List<Book>, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(

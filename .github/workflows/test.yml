@@ -29,3 +29,5 @@ jobs:
       # The runner image ships the Android SDK; AGP finds it through ANDROID_HOME.
       - name: Unit tests
         run: ./gradlew --console=plain test
+      - name: Static analysis
+        run: ./gradlew --console=plain detekt

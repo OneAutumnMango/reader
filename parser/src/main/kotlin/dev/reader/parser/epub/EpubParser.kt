@@ -20,6 +20,7 @@ private const val EPUB_TYPE_SCAN_DEPTH = 4
 /** The EPUB's own manifest/spine names a file the archive doesn't actually contain — the file itself is broken. */
 class EpubContentMissingException(message: String) : Exception(message)
 
+@Suppress("TooManyFunctions") // small private parsing steps of one format
 object EpubParser {
 
     fun parseChapter(file: File, orderIndex: Int): ParsedChapter.TextChapter? = ZipFile(file).use { zip ->

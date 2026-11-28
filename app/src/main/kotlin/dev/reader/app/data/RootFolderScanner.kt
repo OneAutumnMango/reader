@@ -116,15 +116,21 @@ class RootFolderScanner(
      * read, books are only tagged, never cleared, so an unmounted drive doesn't wipe series.
      */
     internal suspend fun tagSeries(
-        openRoot: (String) -> DocumentFile? = { runCatching { DocumentFile.fromTreeUri(context, Uri.parse(it)) }.getOrNull() },
+        openRoot: (
+            String
+        ) -> DocumentFile? = { runCatching { DocumentFile.fromTreeUri(context, Uri.parse(it)) }.getOrNull() },
     ) {
         val prefs = settings.preferences.first()
         val desired = mutableMapOf<String, String>()
         var allRead = true
+        @Suppress("LoopWithTooManyJumpStatements") // guard-style continues read better than nesting
         for (rootUri in prefs.rootFolders) {
             if (prefs.rootFolderKinds[rootUri] != CollectionKind.FILES) continue
             val root = openRoot(rootUri)
-            if (root == null || !root.canRead()) { allRead = false; continue }
+            if (root == null || !root.canRead()) {
+                allRead = false
+                continue
+            }
             collectSeriesFolders(root).forEach { (uri, name) ->
                 prefs.rootEntryBooks[uri]?.let { desired[it] = name }
             }
@@ -133,7 +139,10 @@ class RootFolderScanner(
         for (book in library.observeBooks().first()) {
             val wanted = desired[book.sourcePath]
             if (wanted == null && !allRead) continue
-            if (book.series != wanted) { library.setSeries(book.id, wanted); changed++ }
+            if (book.series != wanted) {
+                library.setSeries(book.id, wanted)
+                changed++
+            }
         }
         AppLog.info("Series tagging updated $changed book(s) from ${desired.size} grouped file(s)", "LibraryScan")
     }

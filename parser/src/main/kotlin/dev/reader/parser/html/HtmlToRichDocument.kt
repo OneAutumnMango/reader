@@ -69,7 +69,8 @@ private fun Element.isSvgFallbackImage(): Boolean {
     // e-ink devices, marking the mobi7-only copy with data-amznremoved-m8; we're not mobi7, so
     // showing both just renders the real image next to a blurry upscaled duplicate.
     if (attr("data-amznremoved-m8").equals("true", ignoreCase = true)) return true
-    // Inside an SVG that also has an <image> element (e.g. <svg><switch><image/><foreignObject><img/></foreignObject></switch></svg>)
+    // Inside an SVG that also has an <image> element
+    // (e.g. <svg><switch><image/><foreignObject><img/></foreignObject></switch></svg>)
     if (parents().any { ancestor -> ancestor.tagName() == "svg" && ancestor.selectFirst("image") != null }) return true
     // Directly before or after a sibling SVG that contains an <image> — fallback order varies by toolchain
     if (adjacentElementSiblings().any { it.tagName() == "svg" && it.selectFirst("image") != null }) return true

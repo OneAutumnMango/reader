@@ -1,3 +1,6 @@
+// Named for the feature: the file also holds the functions around its one class.
+@file:Suppress("MatchingDeclarationName", "Filename")
+
 package dev.reader.app.ui.reader
 
 import androidx.compose.ui.geometry.Offset
@@ -34,6 +37,7 @@ internal class BlockAnchorRegistry {
     fun resolveFraction(document: RichDocument, root: LayoutCoordinates, rect: Rect): Float? {
         val point = rect.topLeft
         var best: Pair<Int, Offset>? = null
+        @Suppress("LoopWithTooManyJumpStatements") // guard-style continues read better than nesting
         for ((index, pair) in anchors) {
             val (coordinates, layout) = pair
             if (!coordinates.isAttached) continue

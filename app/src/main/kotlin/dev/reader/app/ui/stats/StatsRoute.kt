@@ -13,7 +13,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun StatsRoute(graph: ReaderGraph, modifier: Modifier = Modifier) {
-    val summaryFlow = remember(graph) { graph.stats.observeSummary(graph.settings.preferences.map { it.sessionStatsFrom }) }
+    val summaryFlow =
+        remember(graph) { graph.stats.observeSummary(graph.settings.preferences.map { it.sessionStatsFrom }) }
     val summary by summaryFlow.collectAsState(initial = StatsSummary())
     val sessions by graph.stats.observeAllSessions().collectAsState(initial = emptyList())
     val books by graph.library.observeBooks().collectAsState(initial = emptyList())

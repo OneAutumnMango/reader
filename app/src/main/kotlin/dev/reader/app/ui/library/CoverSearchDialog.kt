@@ -108,8 +108,10 @@ fun CoverSearchDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 TextButton(
                     onClick = {
-                        val query = Uri.encode(listOf(title, author, "book cover").filter { it.isNotBlank() }.joinToString(" "))
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?tbm=isch&q=$query"))
+                        val terms = listOf(title, author, "book cover").filter { it.isNotBlank() }
+                        val query = Uri.encode(terms.joinToString(" "))
+                        val intent =
+                            Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?tbm=isch&q=$query"))
                         runCatching { context.startActivity(intent) }
                     },
                     modifier = Modifier.testTag("cover-search-browser"),
@@ -136,7 +138,8 @@ fun CoverSearchDialog(
 @Composable
 private fun CoverCandidateThumbnail(candidate: CoverCandidate, service: CoverSearchService, onClick: () -> Unit) {
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, candidate.previewUrl) {
-        value = service.download(candidate.previewUrl)?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+        value = service.download(candidate.previewUrl)
+            ?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
     }
     Box(
         modifier = Modifier

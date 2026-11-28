@@ -1,3 +1,6 @@
+// Named for the feature: the file also holds the functions around its one class.
+@file:Suppress("MatchingDeclarationName", "Filename")
+
 package dev.reader.app.ui.reader
 
 import dev.reader.core.richtext.Block

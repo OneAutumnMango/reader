@@ -11,7 +11,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -109,7 +108,12 @@ fun PagedReader(
             ) {
                 val content: @Composable () -> Unit = {
                     Column(verticalArrangement = Arrangement.spacedBy(theme.paragraphSpacingSp.dp)) {
-                        pages.getOrNull(index)?.forEach { PagedReaderBlock(it.value, theme, useBookStyling, highlight, onBookmarkTap, textWidthPx.toFloat(), pageHeightPx) }
+                        pages.getOrNull(index)?.forEach {
+                            PagedReaderBlock(
+                                it.value, theme, useBookStyling, highlight, onBookmarkTap,
+                                textWidthPx.toFloat(), pageHeightPx,
+                            )
+                        }
                     }
                 }
                 if (settings.selectableText) SelectionContainer { content() } else content()
@@ -193,7 +197,15 @@ private fun Block.styleOf(theme: ReaderTheme, useBookStyling: Boolean) = when (t
 }
 
 @Composable
-private fun PagedReaderBlock(block: Block, theme: ReaderTheme, useBookStyling: Boolean, highlight: Regex?, onBookmarkTap: ((String) -> Unit)?, textWidthPx: Float, pageHeightPx: Float) {
+private fun PagedReaderBlock(
+    block: Block,
+    theme: ReaderTheme,
+    useBookStyling: Boolean,
+    highlight: Regex?,
+    onBookmarkTap: ((String) -> Unit)?,
+    textWidthPx: Float,
+    pageHeightPx: Float
+) {
     if (block is Block.Image) {
         // Known-size images take their natural height (the pager measured the same value); unknown ones fill the page.
         val heightPx = block.fittedHeightPx(textWidthPx, pageHeightPx, pageHeightPx)

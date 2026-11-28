@@ -99,7 +99,7 @@ class RootFolderScannerTest {
     }
 
     @Test
-    fun `tagSeries sets series from folder, clears it for a book moved to the root, and leaves books alone when a root cannot be read`() =
+    fun `tagSeries sets series from folder, clears it at the root, and skips books under an unreadable root`() =
         runBlocking {
             val root = createTempDirectory("library-tag").toFile()
             val settingsDir = createTempDirectory("library-tag-settings").toFile()

@@ -9,6 +9,7 @@ sealed interface Block {
     data class Paragraph(val spans: List<Span>, val textAlign: Justification? = null) : Block
     data class Heading(val level: Int, val spans: List<Span>, val textAlign: Justification? = null) : Block
     data class ListItem(val spans: List<Span>, val ordered: Boolean, val index: Int) : Block
+
     /** [width]/[height] are the image's natural pixel size, or 0 when unknown (then it gets a fixed-size slot). */
     data class Image(val path: String, val alt: String = "", val width: Int = 0, val height: Int = 0) : Block
 }

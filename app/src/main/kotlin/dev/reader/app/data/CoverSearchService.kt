@@ -14,6 +14,10 @@ data class CoverCandidate(val previewUrl: String, val fullUrl: String, val label
 
 private const val USER_AGENT = "ReaderApp/1.0 (personal ebook reader; cover lookup)"
 
+private const val MAX_RESULTS = 8
+private const val CONNECT_TIMEOUT_MS = 10_000
+private const val READ_TIMEOUT_MS = 15_000
+
 /** Finds candidate cover images via the Open Library covers API, which needs no API key. */
 class CoverSearchService {
 
@@ -56,13 +60,13 @@ class CoverSearchService {
                 fullUrl = "https://covers.openlibrary.org/b/id/$coverId-L.jpg",
                 label = doc.optString("title", fallbackTitle),
             )
-        }.distinctBy { it.fullUrl }.take(8)
+        }.distinctBy { it.fullUrl }.take(MAX_RESULTS)
     }
 
     private fun connect(url: String): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 10_000
-            readTimeout = 15_000
+            connectTimeout = CONNECT_TIMEOUT_MS
+            readTimeout = READ_TIMEOUT_MS
             instanceFollowRedirects = true
             setRequestProperty("User-Agent", USER_AGENT)
         }

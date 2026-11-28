@@ -74,7 +74,8 @@ fun LibraryScreen(
         ) { page ->
             val category = pages.getOrNull(page)
             val pageBooks = if (category == null) books else booksByCategory[category].orEmpty()
-            val groupedItems = remember(pageBooks, groupBySeries) { if (groupBySeries) groupBySeries(pageBooks) else emptyList() }
+            val groupedItems =
+                remember(pageBooks, groupBySeries) { if (groupBySeries) groupBySeries(pageBooks) else emptyList() }
             LazyVerticalGrid(
                 state = gridStateFor(category) ?: rememberLazyGridState(),
                 columns = GridCells.Fixed(layout.columns),
@@ -96,10 +97,13 @@ fun LibraryScreen(
                     )
                 }
                 if (groupBySeries) {
-                    items(groupedItems, key = { if (it is LibraryItem.Series) "series:${it.name}" else (it as LibraryItem.Single).book.id.value }) { item ->
+                    items(groupedItems, key = {
+                        if (it is LibraryItem.Series) "series:${it.name}" else (it as LibraryItem.Single).book.id.value
+                    }) { item ->
                         when (item) {
                             is LibraryItem.Single -> bookCard(item.book)
-                            is LibraryItem.Series -> SeriesCard(item.name, item.books, onClick = { onSeriesClick(item.name) })
+                            is LibraryItem.Series ->
+                                SeriesCard(item.name, item.books, onClick = { onSeriesClick(item.name) })
                         }
                     }
                 } else {

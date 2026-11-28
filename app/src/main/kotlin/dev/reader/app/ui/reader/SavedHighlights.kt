@@ -6,6 +6,7 @@ import dev.reader.core.richtext.RichDocument
 import dev.reader.core.richtext.Span
 import kotlin.math.abs
 
+@Suppress("CyclomaticComplexMethod") // exactly at the limit; splitting would scatter one mapping
 internal fun RichDocument.withSavedHighlights(bookmarks: List<Bookmark>): RichDocument {
     val spansByBlock = blocks.map { block ->
         when (block) {
@@ -60,7 +61,11 @@ internal fun RichDocument.withSavedHighlights(bookmarks: List<Bookmark>): RichDo
     )
 }
 
-private fun Span.withHighlightRanges(offset: Int, ranges: List<IntRange>, rangeToId: Map<IntRange, String>): List<Span> {
+private fun Span.withHighlightRanges(
+    offset: Int,
+    ranges: List<IntRange>,
+    rangeToId: Map<IntRange, String>,
+): List<Span> {
     val highlightBoundaries = ranges.flatMap { range ->
         listOf((range.first - offset).coerceIn(0, text.length), (range.last + 1 - offset).coerceIn(0, text.length))
     }

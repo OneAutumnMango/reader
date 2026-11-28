@@ -231,7 +231,8 @@ fun ReaderRoute(
                 onToggleSelectableText = {
                     scope.launch {
                         graph.settings.update {
-                            it.copy(readerSettings = it.readerSettings.copy(selectableText = !it.readerSettings.selectableText))
+                            val reader = it.readerSettings
+                            it.copy(readerSettings = reader.copy(selectableText = !reader.selectableText))
                         }
                     }
                 },
@@ -476,7 +477,12 @@ private fun ChapterPage(
         }
     }
 
-    fun saveSelectionBookmark(action: SelectionAction, selectedText: String, note: String = "", anchorFraction: Float? = null) {
+    fun saveSelectionBookmark(
+        action: SelectionAction,
+        selectedText: String,
+        note: String = "",
+        anchorFraction: Float? = null,
+    ) {
         scope.launch {
             graph.bookmarks.add(
                 Bookmark(

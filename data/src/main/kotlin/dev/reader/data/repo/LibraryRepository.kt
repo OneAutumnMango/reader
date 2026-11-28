@@ -22,7 +22,8 @@ import java.io.File
 @Suppress("TooManyFunctions")
 class LibraryRepository(private val database: ReaderDatabase) {
 
-    fun observeBooks(): Flow<List<Book>> = combine(database.books().observeAll(), database.books().observeCategoryRefs()) { books, _ -> books.toBooks() }
+    fun observeBooks(): Flow<List<Book>> =
+        combine(database.books().observeAll(), database.books().observeCategoryRefs()) { books, _ -> books.toBooks() }
 
     fun observeBooksInCategory(categoryId: CategoryId): Flow<List<Book>> =
         database.books().observeByCategory(categoryId.value).map { it.toBooks() }

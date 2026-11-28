@@ -265,8 +265,13 @@ fun ReaderMenuOverlay(
                             ) {
                                 Icon(
                                     Icons.Filled.TextFields,
-                                    contentDescription = if (settings.selectableText) "Disable selectable text" else "Enable selectable text",
-                                    tint = LocalContentColor.current.copy(alpha = if (settings.selectableText) 1f else 0.4f),
+                                    contentDescription = if (settings.selectableText) {
+                                        "Disable selectable text"
+                                    } else {
+                                        "Enable selectable text"
+                                    },
+                                    tint = LocalContentColor.current
+                                        .copy(alpha = if (settings.selectableText) 1f else 0.4f),
                                 )
                             }
                         }
@@ -289,7 +294,11 @@ fun ReaderMenuOverlay(
                             ) {
                                 Icon(
                                     if (isNightTheme) Icons.Filled.DarkMode else Icons.Filled.LightMode,
-                                    contentDescription = if (isNightTheme) "Switch to day theme" else "Switch to night theme",
+                                    contentDescription = if (isNightTheme) {
+                                        "Switch to day theme"
+                                    } else {
+                                        "Switch to night theme"
+                                    },
                                 )
                             }
                         }

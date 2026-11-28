@@ -10,6 +10,8 @@ import dev.reader.data.room.entity.BookCategoryCrossRef
 import dev.reader.data.room.entity.BookEntity
 import kotlinx.coroutines.flow.Flow
 
+// One query per function; splitting the DAO only to lower the count would add nothing.
+@Suppress("TooManyFunctions")
 @Dao
 interface BookDao {
 

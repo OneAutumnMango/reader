@@ -81,7 +81,9 @@ fun ReaderThemeEditor(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Background colour", modifier = Modifier.weight(1f))
             ColorSwatch(theme.backgroundColor, selected = false, onClick = {})
-            PickColorButton(theme.backgroundColor, "Day background colour") { onChange(theme.copy(backgroundColor = it)) }
+            PickColorButton(theme.backgroundColor, "Day background colour") {
+                onChange(theme.copy(backgroundColor = it))
+            }
         }
         Text(
             "Night",

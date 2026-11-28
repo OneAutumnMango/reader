@@ -5,8 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material.icons.Icons
@@ -183,7 +183,8 @@ fun LibraryRoute(
                     groupBySeries = grouping && openSeries == null,
                     onSeriesClick = { openSeries = it },
                     books = openSeries?.let { name ->
-                        sortedBooks.filter { it.series == name }.sortedWith(compareBy(NaturalSortComparator) { it.title })
+                        sortedBooks.filter { it.series == name }
+                            .sortedWith(compareBy(NaturalSortComparator) { it.title })
                     } ?: sortedBooks,
                     categories = categories,
                     selectedCategory = selectedCategory,

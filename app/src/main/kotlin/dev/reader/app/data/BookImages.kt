@@ -38,14 +38,14 @@ internal object BookImages {
         // Not a raster: try an SVG's width/height attributes.
         val head = file.inputStream().use { it.readNBytes(SVG_HEAD_BYTES) }.decodeToString()
         val tag = SVG_TAG.find(head)?.value ?: return 0 to 0
-        val w = SVG_SIZE("width").find(tag)?.groupValues?.get(1)?.toFloatOrNull() ?: return 0 to 0
-        val h = SVG_SIZE("height").find(tag)?.groupValues?.get(1)?.toFloatOrNull() ?: return 0 to 0
+        val w = svgSizeAttribute("width").find(tag)?.groupValues?.get(1)?.toFloatOrNull() ?: return 0 to 0
+        val h = svgSizeAttribute("height").find(tag)?.groupValues?.get(1)?.toFloatOrNull() ?: return 0 to 0
         if (w > 0 && h > 0) w.toInt() to h.toInt() else 0 to 0
     }.getOrDefault(0 to 0)
 
     private const val SVG_HEAD_BYTES = 2048
     private val SVG_TAG = Regex("<svg\\b[^>]*>")
-    private fun SVG_SIZE(name: String) = Regex("\\b$name\\s*=\\s*\"([0-9.]+)(?:px)?\"")
+    private fun svgSizeAttribute(name: String) = Regex("\\b$name\\s*=\\s*\"([0-9.]+)(?:px)?\"")
 
     private fun resolvePath(context: Context, source: File, format: BookFormat, path: String): String {
         if (path.isBlank()) return path
