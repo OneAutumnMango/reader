@@ -16,8 +16,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -38,6 +40,11 @@ import dev.reader.app.data.markBookRead
 import dev.reader.app.data.markBookUnread
 import dev.reader.app.ui.ScreenTopBar
 import dev.reader.app.ui.rememberImportActions
+import dev.reader.app.ui.sync.MERGE_ACTION
+import dev.reader.app.ui.sync.QuickSyncButton
+import dev.reader.app.ui.sync.SyncUiState
+import dev.reader.app.ui.sync.quickSyncAction
+import dev.reader.app.ui.sync.quickSyncMessage
 import dev.reader.core.model.Book
 import dev.reader.core.model.BookId
 import dev.reader.core.model.Category
@@ -62,6 +69,8 @@ fun LibraryRoute(
     selectedCategory: CategoryId? = null,
     onCategorySelected: (CategoryId?) -> Unit = {},
     modifier: Modifier = Modifier,
+    onOpenMerge: () -> Unit = {},
+    onOpenSync: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -84,6 +93,19 @@ fun LibraryRoute(
     var isRefreshing by remember { mutableStateOf(false) }
     var missingBooks by remember { mutableStateOf<List<Book>>(emptyList()) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val syncState by graph.sync.state.collectAsState()
+
+    // Shown once, from this composition's scope: if the library has gone by then, the result is dropped.
+    fun showSyncMessage(message: String, action: String? = null) {
+        scope.launch {
+            // With an action the default is to stay until dismissed, which would hold back later messages.
+            val result = snackbarHostState.showSnackbar(message, action, duration = SnackbarDuration.Long)
+            if (result == SnackbarResult.ActionPerformed) {
+                if (action == MERGE_ACTION) onOpenMerge() else onOpenSync()
+            }
+        }
+    }
+    val showSyncResult = { done: SyncUiState -> showSyncMessage(quickSyncMessage(done), quickSyncAction(done)) }
 
     val coverPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val target = coverTargetBook
@@ -111,6 +133,14 @@ fun LibraryRoute(
         if (openSeries != null && sortedBooks.count { it.series == openSeries } < 2) openSeries = null
     }
     ScreenTopBar(title = null) {
+        QuickSyncButton(
+            syncState,
+            onSync = { graph.sync.syncNow(showSyncResult) },
+            onPullOnly = { graph.sync.pullOnly(showSyncResult) },
+            onPushOnly = { graph.sync.pushOnly { showSyncMessage(it.error ?: "Published") } },
+            onMerge = onOpenMerge,
+            onSettings = onOpenSync,
+        )
         LibrarySortMenu(sort, descending) { newSort, newDescending ->
             scope.launch {
                 graph.settings.update { it.copy(librarySort = newSort, librarySortDescending = newDescending) }
@@ -316,8 +346,6 @@ fun LibraryRoute(
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
-        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
-
         Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
             if (!selecting) {
                 FloatingActionButton(onClick = { showQuickAddMenu = true }) {
@@ -341,5 +369,7 @@ fun LibraryRoute(
                 }
             }
         }
+        // After the add button, so that the button cannot cover the message's action.
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }

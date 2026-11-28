@@ -251,6 +251,8 @@ fun ReaderApp(graph: ReaderGraph) {
                         selectedCategory = libraryCategory,
                         onCategorySelected = { libraryCategory = it },
                         modifier = content,
+                        onOpenMerge = { navigator.push(Destination.Merge) },
+                        onOpenSync = { navigator.switchRoot(Destination.OnlineSync) },
                     )
                     Destination.Search -> SearchRoute(
                         graph,
