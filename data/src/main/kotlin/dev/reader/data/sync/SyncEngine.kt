@@ -23,6 +23,9 @@ import java.io.IOException
 
 private const val CONFLICT_MARKER = ".sync-conflict-"
 private const val TOO_LARGE = "File is too large"
+private const val TOO_MANY = "Too many sync files"
+private const val MAX_PULL_FILES = 50
+private const val MAX_PULL_BYTES = 40L * 1024 * 1024
 
 data class SyncDocument(val name: String, val size: Long)
 
@@ -56,7 +59,31 @@ data class SyncReport(
     val publishError: String? = null,
 )
 
-private class Pulled(val files: List<SyncFile>, val devices: List<DeviceInfo>, val rejected: List<RejectedFile>)
+/** [files] hold only books in this library; the rest are listed in [skipped]. */
+private class Pulled(
+    val files: List<SyncFile>,
+    val devices: List<DeviceInfo>,
+    val rejected: List<RejectedFile>,
+    val skipped: List<SkippedBook>,
+)
+
+/** Limits what one pull reads, since every decoded file is held in memory at once. */
+private class PullLimit {
+    private var files = 0
+    private var bytes = 0L
+
+    suspend fun read(folder: SyncFolder, document: SyncDocument): ByteArray {
+        if (document.size > MAX_SYNC_FILE_BYTES) throw SyncFileException(TOO_LARGE)
+        var content: ByteArray? = null
+        if (files < MAX_PULL_FILES && bytes + document.size <= MAX_PULL_BYTES) {
+            files++
+            content = folder.read(document.name)
+            // The listed size can be wrong, so the larger of the two counts.
+            bytes += maxOf(document.size, content.size.toLong())
+        }
+        return content?.takeIf { bytes <= MAX_PULL_BYTES } ?: throw SyncFileException(TOO_MANY)
+    }
+}
 
 /** The outcome of comparing the library with the pulled files; nothing has been written yet. */
 private class Merge(
@@ -79,16 +106,20 @@ private fun List<ItemRecord>.byKey() = associate { it.key to it.item }
 
 private fun Map<ItemKey, Versioned>.toRecords() = map { ItemRecord(it.key, it.value) }
 
-/** Counts local changes since the last time. Records of books that are absent or skipped now are kept. */
+/**
+ * Counts local changes since the last time. Records, and pending records, of items that are absent or hidden now
+ * are kept.
+ */
 private fun recorded(state: SyncState, snapshot: LibrarySnapshot): SyncState {
     val records = state.records.byKey().toMutableMap()
     val pending = state.pending.byKey()
-    for ((key, current) in snapshot.items()) {
+    val items = snapshot.items()
+    for ((key, current) in items) {
         // An apply that reached the library before its records were saved is not a local change.
         val intended = pending[key]?.takeIf { sameValue(it.value, current) }
         records[key] = record(key.kind, intended ?: records[key], current, state.deviceId)
     }
-    return state.copy(records = records.toRecords(), pending = emptyList())
+    return state.copy(records = records.toRecords(), pending = state.pending.filter { it.key !in items })
 }
 
 /**
@@ -117,10 +148,8 @@ private fun offers(snapshot: LibrarySnapshot, files: List<SyncFile>): Offers {
     val skipped = linkedSetOf<SkippedBook>()
     val candidates = mutableMapOf<ItemKey, MutableList<Candidate>>()
     for ((deviceId, peer) in files.flatMap { file -> file.books.map { file.deviceId to it } }) {
-        val book = snapshot.books[peer.contentHash]
-        if (book == null) {
-            skipped += SkippedBook(peer.title, "Not in this library")
-        } else if (book.signature != peer.signature) {
+        val book = snapshot.books[peer.contentHash] ?: continue // removed while the files were being read
+        if (book.signature != peer.signature) {
             skipped += SkippedBook(book.title, "Chapters don't match")
         } else {
             for ((key, item) in peer.items()) {
@@ -138,28 +167,41 @@ private fun SyncBook.items(): List<Pair<ItemKey, Versioned>> = buildList {
     categories?.let { add(ItemKey(contentHash, ItemKind.CATEGORIES) to it) }
 }
 
+/** Merged histories add up across files, and this install's own count must still fit after its next change. */
+private fun publishable(item: Versioned, deviceId: String) = (item.version.keys + deviceId).size <= MAX_VERSION_ENTRIES
+
+private fun historyTooLong(title: String) = SkippedBook(title, "Change history is too long")
+
 private fun merge(state: SyncState, snapshot: LibrarySnapshot, files: List<SyncFile>, oneCategory: Boolean): Merge {
     val offers = offers(snapshot, files)
     val records = state.records.byKey().toMutableMap()
     val applied = mutableMapOf<ItemKey, Versioned>()
     val changes = mutableListOf<Change>()
     val questions = mutableListOf<Question>()
+    val tooLong = linkedSetOf<SkippedBook>()
     for (key in snapshot.items().keys) {
         val others = offers.candidates[key] ?: continue
         val local = records.getValue(key)
         val title = snapshot.books.getValue(key.bookHash).title
         when (val decision = decide(state.deviceId, local, others, oneCategory)) {
-            is Decision.Keep ->
-                records[key] = local.copy(version = decision.item.version, rewound = decision.item.rewound)
+            is Decision.Keep -> {
+                val kept = local.copy(version = decision.item.version, rewound = decision.item.rewound)
+                if (publishable(kept, state.deviceId)) records[key] = kept else tooLong += historyTooLong(title)
+            }
             is Decision.Apply -> {
                 val all = listOf(local) + others.map { it.item }
-                applied[key] = resolve(decision.item, all, state.deviceId, manual = false)
-                changes += Change(key, title, local.value, decision.item.value, decision.sourceDeviceId)
+                val resolved = resolve(decision.item, all, state.deviceId, manual = false)
+                if (publishable(resolved, state.deviceId)) {
+                    applied[key] = resolved
+                    changes += Change(key, title, local.value, decision.item.value, decision.sourceDeviceId)
+                } else {
+                    tooLong += historyTooLong(title)
+                }
             }
             is Decision.Ask -> questions += Question(key, title, decision.reason, decision.choices, local)
         }
     }
-    return Merge(records, applied, changes, questions, snapshot.skipped + offers.skipped)
+    return Merge(records, applied, changes, questions, snapshot.skipped + offers.skipped + tooLong)
 }
 
 /** Publishes this install's sync file and merges the others into the library. */
@@ -176,8 +218,12 @@ class SyncEngine(
 
     suspend fun publish(folder: SyncFolder) = locked { publishFile(folder, emptyMap()) }
 
+    suspend fun state(): SyncState = locked { store.load() }
+
+    suspend fun updateState(transform: (SyncState) -> SyncState) = locked { store.save(transform(store.load())) }
+
     suspend fun sync(folder: SyncFolder, publish: Boolean = true): SyncReport = locked {
-        val pulled = pull(folder, store.load())
+        val pulled = pull(folder)
         // Read the library after the files, which can be slow, to keep the gap before writing short.
         val snapshot = library.snapshot()
         val state = recorded(store.load(), snapshot)
@@ -200,29 +246,13 @@ class SyncEngine(
 
     /** Writes what [merge] decided to apply, saves the outcome and returns the changes that took effect. */
     private suspend fun write(state: SyncState, merge: Merge): List<Change> {
-        // The user may have moved on since the merge was decided; those items wait for the next sync.
-        val fresh = library.snapshot()
-        val current = fresh.items()
-        val decidedOn = state.records.byKey()
-        val due = merge.applied.filterKeys { it in current && sameValue(current[it], decidedOn.getValue(it).value) }
-        val dueChanges = merge.changes.filter { it.key in due }
-
-        // Intended records are saved first so that dying mid-apply cannot turn them into local changes.
-        val intent = state.copy(pending = due.toRecords(), lastChanges = dueChanges)
-        store.save(intent)
-        var done = due
-        if (due.isNotEmpty()) {
-            library.write(fresh, due.mapValues { it.value.value })
-            val after = library.snapshot().items()
-            // The library can ignore a write; recording it anyway would look like the user undid it. An item
-            // that is now hidden (categories turned ambiguous) was written, so it keeps the new record.
-            done = due.filter { (key, item) -> key !in after || sameValue(after[key], item.value) }
-        }
-        val changes = dueChanges.filter { it.key in done }
+        // One transaction, so the user cannot change an item between the check that it is unchanged and the write.
+        val (intent, done) = library.transaction { writeUnchanged(state, merge) }
+        val changes = intent.lastChanges.filter { it.key in done }
         store.save(
             intent.copy(
                 records = (merge.records + done).toRecords(),
-                pending = emptyList(),
+                pending = state.pending,
                 lastChanges = changes,
                 lastSyncAt = now(),
                 questionCount = merge.questions.size,
@@ -231,9 +261,31 @@ class SyncEngine(
         return changes
     }
 
+    /** Returns the state saved before writing and the records of the writes that took effect. */
+    private suspend fun writeUnchanged(state: SyncState, merge: Merge): Pair<SyncState, Map<ItemKey, Versioned>> {
+        // The user may have moved on since the merge was decided; those items wait for the next sync.
+        val fresh = library.snapshot()
+        val current = fresh.items()
+        val decidedOn = state.records.byKey()
+        val due = merge.applied.filterKeys { it in current && sameValue(current[it], decidedOn.getValue(it).value) }
+
+        // Intended records are saved first so that dying mid-apply cannot turn them into local changes.
+        val intent = state.copy(
+            pending = state.pending + due.toRecords(),
+            lastChanges = merge.changes.filter { it.key in due },
+        )
+        store.save(intent)
+        if (due.isEmpty()) return intent to due
+        library.write(fresh, due.mapValues { it.value.value })
+        val after = library.snapshot().items()
+        // The library can ignore a write; recording it anyway would look like the user undid it. An item
+        // that is now hidden (categories turned ambiguous) was written, so it keeps the new record.
+        return intent to due.filter { (key, item) -> key !in after || sameValue(after[key], item.value) }
+    }
+
     /** Finds the open questions without changing the library, the saved state or the folder. */
     suspend fun check(folder: SyncFolder): SyncReport = locked {
-        val pulled = pull(folder, store.load())
+        val pulled = pull(folder)
         val snapshot = library.snapshot()
         val state = recorded(store.load(), snapshot)
         report(state, pulled, merge(state, snapshot, pulled.files, oneCategory()))
@@ -243,7 +295,7 @@ class SyncEngine(
 
     private fun report(state: SyncState, pulled: Pulled, merge: Merge) = SyncReport(
         questions = merge.questions,
-        skipped = merge.skipped,
+        skipped = merge.skipped + pulled.skipped,
         rejected = pulled.rejected,
         devices = pulled.devices,
         // A file's own name for itself wins over what other files call that device.
@@ -252,19 +304,22 @@ class SyncEngine(
             (state.deviceId to state.deviceName),
     )
 
-    private suspend fun pull(folder: SyncFolder, state: SyncState): Pulled {
+    private suspend fun pull(folder: SyncFolder): Pulled {
+        val state = store.load()
         val ownName = syncFileName(state.deviceName, state.deviceId)
+        val known = library.snapshot().books.keys
         val files = mutableListOf<SyncFile>()
         val devices = mutableListOf<DeviceInfo>()
         val rejected = mutableListOf<RejectedFile>()
+        val skipped = linkedSetOf<SkippedBook>()
+        val limit = PullLimit()
         for (document in folder.list().filter { isSyncFileName(it.name) && it.name != ownName }) {
-            if (document.size > MAX_SYNC_FILE_BYTES) {
-                rejected += RejectedFile(document.name, TOO_LARGE)
-                continue
-            }
             try {
-                val file = SyncFileCodec.decode(folder.read(document.name))
-                files += file
+                val file = SyncFileCodec.decode(limit.read(folder, document))
+                // Other books are dropped now so that they do not stay in memory.
+                val (matched, unknown) = file.books.partition { it.contentHash in known }
+                unknown.forEach { skipped += SkippedBook(it.title, "Not in this library") }
+                files += file.copy(books = matched)
                 val conflictCopy = CONFLICT_MARKER in document.name
                 devices += DeviceInfo(file.deviceId, file.deviceName, file.publishedAt, conflictCopy)
             } catch (e: IOException) {
@@ -273,7 +328,7 @@ class SyncEngine(
                 rejected += RejectedFile(document.name, e.message.orEmpty())
             }
         }
-        return Pulled(files, devices, rejected)
+        return Pulled(files, devices, rejected, skipped.toList())
     }
 
     /** Must be called under the lock. */
@@ -314,21 +369,25 @@ class SyncEngine(
 
     /** Removes files this install wrote under an earlier name. Anything not provably its own is kept. */
     private suspend fun deleteOldFiles(folder: SyncFolder, ownName: String, deviceId: String) {
-        // Every name this install has used ends the same way as its current one.
-        val ending = ownName.substring(ownName.lastIndexOf('-'))
-        for (document in folder.list()) {
-            val name = document.name
-            val candidate = name != ownName && isSyncFileName(name) && name.endsWith(ending) &&
-                CONFLICT_MARKER !in name && document.size <= MAX_SYNC_FILE_BYTES
-            if (!candidate) continue
-            val owner = try {
-                SyncFileCodec.decode(folder.read(name)).deviceId
-            } catch (_: IOException) {
-                null
-            } catch (_: SyncFileException) {
-                null
-            }
-            if (owner == deviceId) folder.delete(name)
+        // The new file is already written, so a failure here only leaves an old file for a later publish to remove.
+        val documents = try {
+            folder.list()
+        } catch (_: IOException) {
+            return
         }
+        val candidates = documents.filter {
+            it.name != ownName && isOwnNamingScheme(it.name, deviceId) && it.size <= MAX_SYNC_FILE_BYTES
+        }
+        candidates.forEach { deleteIfOwn(folder, it.name, deviceId) }
+    }
+
+    private suspend fun deleteIfOwn(folder: SyncFolder, name: String, deviceId: String): Boolean = try {
+        val own = SyncFileCodec.decode(folder.read(name)).deviceId == deviceId
+        if (own) folder.delete(name)
+        own
+    } catch (_: IOException) {
+        false
+    } catch (_: SyncFileException) {
+        false
     }
 }

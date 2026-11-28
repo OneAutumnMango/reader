@@ -113,6 +113,9 @@ class SyncLibrary(
         LibrarySnapshot(books, skipped)
     }
 
+    /** Runs [block] in one database transaction, which [snapshot] and [write] join. */
+    suspend fun <T> transaction(block: suspend () -> T): T = database.withTransaction { block() }
+
     /** Applies [changes] in one transaction. Anything naming an unknown book or chapter is ignored. */
     suspend fun write(snapshot: LibrarySnapshot, changes: Map<ItemKey, ItemValue?>) = database.withTransaction {
         for ((key, value) in changes) {

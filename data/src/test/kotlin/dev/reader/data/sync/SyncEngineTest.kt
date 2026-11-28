@@ -45,6 +45,7 @@ private class FakeSyncFolder : SyncFolder {
     val reads = mutableListOf<String>()
     var listFails = false
     var writeFails = false
+    var deleteFails = false
     var writes = 0
     var writeGate: CompletableDeferred<Unit>? = null
     val writing = CompletableDeferred<Unit>()
@@ -68,6 +69,7 @@ private class FakeSyncFolder : SyncFolder {
     }
 
     override suspend fun delete(name: String) {
+        if (deleteFails) throw IOException("Delete refused")
         files.remove(name)
     }
 }
@@ -86,15 +88,31 @@ class SyncEngineTest {
     private inner class Device(val id: String, withBook: Boolean = true) {
         /** Runs after a merge has read the library and before it writes. */
         var duringMerge: suspend () -> Unit = {}
+
+        /** Runs while the library is writing, when it creates a category. */
+        var duringWrite: () -> Unit = {}
+
+        /** Whether the library was in a transaction at each save of the sync state. */
+        val savedInTransaction = mutableListOf<Boolean>()
         val database = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
             ReaderDatabase::class.java,
         ).allowMainThreadQueries().build()
         val repository = LibraryRepository(database)
         private var ids = 0
-        val store = SyncStateStore(File(temp.newFolder(), "sync.json"), id) { if (ids++ == 0) id else "$id-$ids" }
+        private val stateFile = object : File(temp.newFolder(), "sync.json") {
+            // Every save asks for the parent folder.
+            override fun getParentFile(): File? {
+                savedInTransaction += database.inTransaction()
+                return super.getParentFile()
+            }
+        }
+        val store = SyncStateStore(stateFile, id) { if (ids++ == 0) id else "$id-$ids" }
         val engine = SyncEngine(
-            SyncLibrary(database),
+            SyncLibrary(database) {
+                duringWrite()
+                "new-category"
+            },
             store,
             {
                 duringMerge()
@@ -144,9 +162,10 @@ class SyncEngineTest {
         chapters: List<SyncChapter> = emptyList(),
         categories: Versioned? = null,
         signature: String,
+        deviceId: String = "peer",
     ) = SyncFileCodec.encode(
         SyncFile(
-            deviceId = "peer",
+            deviceId = deviceId,
             deviceName = "Peer",
             devices = emptyMap(),
             publishedAt = 5,
@@ -352,12 +371,17 @@ class SyncEngineTest {
         val copy = old.removeSuffix(".json") + ".sync-conflict-20261128-1.json"
         val copyWithSuffix = "reader-sync-x.sync-conflict-1-aaaaaa.json"
         val otherScheme = "reader-sync-handmade.json"
-        listOf(copy, copyWithSuffix, otherScheme).forEach { folder.files[it] = folder.files.getValue(old) }
+        val otherCharacters = "reader-sync-My_Notes-aaaaaa.json"
+        val kept = listOf(copy, copyWithSuffix, otherScheme, otherCharacters)
+        kept.forEach { folder.files[it] = folder.files.getValue(old) }
         a.store.save(a.store.load().copy(deviceName = "Renamed"))
 
         a.engine.publish(folder)
 
-        assertEquals(setOf(a.fileName, b.fileName, copy, copyWithSuffix, otherScheme), folder.files.keys)
+        assertEquals(
+            setOf(a.fileName, b.fileName, copy, copyWithSuffix, otherScheme, otherCharacters),
+            folder.files.keys,
+        )
     }
 
     @Test
@@ -494,6 +518,161 @@ class SyncEngineTest {
         a.engine.sync(folder)
 
         assertEquals(Versioned(CategoriesValue(listOf("Dup")), mapOf("peer" to 1L)), a.record(key))
+    }
+
+    @Test
+    fun `the intent is saved in the same transaction as the write`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        val b = Device("bbbbbb")
+        a.read(1, 0.5f, 10)
+        a.engine.publish(folder)
+        b.engine.publish(folder)
+        b.savedInTransaction.clear()
+
+        b.engine.sync(folder, publish = false)
+
+        // The intent inside the transaction, the outcome after it has committed.
+        assertEquals(listOf(true, false), b.savedInTransaction)
+    }
+
+    @Test
+    fun `a failed library write rolls back and its pending record is not adopted`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        folder.files["reader-sync-peer-peer.json"] = peerFile(
+            position = Versioned(PositionValue(1, 0.5f, false, 1), mapOf("peer" to 1L)),
+            categories = Versioned(CategoriesValue(listOf("New")), mapOf("peer" to 1L)),
+            signature = signature(a),
+        )
+        a.duringWrite = { error("boom") }
+
+        assertFailsWith<IllegalStateException> { a.engine.sync(folder) }
+        assertNull(a.progress())
+        assertEquals(2, a.store.load().pending.size)
+        assertEquals(0, folder.writes)
+        a.engine.publish(folder)
+        assertEquals(emptyList(), a.store.load().pending)
+        assertEquals(emptyMap(), a.record().version)
+        a.duringWrite = {}
+        val report = a.engine.sync(folder)
+
+        assertEquals(2, report.applied.size)
+        assertEquals(mapOf("peer" to 1L), a.record().version)
+        assertEquals("a-1" to 0.5f, a.progress())
+    }
+
+    @Test
+    fun `pending is kept while its book is hidden`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        a.engine.publish(folder)
+        val before = a.store.load()
+        val pending = ItemRecord(POSITION, Versioned(PositionValue(1, 0.5f, false, 10), mapOf("peer" to 1L)))
+        a.read(1, 0.5f, 10)
+        a.store.save(before.copy(pending = listOf(pending)))
+        a.addBook("copy", HASH)
+
+        a.engine.publish(folder)
+        a.engine.sync(folder)
+        assertEquals(listOf(pending), a.store.load().pending)
+        a.repository.deleteBook(BookId("copy"))
+        a.engine.sync(folder)
+
+        assertEquals(pending.item, a.record())
+        assertEquals(emptyList(), a.store.load().pending)
+    }
+
+    @Test
+    fun `own conflict copy is read and kept`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        val copy = "reader-sync-aaaaaa-aaaaaa.sync-conflict-20261128-1.json"
+        folder.files[copy] = peerFile(
+            position = Versioned(PositionValue(1, 0.5f, false, 1), mapOf("aaaaaa" to 5L)),
+            signature = signature(a),
+            deviceId = "aaaaaa",
+        )
+
+        val report = a.engine.sync(folder)
+
+        assertEquals("a-1" to 0.5f, a.progress())
+        assertEquals(mapOf("aaaaaa" to 5L), a.record().version)
+        assertTrue(report.devices.single().conflictCopy)
+        assertTrue(copy in folder.files)
+    }
+
+    @Test
+    fun `a merged history too long to publish is not recorded`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        val signature = signature(a)
+        for (peer in listOf("x", "y")) {
+            folder.files["reader-sync-$peer-$peer.json"] = peerFile(
+                position = Versioned(PositionValue(1, 0.5f, false, 1), (1..40).associate { "$peer$it" to 1L }),
+                signature = signature,
+                deviceId = peer,
+            )
+        }
+
+        val report = a.engine.sync(folder)
+
+        assertNull(a.progress())
+        assertEquals(emptyMap(), a.record().version)
+        assertEquals(listOf(SkippedBook("Title", "Change history is too long")), report.skipped)
+        assertEquals("aaaaaa", SyncFileCodec.decode(folder.files.getValue(a.fileName)).deviceId)
+    }
+
+    @Test
+    fun `no more than fifty peer files are read`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        repeat(51) { folder.files["reader-sync-junk-$it.json"] = ByteArray(1) }
+
+        val report = a.engine.sync(folder, publish = false)
+
+        assertEquals(50, folder.reads.size)
+        assertEquals(51, report.rejected.size)
+        assertEquals(1, report.rejected.count { it.reason == "Too many sync files" })
+    }
+
+    @Test
+    fun `no more than forty MiB of peer files are read`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        repeat(9) {
+            folder.files["reader-sync-junk-$it.json"] = ByteArray(1)
+            folder.sizes["reader-sync-junk-$it.json"] = MAX_SYNC_FILE_BYTES.toLong()
+        }
+
+        val report = a.engine.sync(folder, publish = false)
+
+        assertEquals(8, folder.reads.size)
+        assertEquals(1, report.rejected.count { it.reason == "Too many sync files" })
+    }
+
+    @Test
+    fun `failing to remove an old file is not a publish failure`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        a.engine.publish(folder)
+        a.store.save(a.store.load().copy(deviceName = "Renamed"))
+        folder.deleteFails = true
+
+        assertNull(a.engine.sync(folder).publishError)
+        a.engine.publish(folder)
+
+        assertEquals(2, folder.files.size)
+    }
+
+    @Test
+    fun `state can be read and changed under the engine lock`() = runBlocking {
+        val a = Device("aaaaaa")
+
+        a.engine.updateState { it.copy(deviceName = "Renamed", folderUri = "content://folder") }
+
+        assertEquals("Renamed", a.engine.state().deviceName)
+        assertEquals("content://folder", a.store.load().folderUri)
     }
 
     @Test

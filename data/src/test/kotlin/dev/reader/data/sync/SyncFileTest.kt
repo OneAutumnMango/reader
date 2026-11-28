@@ -209,4 +209,27 @@ class SyncFileTest {
         assertEquals(CategoriesValue(listOf(long)), decodedNames("$long z"))
         assertEquals(CategoriesValue(listOf(long)), decodedNames("$long\uD83D\uDE00"))
     }
+
+    @Test
+    fun `rejects oversized or blank ids in version maps`() {
+        fun withVersion(version: Map<String, Long>) = book.copy(position = item().copy(version = version))
+        val most = (1..64).associate { "device$it" to 1L }
+
+        SyncFileCodec.decode(SyncFileCodec.encode(file.copy(books = listOf(withVersion(most)))))
+        assertRejected(withVersion(most + ("one-more" to 1L)))
+        assertRejected(withVersion(mapOf(" " to 1L)))
+        assertRejected(withVersion(mapOf("x".repeat(65) to 1L)))
+        assertRejected(book.copy(chapters = listOf(SyncChapter(0, item().copy(version = mapOf("" to 1L))))))
+        assertRejected(book.copy(categories = categories.copy(version = mapOf("" to 1L))))
+        assertRejected(file.copy(deviceId = "x".repeat(65)))
+    }
+
+    @Test
+    fun `decode strips control characters and caps titles`() {
+        val raw = "a\u0000b\n" + "t".repeat(400)
+
+        val decoded = SyncFileCodec.decode(SyncFileCodec.encode(file.copy(books = listOf(book.copy(title = raw)))))
+
+        assertEquals("ab" + "t".repeat(298), decoded.books.single().title)
+    }
 }

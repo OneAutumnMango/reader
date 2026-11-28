@@ -12,6 +12,11 @@ import kotlinx.serialization.json.Json
 const val SYNC_FORMAT = 1
 const val MAX_SYNC_FILE_BYTES = 5 * 1024 * 1024
 
+/** Change histories are copied into this install's own file, so their size is limited too. */
+internal const val MAX_VERSION_ENTRIES = 64
+private const val MAX_ID_LENGTH = 64
+private const val MAX_TITLE = 300
+
 private const val FILE_PREFIX = "reader-sync-"
 private const val FILE_SUFFIX = ".json"
 private const val MAX_DEVICE_NAME = 40
@@ -73,7 +78,7 @@ object SyncFileCodec {
         return file.copy(
             deviceName = sanitizeDeviceName(file.deviceName),
             devices = file.devices.mapValues { sanitizeDeviceName(it.value) },
-            books = file.books.map(::normalizeCategories),
+            books = file.books.map { normalizeCategories(it).copy(title = cleanText(it.title, MAX_TITLE)) },
         )
     }
 
@@ -85,7 +90,7 @@ object SyncFileCodec {
 
     private fun validate(file: SyncFile) {
         require(file.format == SYNC_FORMAT) { "Unknown format version ${file.format}" }
-        require(file.deviceId.isNotBlank()) { "Missing device ID" }
+        require(isId(file.deviceId)) { "Bad device ID" }
         require(file.publishedAt >= 0) { "Negative publish time" }
         require(file.books.distinctBy { it.contentHash }.size == file.books.size) { "Duplicate book" }
         for (book in file.books) {
@@ -111,16 +116,22 @@ object SyncFileCodec {
     }
 
     private fun checkVersion(item: Versioned) {
+        require(item.version.size <= MAX_VERSION_ENTRIES) { "Change history is too long" }
+        require(item.version.keys.all(::isId)) { "Bad device ID in change history" }
         require(item.version.values.all { it in 0..MAX_VERSION_COUNT }) { "Change count out of range" }
     }
+
+    private fun isId(id: String) = id.isNotBlank() && id.length <= MAX_ID_LENGTH
 }
 
-/** A category name without control characters or outer spaces, at most [MAX_CATEGORY_NAME] characters. */
-internal fun cleanCategoryName(raw: String): String {
-    var name = raw.filterNot { it.isISOControl() }.trim().take(MAX_CATEGORY_NAME)
-    if (name.lastOrNull()?.isHighSurrogate() == true) name = name.dropLast(1)
-    return name.trim()
+/** [raw] without control characters or outer spaces, at most [max] characters. */
+private fun cleanText(raw: String, max: Int): String {
+    var text = raw.filterNot { it.isISOControl() }.trim().take(max)
+    if (text.lastOrNull()?.isHighSurrogate() == true) text = text.dropLast(1)
+    return text.trim()
 }
+
+internal fun cleanCategoryName(raw: String) = cleanText(raw, MAX_CATEGORY_NAME)
 
 /** False for names that would show as empty: only spaces, control or invisible format characters. */
 internal fun isVisibleName(name: String) =
@@ -131,15 +142,17 @@ internal fun normalizeCategoryNames(names: List<String>): List<String> =
     names.map(::cleanCategoryName).filter(::isVisibleName).distinctBy { it.lowercase() }
 
 /** A device name that is safe to display: no control characters, at most 40 characters, never blank. */
-fun sanitizeDeviceName(raw: String): String {
-    var name = raw.filterNot { it.isISOControl() }.trim().take(MAX_DEVICE_NAME)
-    if (name.lastOrNull()?.isHighSurrogate() == true) name = name.dropLast(1)
-    return name.trim().ifEmpty { "Device" }
-}
+fun sanitizeDeviceName(raw: String): String = cleanText(raw, MAX_DEVICE_NAME).ifEmpty { "Device" }
 
 fun syncFileName(deviceName: String, deviceId: String): String {
     val name = sanitizeDeviceName(deviceName).lowercase().replace(Regex("[^a-z0-9]+"), "-")
     return "$FILE_PREFIX$name-${deviceId.take(SHORT_ID_LENGTH)}$FILE_SUFFIX"
+}
+
+/** Whether [syncFileName] could have made [name] for this ID, under any device name. */
+internal fun isOwnNamingScheme(name: String, deviceId: String): Boolean {
+    val shortId = Regex.escape(deviceId.take(SHORT_ID_LENGTH))
+    return Regex("$FILE_PREFIX[a-z0-9-]+-$shortId${Regex.escape(FILE_SUFFIX)}").matches(name)
 }
 
 /** Includes Syncthing conflict copies, but not its temporary files. */
