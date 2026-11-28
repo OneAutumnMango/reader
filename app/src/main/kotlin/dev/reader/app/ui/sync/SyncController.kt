@@ -15,10 +15,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
@@ -42,6 +44,8 @@ data class SyncUiState(
     val lastChanges: List<Change> = emptyList(),
     val lastSyncAt: Long? = null,
     val error: String? = null,
+    val syncOnOpen: Boolean = true,
+    val publishOnClose: Boolean = true,
 )
 
 /** What a finished operation changes on screen, given the state saved after it. */
@@ -61,6 +65,7 @@ private val dropPublishError: SyncUiState.() -> SyncUiState = {
  * Runs one sync operation at a time and shows the result; calls made while one is running are ignored.
  * Saved state is only read and changed through [engine], under its lock, so [reset] cannot be overwritten.
  */
+@Suppress("TooManyFunctions") // one small entry point per thing a screen can ask for
 class SyncController(
     private val engine: SyncEngine,
     @Suppress("UnusedParameter", "UNUSED_PARAMETER") store: SyncStateStore, // only touched through the engine
@@ -73,6 +78,13 @@ class SyncController(
 
     /** Keeps reading the saved state and showing it in order. Never taken while holding the engine's lock. */
     private val showing = Mutex()
+
+    /** Whether a book is on screen. A sync must not change its position underneath it. */
+    @Volatile private var reading = false
+
+    /** An automatic sync that has yet to run, or that held changes back because a book was open. */
+    @Volatile private var autoSyncDue = false
+    private var autoSync: Job? = null
 
     /** Results of operations that started before the latest reset are not shown. */
     @Volatile private var resets = 0
@@ -92,6 +104,45 @@ class SyncController(
     fun setDeviceName(name: String) = operation {
         engine.updateState { it.copy(deviceName = sanitizeDeviceName(name)) }
         return@operation { copy(error = null) }
+    }
+
+    fun setSyncOnOpen(on: Boolean) = operation {
+        engine.updateState { it.copy(syncOnOpen = on) }
+        return@operation { this }
+    }
+
+    fun setPublishOnClose(on: Boolean) = operation {
+        engine.updateState { it.copy(publishOnClose = on) }
+        return@operation { this }
+    }
+
+    /** The app was opened or returned to. */
+    fun appOpened() {
+        autoSyncDue = true
+        runAutoSync()
+    }
+
+    fun setReading(open: Boolean) {
+        reading = open
+        runAutoSync()
+    }
+
+    /** Syncs if one is due, once no book is open and nothing else is running. It shows no message. */
+    private fun runAutoSync() {
+        if (reading || !autoSyncDue || autoSync?.isActive == true) return
+        autoSync = scope.launch {
+            var saved: SyncState? = null
+            // Waits for the engine too, then checks that nothing started meanwhile, which would drop our call.
+            val failure = attempt {
+                do {
+                    state.first { !it.running }
+                    saved = engine.state()
+                } while (state.value.running)
+            }
+            if (failure != null || reading) return@launch
+            autoSyncDue = false
+            if (saved?.run { syncOnOpen && folderUri != null } == true) syncNow()
+        }
     }
 
     /** Never ignored. Returns once the saved state is reset, even if a sync had to finish first. */
@@ -130,8 +181,17 @@ class SyncController(
     fun pullOnly(onDone: (SyncUiState) -> Unit = {}) = sync(publish = false, onDone)
 
     private fun sync(publish: Boolean, onDone: (SyncUiState) -> Unit) =
-        operation({ finished, _ -> onDone(finished) }, dropLastRun) {
-            val report = engine.sync(folder(), publish)
+        operation(
+            { finished, _ ->
+                onDone(finished)
+                // The book may have been closed again while this was still running.
+                runAutoSync()
+            },
+            dropLastRun,
+        ) {
+            var held = false
+            val report = engine.sync(folder(), publish) { (!reading).also { if (!it) held = true } }
+            if (held) autoSyncDue = true
             return@operation {
                 copy(report = report, questionCount = report.questions.size, error = report.publishError)
             }
@@ -263,6 +323,8 @@ class SyncController(
                     deviceName = saved.deviceName,
                     lastChanges = saved.lastChanges,
                     lastSyncAt = saved.lastSyncAt,
+                    syncOnOpen = saved.syncOnOpen,
+                    publishOnClose = saved.publishOnClose,
                 ).outcome(saved)
             }
         }

@@ -251,14 +251,20 @@ class SyncEngine(
 
     suspend fun updateState(transform: (SyncState) -> SyncState) = locked { store.save(transform(store.load())) }
 
-    suspend fun sync(folder: SyncFolder, publish: Boolean = true): SyncReport = locked {
+    /** [mayApply] is asked just before writing; if it says no, the safe changes wait for a later sync. */
+    suspend fun sync(
+        folder: SyncFolder,
+        publish: Boolean = true,
+        mayApply: () -> Boolean = { true },
+    ): SyncReport = locked {
         val pulled = pull(folder)
         // Read the library after the files, which can be slow, to keep the gap before writing short.
         val snapshot = library.snapshot()
         val state = recorded(store.load(), snapshot)
         val merge = merge(state, snapshot, pulled.files, oneCategory())
 
-        val (applied, _) = write(state, merge, syncedAt = now())
+        // A sync that applies nothing leaves the earlier changes undoable.
+        val (applied, _) = write(state, merge, syncedAt = now(), undoFallback = state.lastChanges, mayApply = mayApply)
 
         val publishError = if (publish) publishAfterWriting(folder, pulled.files) else null
         report(state, pulled, merge).copy(applied = applied, publishError = publishError)
@@ -347,9 +353,10 @@ class SyncEngine(
         merge: Merge,
         syncedAt: Long?,
         undoFallback: List<Change> = emptyList(),
+        mayApply: () -> Boolean = { true },
     ): Pair<List<Change>, Set<ItemKey>> {
         // One transaction, so the user cannot change an item between the check that it is unchanged and the write.
-        val (intent, done) = library.transaction { writeUnchanged(state, merge, undoFallback) }
+        val (intent, done) = library.transaction { writeUnchanged(state, merge, undoFallback, mayApply) }
         val changes = merge.changes.filter { it.key in done }
         store.save(
             intent.copy(
@@ -369,12 +376,16 @@ class SyncEngine(
         state: SyncState,
         merge: Merge,
         undoFallback: List<Change> = emptyList(),
+        mayApply: () -> Boolean = { true },
     ): Pair<SyncState, Map<ItemKey, Versioned>> {
         // The user may have moved on since the merge was decided; those items wait for the next sync.
         val fresh = library.snapshot()
         val current = fresh.items()
         val decidedOn = state.records.byKey()
-        val due = merge.applied.filterKeys { it in current && sameValue(current[it], decidedOn.getValue(it).value) }
+        val unchanged = merge.applied.filterKeys {
+            it in current && sameValue(current[it], decidedOn.getValue(it).value)
+        }
+        val due = if (unchanged.isEmpty() || mayApply()) unchanged else emptyMap()
 
         // Intended records are saved first so that dying mid-apply cannot turn them into local changes.
         val intent = state.copy(

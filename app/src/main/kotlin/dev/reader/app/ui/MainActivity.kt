@@ -66,9 +66,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        val graph = (application as ReaderApplication).graph
+        if (!graph.inForeground) {
+            graph.inForeground = true
+            graph.sync.appOpened()
+        }
+    }
+
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) SyncPublishScheduler.schedule(this)
+        if (!isChangingConfigurations) {
+            (application as ReaderApplication).graph.inForeground = false
+            SyncPublishScheduler.schedule(this)
+        }
     }
 
     private val swallowedVolumeKeys = mutableSetOf<Int>()

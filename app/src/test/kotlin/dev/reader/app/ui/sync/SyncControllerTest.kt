@@ -159,6 +159,70 @@ class SyncControllerTest {
         return Pick(asked, asked.choices.last().item.value)
     }
 
+    @Test fun `opening the app syncs`() = runBlocking<Unit> {
+        peerIsAhead()
+        chooseFolder()
+
+        controller.appOpened()
+
+        assertEquals(1, until { !it.running && it.lastSyncAt != null }.report.applied.size)
+        assertEquals(1, folder.writes)
+    }
+
+    @Test fun `opening the app does not sync when that is switched off`() = runBlocking<Unit> {
+        peerIsAhead()
+        chooseFolder()
+        controller.setSyncOnOpen(false)
+        until { !it.running && !it.syncOnOpen }
+
+        controller.appOpened()
+        delay(500)
+
+        assertEquals(0, folder.lists)
+    }
+
+    @Test fun `the automatic sync waits until the book is closed`() = runBlocking<Unit> {
+        peerIsAhead()
+        chooseFolder()
+        controller.setReading(true)
+
+        controller.appOpened()
+        delay(500)
+        assertEquals(0, folder.lists)
+
+        controller.setReading(false)
+        assertEquals(1, until { !it.running && it.lastSyncAt != null }.report.applied.size)
+    }
+
+    @Test fun `a book opened during a sync holds the changes until it is closed`() = runBlocking<Unit> {
+        peerIsAhead()
+        chooseFolder()
+        val gate = CompletableDeferred<Unit>()
+        folder.listGate = gate
+        controller.appOpened()
+        withTimeout(10_000) { folder.listing.await() }
+
+        controller.setReading(true)
+        gate.complete(Unit)
+        assertTrue(until { !it.running && it.lastSyncAt != null }.report.applied.isEmpty())
+        assertTrue(database.progress().observeAll().first().isEmpty())
+
+        controller.setReading(false)
+        until { !it.running && it.report.applied.size == 1 }
+    }
+
+    @Test fun `the automatic sync settings are saved and survive a reset`() = runBlocking<Unit> {
+        controller.setSyncOnOpen(false)
+        until { !it.running && !it.syncOnOpen }
+        controller.setPublishOnClose(false)
+        until { !it.running && !it.publishOnClose }
+
+        controller.reset()
+
+        assertFalse(store.load().syncOnOpen)
+        assertFalse(store.load().publishOnClose)
+    }
+
     @Test fun `a failed sync, pull or push drops the earlier results`() = runBlocking<Unit> {
         peerIsAhead()
         chooseFolder()

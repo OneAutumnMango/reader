@@ -109,6 +109,9 @@ class ReaderGraph(context: Context) {
     val coverSearch = CoverSearchService()
     val rootFolderScanner = RootFolderScanner(context.applicationContext, settings, library, importer)
 
+    /** True from the activity starting until it stops for real, so that a rotation is not a new opening. */
+    var inForeground = false
+
     private val launchScanStarted = AtomicBoolean(false)
 
     /** Runs once per process in the app scope, so rotation or leaving the screen can't cancel it. */
@@ -146,7 +149,8 @@ class ReaderGraph(context: Context) {
      * to it was lost; throws IOException if publishing fails otherwise.
      */
     suspend fun publishSync(): Boolean = withContext(Dispatchers.IO) {
-        val uri = syncEngine.state().folderUri ?: return@withContext true
+        val saved = syncEngine.state()
+        val uri = saved.folderUri?.takeIf { saved.publishOnClose } ?: return@withContext true
         val folder = SafSyncFolder.open(appContext, uri) ?: return@withContext false
         syncEngine.publish(folder)
         true

@@ -483,6 +483,35 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `a sync that applies nothing keeps the earlier changes undoable`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        val b = Device("bbbbbb")
+        a.read(1, 0.5f, 10)
+        a.engine.publish(folder)
+        val applied = b.engine.sync(folder).applied
+
+        assertEquals(emptyList(), b.engine.sync(folder).applied)
+
+        assertEquals(applied, b.store.load().lastChanges)
+    }
+
+    @Test
+    fun `a sync that may not apply leaves the library alone and applies later`() = runBlocking {
+        val folder = FakeSyncFolder()
+        val a = Device("aaaaaa")
+        val b = Device("bbbbbb")
+        a.read(1, 0.5f, 10)
+        a.engine.publish(folder)
+
+        val held = b.engine.sync(folder, mayApply = { false })
+
+        assertEquals(emptyList(), held.applied)
+        assertNull(b.progress())
+        assertEquals("a-1" to 0.5f, b.engine.sync(folder).let { b.progress() })
+    }
+
+    @Test
     fun `an item the user changed during a sync is not overwritten`() = runBlocking {
         val folder = FakeSyncFolder()
         val a = Device("aaaaaa")

@@ -73,6 +73,22 @@ class QuickSyncButtonTest {
     }
 
     @Test
+    fun `waiting merges are counted on the icon and read out`() {
+        setContent(SyncUiState(folderName = "Shared", questionCount = 3))
+
+        button.assertContentDescriptionEquals("Sync, 3 to merge")
+        composeRule.onNodeWithText("3", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun `a large count is capped on the icon only`() {
+        setContent(SyncUiState(folderName = "Shared", questionCount = 120))
+
+        button.assertContentDescriptionEquals("Sync, 120 to merge")
+        composeRule.onNodeWithText("99+", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
     fun `tap syncs once`() {
         setContent(SyncUiState(folderName = "Shared"))
 

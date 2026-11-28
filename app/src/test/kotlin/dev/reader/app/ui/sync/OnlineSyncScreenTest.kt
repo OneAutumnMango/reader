@@ -3,6 +3,7 @@ package dev.reader.app.ui.sync
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -50,6 +51,7 @@ class OnlineSyncScreenTest {
 
     private val names = mutableListOf<String>()
     private var undos = 0
+    private val toggles = mutableListOf<String>()
 
     private fun setContent(state: SyncUiState) = composeRule.setContent {
         OnlineSyncScreen(
@@ -59,6 +61,8 @@ class OnlineSyncScreenTest {
             onSyncNow = {},
             onMerge = {},
             onUndo = { undos++ },
+            onSyncOnOpen = { toggles += "open $it" },
+            onPublishOnClose = { toggles += "close $it" },
         )
     }
 
@@ -89,6 +93,16 @@ class OnlineSyncScreenTest {
         node("Change folder").assertIsEnabled()
         node("Sync now").assertIsEnabled()
         node("Merge (3)").assertIsEnabled()
+    }
+
+    @Test
+    fun `both automatic syncs start on and can be switched off`() {
+        setContent(SyncUiState(folderName = "Shared"))
+
+        node("Sync when the app opens").assertIsOn().performClick()
+        node("Publish when you leave the app").assertIsOn().performClick()
+
+        assertEquals(listOf("open false", "close false"), toggles)
     }
 
     @Test

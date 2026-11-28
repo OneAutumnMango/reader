@@ -33,6 +33,8 @@ data class SyncState(
     val lastChanges: List<Change> = emptyList(),
     val lastSyncAt: Long? = null,
     val questionCount: Int = 0,
+    val syncOnOpen: Boolean = true,
+    val publishOnClose: Boolean = true,
 )
 
 /** This install's sync state. [file] belongs in noBackupFilesDir so that a backup never copies the device ID. */

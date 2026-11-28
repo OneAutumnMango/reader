@@ -33,6 +33,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -127,6 +128,13 @@ fun ReaderApp(graph: ReaderGraph) {
     }
     LaunchedEffect(libraryPreferences) {
         libraryPreferences?.let { searchState.applyDefaults(it.searchSettings) }
+    }
+
+    // A disposable effect, so that sync knows before the reader's own effects load the saved position.
+    val reading = navigator.current is Destination.Reader
+    DisposableEffect(reading) {
+        graph.sync.setReading(reading)
+        onDispose {}
     }
 
     BackHandler(enabled = navigator.handlesSystemBack) { navigator.back() }

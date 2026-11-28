@@ -61,6 +61,8 @@ fun OnlineSyncRoute(graph: ReaderGraph, onMerge: () -> Unit, modifier: Modifier 
         onMerge = onMerge,
         onUndo = { graph.sync.undo { message = describeUndo(it) } },
         modifier = modifier,
+        onSyncOnOpen = graph.sync::setSyncOnOpen,
+        onPublishOnClose = graph.sync::setPublishOnClose,
     )
 
     message?.let {

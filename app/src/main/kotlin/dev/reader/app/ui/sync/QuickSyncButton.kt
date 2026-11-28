@@ -3,14 +3,16 @@ package dev.reader.app.ui.sync
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -44,8 +45,10 @@ fun QuickSyncButton(
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .clip(CircleShape)
                 .combinedClickable(
+                    // A round ripple without clipping, which would cut off the badge.
+                    interactionSource = null,
+                    indication = ripple(bounded = false, radius = 24.dp),
                     role = Role.Button,
                     onLongClickLabel = "Sync options",
                     onLongClick = { open = true },
@@ -53,15 +56,18 @@ fun QuickSyncButton(
                 )
                 .testTag("library-sync")
                 .semantics {
-                    contentDescription = "Sync"
+                    contentDescription =
+                        if (state.questionCount > 0) "Sync, ${state.questionCount} to merge" else "Sync"
                     if (state.running) stateDescription = "Syncing"
                 },
             contentAlignment = Alignment.Center,
         ) {
-            if (state.running) {
-                CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-            } else {
-                Icon(Icons.Filled.Sync, contentDescription = null)
+            BadgedBox(badge = { MergeBadge(state.questionCount) }) {
+                if (state.running) {
+                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.Sync, contentDescription = null)
+                }
             }
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
@@ -79,6 +85,13 @@ fun QuickSyncButton(
             DropdownMenuItem(text = { Text("Online Sync settings") }, onClick = close(onSettings))
         }
     }
+}
+
+private const val MAX_BADGE_COUNT = 99
+
+@Composable
+private fun MergeBadge(count: Int) {
+    if (count > 0) Badge { Text(if (count > MAX_BADGE_COUNT) "$MAX_BADGE_COUNT+" else "$count") }
 }
 
 /** The result of a finished sync or pull. */

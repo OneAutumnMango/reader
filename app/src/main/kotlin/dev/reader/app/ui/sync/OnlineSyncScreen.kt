@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -17,6 +19,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,8 +28,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -50,6 +55,8 @@ fun OnlineSyncScreen(
     onMerge: () -> Unit,
     onUndo: () -> Unit,
     modifier: Modifier = Modifier,
+    onSyncOnOpen: (Boolean) -> Unit = {},
+    onPublishOnClose: (Boolean) -> Unit = {},
 ) {
     // Held outside the list so that scrolling away keeps it. It resets only when the saved name changes.
     var name by rememberSaveable(state.deviceName) { mutableStateOf(state.deviceName) }
@@ -64,6 +71,7 @@ fun OnlineSyncScreen(
         item { FolderControls(state, onChooseFolder) }
         item { NameControls(state, name, { name = it.take(MAX_NAME_INPUT) }, onDeviceName) }
         item { SyncControls(state, onSyncNow, onMerge) }
+        item { AutoSyncControls(state, onSyncOnOpen, onPublishOnClose) }
         // A failure to publish is already shown under Last sync.
         state.error?.takeIf { it != state.report.publishError }?.let { error ->
             item {
@@ -154,6 +162,52 @@ private fun SyncControls(state: SyncUiState, onSyncNow: () -> Unit, onMerge: () 
     }
 }
 
+@Composable
+private fun AutoSyncControls(state: SyncUiState, onSyncOnOpen: (Boolean) -> Unit, onPublish: (Boolean) -> Unit) {
+    Column {
+        MenuSubheader("Automatic sync")
+        SettingSwitch(
+            "Sync when the app opens",
+            "Also when you return to it. Waits while a book is open.",
+            state.syncOnOpen,
+            !state.running,
+            onSyncOnOpen,
+        )
+        SettingSwitch(
+            "Publish when you leave the app",
+            "Saves this device's changes to the sync folder.",
+            state.publishOnClose,
+            !state.running,
+            onPublish,
+        )
+    }
+}
+
+@Composable
+private fun SettingSwitch(
+    label: String,
+    detail: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        // The whole row toggles, so it is one control with both texts for a screen reader.
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label)
+            Text(detail, style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
+}
+
 private fun LazyListScope.devices(state: SyncUiState) {
     val report = state.report
     if (report.devices.isNotEmpty()) {
@@ -187,7 +241,7 @@ private fun LazyListScope.lastSync(state: SyncUiState, onUndo: () -> Unit) {
     }
     if (state.lastChanges.isNotEmpty()) {
         item {
-            MenuSubheader("Applied")
+            MenuSubheader("Last applied changes")
             OutlinedButton(onClick = onUndo, enabled = !state.running, modifier = Modifier.fillMaxWidth()) {
                 Text("Undo last apply")
             }
