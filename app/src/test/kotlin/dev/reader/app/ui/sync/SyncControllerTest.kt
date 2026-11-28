@@ -20,6 +20,7 @@ import dev.reader.data.sync.SyncFile
 import dev.reader.data.sync.SyncFileCodec
 import dev.reader.data.sync.SyncFolder
 import dev.reader.data.sync.SyncLibrary
+import dev.reader.data.sync.SyncReport
 import dev.reader.data.sync.SyncStateStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -55,7 +56,7 @@ private class FakeFolder : SyncFolder {
     var lists = 0
     var writes = 0
     var listGate: CompletableDeferred<Unit>? = null
-    val listing = CompletableDeferred<Unit>()
+    var listing = CompletableDeferred<Unit>()
 
     override suspend fun list(): List<SyncDocument> {
         lists++
@@ -381,7 +382,9 @@ class SyncControllerTest {
     @Test fun `reset during a running sync is not ignored`() = runBlocking<Unit> {
         peerIsAhead()
         chooseFolder()
+        finish { controller.syncNow(it) }
         val before = engine.state().deviceId
+        folder.listing = CompletableDeferred()
         folder.listGate = CompletableDeferred()
         val done = CompletableDeferred<SyncUiState>()
         controller.syncNow { done.complete(it) }
@@ -396,6 +399,7 @@ class SyncControllerTest {
             done.await()
         }
         assertNotNull(finished.error)
+        assertEquals(SyncReport(), finished.report)
 
         val after = engine.state()
         assertNotEquals(before, after.deviceId)

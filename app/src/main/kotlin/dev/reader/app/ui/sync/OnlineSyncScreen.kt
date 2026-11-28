@@ -64,7 +64,8 @@ fun OnlineSyncScreen(
         item { FolderControls(state, onChooseFolder) }
         item { NameControls(state, name, { name = it.take(MAX_NAME_INPUT) }, onDeviceName) }
         item { SyncControls(state, onSyncNow, onMerge) }
-        state.error?.let { error ->
+        // A failure to publish is already shown under Last sync.
+        state.error?.takeIf { it != state.report.publishError }?.let { error ->
             item {
                 MenuSubheader("Last error")
                 Bounded(error, lines = 4, error = true)
@@ -120,7 +121,12 @@ private fun NameControls(state: SyncUiState, name: String, onName: (String) -> U
             label = { Text("Device name") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { if (canSave) onSave(name) }),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (canSave) onSave(name)
+                    defaultKeyboardAction(ImeAction.Done)
+                },
+            ),
             modifier = Modifier.fillMaxWidth(),
         )
         TextButton(onClick = { onSave(name) }, enabled = canSave) { Text("Save name") }
@@ -161,7 +167,7 @@ private fun LazyListScope.devices(state: SyncUiState) {
         // No keys: conflict copies repeat a device ID.
         items(report.devices) { device ->
             val name = if (device.id == state.deviceId) "This device (another copy)" else device.name
-            Column {
+            Column(Modifier.semantics(mergeDescendants = true) {}) {
                 Bounded(if (device.conflictCopy) "$name (conflict copy)" else name)
                 Detail("Published ${formatTime(device.publishedAt)}")
             }
@@ -187,7 +193,7 @@ private fun LazyListScope.lastSync(state: SyncUiState, onUndo: () -> Unit) {
             }
         }
         items(state.lastChanges) { change ->
-            Column {
+            Column(Modifier.semantics(mergeDescendants = true) {}) {
                 Bounded("${change.title}: ${describeItem(change.key)}")
                 Detail("Was: ${describeValue(change.before)}")
                 Detail("Now: ${describeValue(change.after)}")

@@ -16,7 +16,7 @@ fun describeValue(value: ItemValue?): String = when (value) {
         val progress = if (value.finished) "finished" else "${(value.position * PERCENT).roundToInt()}%"
         "Ch. ${value.chapter + 1}, $progress"
     }
-    is CategoriesValue -> value.names.joinToString().ifEmpty { "No categories" }
+    is CategoriesValue -> value.names.joinToString(limit = 20).ifEmpty { "No categories" }
 }
 
 internal fun describeItem(key: ItemKey): String = when (key.kind) {

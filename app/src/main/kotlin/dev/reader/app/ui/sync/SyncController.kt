@@ -236,7 +236,12 @@ class SyncController(
             } finally {
                 finished = mutableState.updateAndGet { it.copy(running = false) }
             }
-            if (discarded) onDone(finished.copy(error = DISCARDED), DISCARDED) else onDone(finished, failure)
+            if (discarded) {
+                // The reset may not have shown yet, so the report could still be an old one.
+                onDone(finished.copy(report = SyncReport(), error = DISCARDED), DISCARDED)
+            } else {
+                onDone(finished, failure)
+            }
         }
     }
 

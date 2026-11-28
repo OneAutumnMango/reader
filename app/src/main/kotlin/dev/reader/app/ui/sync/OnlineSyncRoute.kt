@@ -35,6 +35,10 @@ fun OnlineSyncRoute(graph: ReaderGraph, onMerge: () -> Unit, modifier: Modifier 
         val uri = pickedFolder ?: return@LaunchedEffect
         graph.sync.state.first { !it.running }
         graph.sync.setFolder(uri)
+        // Lists what the new folder has waiting.
+        graph.sync.state.first { !it.running }
+        graph.sync.check()
+        // Last, because changing it cancels this effect.
         pickedFolder = null
     }
 

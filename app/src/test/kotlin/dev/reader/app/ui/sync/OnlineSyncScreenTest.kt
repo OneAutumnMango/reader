@@ -206,6 +206,22 @@ class OnlineSyncScreenTest {
     }
 
     @Test
+    fun `a long list of categories is cut off`() {
+        val text = describeValue(CategoriesValue(List(30) { "c$it" }))
+
+        assertEquals((0 until 20).joinToString { "c$it" } + ", ...", text)
+    }
+
+    @Test
+    fun `a publish error is not repeated as the last error`() {
+        setContent(SyncUiState(folderName = "Shared", error = "offline", report = SyncReport(publishError = "offline")))
+
+        node("Not published: offline").assertIsDisplayed()
+        assertAbsent("Last error")
+        assertAbsent("offline")
+    }
+
+    @Test
     fun `describes an undo result`() {
         val one = listOf(CHANGE)
         assertEquals("Restored: 1. Skipped (changed since): 0.", describeUndo(UndoResult(one, emptyList())))
