@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -45,7 +47,7 @@ fun ContinuousReader(
     settings: ReaderSettings,
     modifier: Modifier = Modifier,
     initialPositionFraction: Float = 0f,
-    onPositionChanged: (index: Int, total: Int) -> Unit = { _, _ -> },
+    onPositionChanged: (index: Int, total: Int, userScrolled: Boolean?) -> Unit = { _, _, _ -> },
     highlight: Regex? = null,
     jump: BlockJump? = null,
     onBookmarkTap: ((String) -> Unit)? = null,
@@ -59,10 +61,16 @@ fun ContinuousReader(
         .toInt()
         .coerceIn(0, (document.blocks.size - 1).coerceAtLeast(0))
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
-    ReportReadingPosition(listState, document.blocks.size, onPositionChanged)
+    val userScrolled = remember(theme, settings) { mutableStateOf(false) }
+    ReportReadingPosition(listState, document.blocks.size, userScrolled, onChanged = onPositionChanged)
     LaunchedEffect(jump) {
-        jump?.let { listState.scrollToItem(it.block.coerceIn(0, (document.blocks.size - 1).coerceAtLeast(0))) }
+        jump?.let {
+            userScrolled.value = true
+            listState.scrollToItem(it.block.coerceIn(0, (document.blocks.size - 1).coerceAtLeast(0)))
+        }
     }
+    // Auto-scroll's raw deltas don't mark the list as scrolling.
+    LaunchedEffect(autoScrolling, userScrolled) { if (autoScrolling) userScrolled.value = true }
 
     val density = LocalDensity.current
     val currentSpeedDp by rememberUpdatedState(autoScrollSpeedDp)

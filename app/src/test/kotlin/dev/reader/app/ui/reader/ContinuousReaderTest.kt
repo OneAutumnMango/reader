@@ -1,5 +1,6 @@
 package dev.reader.app.ui.reader
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import dev.reader.core.reader.ReaderSettings
+import dev.reader.core.reader.ReadingMode
 import dev.reader.core.richtext.Block
 import dev.reader.core.richtext.RichDocument
 import dev.reader.core.richtext.Span
@@ -72,7 +74,7 @@ class ContinuousReaderTest {
                 ReaderTheme.Default,
                 ReaderSettings(),
                 Modifier.size(300.dp, 400.dp).testTag("reader"),
-                onPositionChanged = { index, total -> reported = index to total },
+                onPositionChanged = { index, total, _ -> reported = index to total },
             )
         }
 
@@ -83,18 +85,18 @@ class ContinuousReaderTest {
     }
 
     @Test
-    fun `a chapter that fits on screen reports its end straight away`() {
+    fun `a chapter that fits on screen is reported as a single page`() {
         var reported: Pair<Int, Int>? = null
         composeRule.setContent {
             ContinuousReader(
                 document,
                 ReaderTheme.Default,
                 ReaderSettings(),
-                onPositionChanged = { index, total -> reported = index to total },
+                onPositionChanged = { index, total, _ -> reported = index to total },
             )
         }
 
-        assertEquals(1 to 2, reported)
+        assertEquals(0 to 1, reported)
     }
 
     @Test
@@ -142,7 +144,7 @@ class ContinuousReaderTest {
                 tallTheme,
                 ReaderSettings(),
                 Modifier.size(300.dp, 400.dp),
-                onPositionChanged = { index, _ -> firstVisible = index },
+                onPositionChanged = { index, _, _ -> firstVisible = index },
                 autoScrollSpeedDp = 5000f,
                 autoScrolling = true,
             )
@@ -164,7 +166,7 @@ class ContinuousReaderTest {
                 tallTheme,
                 ReaderSettings(),
                 Modifier.size(300.dp, 400.dp),
-                onPositionChanged = { index, _ -> firstVisible = index },
+                onPositionChanged = { index, _, _ -> firstVisible = index },
                 autoScrollSpeedDp = 5000f,
                 autoScrolling = false,
             )
@@ -185,7 +187,7 @@ class ContinuousReaderTest {
                 tallTheme,
                 ReaderSettings(),
                 Modifier.size(300.dp, 400.dp).testTag("list"),
-                onPositionChanged = { index, _ -> firstVisible = index },
+                onPositionChanged = { index, _, _ -> firstVisible = index },
                 autoScrollSpeedDp = 400f,
                 autoScrolling = true,
             )
@@ -202,5 +204,93 @@ class ContinuousReaderTest {
         assert(firstVisible > afterSwipe) {
             "auto-scroll stopped after a swipe ($beforeSwipe -> $afterSwipe -> $firstVisible)"
         }
+    }
+
+    @Test
+    fun `reports no user scroll until the list is scrolled by touch`() {
+        var scrolled: Boolean? = null
+        var settings by mutableStateOf(ReaderSettings())
+        composeRule.setContent {
+            ContinuousReader(
+                longDoc,
+                tallTheme,
+                settings,
+                Modifier.size(300.dp, 400.dp).testTag("list"),
+                onPositionChanged = { _, _, userScrolled -> scrolled = userScrolled },
+            )
+        }
+        composeRule.waitForIdle()
+        assertEquals(false, scrolled)
+
+        composeRule.onNodeWithTag("list").performTouchInput { swipe(Offset(150f, 350f), Offset(150f, 50f), 500) }
+        composeRule.waitForIdle()
+        assertEquals(true, scrolled)
+
+        settings = settings.copy(autoScrollSpeed = settings.autoScrollSpeed + 5f)
+        composeRule.waitForIdle()
+        assertEquals(false, scrolled)
+    }
+
+    @Test
+    fun `a jump counts as a user scroll`() {
+        var reported: Pair<Int, Boolean?>? = null
+        var jump by mutableStateOf<BlockJump?>(null)
+        composeRule.setContent {
+            ContinuousReader(
+                longDoc,
+                tallTheme,
+                ReaderSettings(),
+                Modifier.size(300.dp, 400.dp),
+                onPositionChanged = { index, _, userScrolled -> reported = index to userScrolled },
+                jump = jump,
+            )
+        }
+
+        jump = BlockJump(block = 10, id = 1)
+        composeRule.waitForIdle()
+        assertEquals(10 to true, reported)
+    }
+
+    @Test
+    fun `auto-scrolling counts as a user scroll`() {
+        var reported: Pair<Int, Boolean?>? = null
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            ContinuousReader(
+                longDoc,
+                tallTheme,
+                ReaderSettings(),
+                Modifier.size(300.dp, 400.dp),
+                onPositionChanged = { index, _, userScrolled -> reported = index to userScrolled },
+                autoScrollSpeedDp = 400f,
+                autoScrolling = true,
+            )
+        }
+        composeRule.mainClock.advanceTimeBy(2_000)
+
+        assert(reported!!.first > 0) { "list never moved" }
+        assertEquals(true, reported.second)
+    }
+
+    @Test
+    fun `an image strip is not reported as fitting until its pages have their height`() {
+        val reports = mutableListOf<Triple<Int, Int, Boolean?>>()
+        var loaded by mutableStateOf(false)
+        composeRule.setContent {
+            ImagePager(
+                pageCount = 2,
+                readingMode = ReadingMode.CONTINUOUS_SCROLL,
+                modifier = Modifier.size(300.dp, 400.dp),
+                onPageChanged = { index, total, scrolled -> reports += Triple(index, total, scrolled) },
+            ) { _, _, finalHeight ->
+                Box(Modifier.size(100.dp).then(if (loaded) finalHeight else Modifier))
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals(emptyList(), reports)
+
+        loaded = true
+        composeRule.waitForIdle()
+        assertEquals(listOf(Triple<Int, Int, Boolean?>(0, 1, null)), reports)
     }
 }

@@ -89,7 +89,9 @@ fun PagedReader(
             .coerceIn(0, (pages.size - 1).coerceAtLeast(0))
         val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { pages.size })
 
-        LaunchedEffect(pagerState.currentPage, pages.size) { onPageChanged(pagerState.currentPage, pages.size) }
+        // Clamped: after repagination the pager corrects an out-of-range page late, which would read as a turn.
+        val reportedPage = pagerState.currentPage.coerceAtMost((pages.size - 1).coerceAtLeast(0))
+        LaunchedEffect(reportedPage, pages.size) { onPageChanged(reportedPage, pages.size) }
         LaunchedEffect(jump) {
             val target = jump?.let { j -> pages.indexOfFirst { page -> page.any { it.index == j.block } } } ?: -1
             if (target >= 0) pagerState.scrollToPage(target)

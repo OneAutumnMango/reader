@@ -343,6 +343,12 @@ private fun ChapterPage(
     var loadFailed by remember(chapter.id, book.pdfRenderMode) { mutableStateOf(false) }
     var initialPositionFraction by remember(chapter.id) { mutableStateOf<Float?>(null) }
     var finished by remember(chapter.id) { mutableStateOf(false) }
+    var savedFinished by remember(chapter.id) { mutableStateOf(false) }
+    // A new view of the chapter starts with a new baseline.
+    val saveGate = remember(chapter.id, book.pdfRenderMode, settings.readingMode) { PageSaveGate() }
+    var lastReport by remember(saveGate) { mutableStateOf<Triple<Int, Int, Boolean?>?>(null) }
+    // The pagers hold on to an older onPageChanged, which must still see the current value.
+    val activeNow by rememberUpdatedState(isActive)
     var lastFraction by remember(chapter.id) { mutableStateOf(0f) }
     var lastIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
     var pagesTurned by remember(chapter.id) { mutableStateOf(0) }
@@ -390,17 +396,6 @@ private fun ChapterPage(
             sessionTimer.setActive(true, SystemClock.elapsedRealtimeNanos(), Clock.System.now())
             recordedWords = maxOf(recordedWords, (chapter.wordCount * lastFraction).toInt())
             recordedPages = pagesTurned
-            val isFinished = finished || lastFraction >= 1f
-            finished = isFinished
-            graph.saveChapterProgress(
-                Progress(
-                    bookId = book.id,
-                    chapterId = chapter.id,
-                    position = lastFraction,
-                    updatedAt = Clock.System.now(),
-                    finished = isFinished,
-                ),
-            )
         }
         onDispose {
             lifecycle.removeObserver(observer)
@@ -416,6 +411,7 @@ private fun ChapterPage(
     LaunchedEffect(chapter.id) {
         val saved = graph.progress.observeChapterProgress(book.id, chapter.id).first()
         finished = false
+        savedFinished = saved?.finished == true
         // A finished chapter is being re-read, so start it from the top.
         initialPositionFraction = if (saved?.finished == true) 0f else saved?.position ?: 0f
         lastFraction = initialPositionFraction ?: 0f
@@ -442,25 +438,33 @@ private fun ChapterPage(
         }
     }
 
-    fun onPageChanged(index: Int, pageCount: Int) {
+    fun saveIfRead(index: Int, pageCount: Int, userScrolled: Boolean?) {
+        if (!saveGate.onReport(index, pageCount, activeNow, savedFinished, userScrolled)) return
+        if (index >= pageCount - 1) finished = true
+        graph.saveChapterProgress(
+            Progress(
+                bookId = book.id,
+                chapterId = chapter.id,
+                position = lastFraction,
+                updatedAt = Clock.System.now(),
+                finished = finished,
+            ),
+        )
+    }
+
+    // A one-page chapter loaded off screen reports nothing new when it's swiped in.
+    LaunchedEffect(isActive) {
+        if (isActive) lastReport?.takeIf { it.second == 1 }?.let { saveIfRead(it.first, it.second, it.third) }
+    }
+
+    fun onPageChanged(index: Int, pageCount: Int, userScrolled: Boolean?) {
         onPositionChanged(index, pageCount)
         if (lastIndex != null && lastIndex != index) pagesTurned++
         lastIndex = index
         if (pageCount > 0) {
-            val atEnd = index >= pageCount - 1
-            lastFraction = if (atEnd) 1f else index.toFloat() / pageCount
-            if (isActive) {
-                if (atEnd) finished = true
-                graph.saveChapterProgress(
-                    Progress(
-                        bookId = book.id,
-                        chapterId = chapter.id,
-                        position = lastFraction,
-                        updatedAt = Clock.System.now(),
-                        finished = finished,
-                    ),
-                )
-            }
+            lastFraction = if (index >= pageCount - 1) 1f else index.toFloat() / pageCount
+            lastReport = Triple(index, pageCount, userScrolled)
+            saveIfRead(index, pageCount, userScrolled)
         }
     }
 

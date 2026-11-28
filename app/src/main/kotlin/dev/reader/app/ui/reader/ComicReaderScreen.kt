@@ -40,7 +40,7 @@ fun ComicReaderScreen(
     showTapZoneLabels: Boolean = false,
     initialPositionFraction: Float = 0f,
     onTapAction: (TapAction) -> Unit = {},
-    onPageChanged: (index: Int, pageCount: Int) -> Unit = { _, _ -> },
+    onPageChanged: (index: Int, pageCount: Int, userScrolled: Boolean?) -> Unit = { _, _, _ -> },
 ) {
     KeepScreenAwakeEffect(settings.keepScreenAwake)
 
@@ -54,16 +54,24 @@ fun ComicReaderScreen(
                 doubleTapZoomEnabled = settings.doubleTapZoomEnabled,
                 doubleTapZoomScale = settings.doubleTapZoomScale,
                 pageGap = settings.pageGap,
-                onPageChanged = { onPageChanged(it, pages.size) },
-            ) { index, continuous ->
-                ComicPageImage(file, format, pages[index], index, continuous)
+                onPageChanged = onPageChanged,
+                resetUserScrolledKey = settings,
+            ) { index, continuous, finalHeight ->
+                ComicPageImage(file, format, pages[index], index, continuous, finalHeight)
             }
         }
     }
 }
 
 @Composable
-private fun ComicPageImage(file: File, format: BookFormat, pageName: String, index: Int, continuous: Boolean) {
+private fun ComicPageImage(
+    file: File,
+    format: BookFormat,
+    pageName: String,
+    index: Int,
+    continuous: Boolean,
+    finalHeight: Modifier,
+) {
     val bitmap by produceState<Result<ImageBitmap>?>(null, file, pageName) {
         value = withContext(Dispatchers.IO) {
             AppLog.debug("Loading $format comic page ${index + 1}", "ComicReader")
@@ -80,7 +88,7 @@ private fun ComicPageImage(file: File, format: BookFormat, pageName: String, ind
         loaded != null && continuous -> Image(
             bitmap = loaded,
             contentDescription = null,
-            modifier = Modifier.fillMaxWidth().aspectRatio(loaded.width.toFloat() / loaded.height),
+            modifier = Modifier.fillMaxWidth().aspectRatio(loaded.width.toFloat() / loaded.height).then(finalHeight),
         )
         loaded != null -> Image(bitmap = loaded, contentDescription = null, modifier = Modifier.fillMaxSize())
         else -> Box(

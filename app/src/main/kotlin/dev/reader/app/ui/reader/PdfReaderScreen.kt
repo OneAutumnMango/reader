@@ -43,7 +43,7 @@ fun PdfReaderScreen(
     showTapZoneLabels: Boolean = false,
     initialPositionFraction: Float = 0f,
     onTapAction: (TapAction) -> Unit = {},
-    onPageChanged: (index: Int, pageCount: Int) -> Unit = { _, _ -> },
+    onPageChanged: (index: Int, pageCount: Int, userScrolled: Boolean?) -> Unit = { _, _, _ -> },
 ) {
     var renderer by remember(file) { mutableStateOf<PdfPageRenderer?>(null) }
     var openFailed by remember(file) { mutableStateOf(false) }
@@ -81,9 +81,10 @@ fun PdfReaderScreen(
                     doubleTapZoomEnabled = settings.doubleTapZoomEnabled,
                     doubleTapZoomScale = settings.doubleTapZoomScale,
                     pageGap = settings.pageGap,
-                    onPageChanged = { onPageChanged(it, pageRenderer.pageCount) },
-                ) { index, continuous ->
-                    PdfPageImage(pageRenderer, index, continuous)
+                    onPageChanged = onPageChanged,
+                    resetUserScrolledKey = settings,
+                ) { index, continuous, finalHeight ->
+                    PdfPageImage(pageRenderer, index, continuous, finalHeight)
                 }
                 openFailed -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Couldn't open this PDF. It may be encrypted or corrupted.")
@@ -97,7 +98,7 @@ fun PdfReaderScreen(
 }
 
 @Composable
-private fun PdfPageImage(renderer: PdfPageRenderer, index: Int, continuous: Boolean) {
+private fun PdfPageImage(renderer: PdfPageRenderer, index: Int, continuous: Boolean, finalHeight: Modifier) {
     val ratio by produceState<Float?>(null, renderer, index) {
         value = withContext(Dispatchers.IO) {
             runCatching { renderer.aspectRatio(index) }
@@ -108,6 +109,7 @@ private fun PdfPageImage(renderer: PdfPageRenderer, index: Int, continuous: Bool
     }
     val pageModifier = if (continuous) {
         Modifier.fillMaxWidth().aspectRatio(ratio ?: A4_ASPECT_RATIO)
+            .then(if (ratio != null) finalHeight else Modifier)
     } else {
         Modifier.fillMaxSize()
     }
