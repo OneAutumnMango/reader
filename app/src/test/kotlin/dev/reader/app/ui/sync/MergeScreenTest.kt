@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -321,6 +322,18 @@ class MergeScreenTest {
         composeRule.onNode(isToggleable() and hasText("c0")).performClick()
         composeRule.onNodeWithTag("manual-list").performScrollToNode(hasText("Removes: c0"))
         composeRule.onNodeWithText("Chosen: ${local.names.drop(1).joinToString()}").assertExists()
+    }
+
+    @Test
+    fun `ticking does not move the manual dialog's checkboxes`() {
+        setContent(stateOf(question("Dune", categories("a"), categories("b") to listOf("tab"))))
+        node("Choose manually").performClick()
+        val box = composeRule.onNode(isToggleable() and hasText("b"))
+        val before = box.getUnclippedBoundsInRoot().top
+
+        box.performClick()
+
+        assertEquals(before, box.getUnclippedBoundsInRoot().top)
     }
 
     @Test

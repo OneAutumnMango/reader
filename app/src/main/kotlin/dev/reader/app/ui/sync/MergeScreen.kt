@@ -553,9 +553,7 @@ private fun ManualDialog(
         title = { Text(if (oneCategory) "Choose one category" else "Choose categories") },
         text = {
             LazyColumn(Modifier.heightIn(max = 360.dp).testTag("manual-list")) {
-                item { Line("Chosen: ${describeSet(CategoriesValue(ticked))}", full = true) }
-                items(categoryChanges(CategoriesValue(ticked), localSet)) { Line(it, full = true) }
-                items(names) { name ->
+                items(names, key = { it }) { name ->
                     val on = hasName(ticked, name)
                     Row(
                         Modifier
@@ -576,6 +574,9 @@ private fun ManualDialog(
                         Text(name)
                     }
                 }
+                // Below the rows, so that a tick cannot move them.
+                item { Line("Chosen: ${describeSet(CategoriesValue(ticked))}", full = true) }
+                items(categoryChanges(CategoriesValue(ticked), localSet)) { Line(it, full = true) }
             }
         },
         confirmButton = {
