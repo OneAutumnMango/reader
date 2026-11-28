@@ -15,6 +15,8 @@ sealed interface Destination {
     data object Data : Destination
     data object Settings : Destination
     data object LogHistory : Destination
+    data object OnlineSync : Destination
+    data object Merge : Destination
     data class BookDetail(val bookId: BookId) : Destination
     data class BookInfo(val bookId: BookId) : Destination
     data class Bookmarks(val bookId: BookId) : Destination

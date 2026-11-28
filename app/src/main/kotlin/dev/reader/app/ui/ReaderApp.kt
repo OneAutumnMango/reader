@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -62,6 +63,7 @@ import dev.reader.app.ui.settings.LibrarySettingsRoute
 import dev.reader.app.ui.settings.LogHistoryRoute
 import dev.reader.app.ui.settings.SettingsRoute
 import dev.reader.app.ui.stats.StatsRoute
+import dev.reader.app.ui.sync.OnlineSyncRoute
 import dev.reader.core.model.BookId
 import dev.reader.core.model.CategoryId
 import dev.reader.core.search.TextSearch
@@ -81,6 +83,7 @@ internal val LibraryGridStatesSaver = Saver<MutableMap<CategoryId?, LazyGridStat
     },
 )
 
+@Suppress("CyclomaticComplexMethod") // one branch per destination
 private fun titleFor(destination: Destination): String = when (destination) {
     Destination.Library, Destination.LibrarySettings -> "Library"
     Destination.Search -> "Search"
@@ -91,6 +94,8 @@ private fun titleFor(destination: Destination): String = when (destination) {
     Destination.Data -> "Data"
     Destination.Settings -> "Settings"
     Destination.LogHistory -> "Logs"
+    Destination.OnlineSync -> "Online Sync"
+    Destination.Merge -> "Merge"
     is Destination.BookDetail -> "Book"
     is Destination.BookInfo -> "Details"
     is Destination.Bookmarks -> "Bookmarks"
@@ -156,6 +161,9 @@ fun ReaderApp(graph: ReaderGraph) {
                             selectDestination(it)
                         }
                         DrawerItem(Destination.SearchSettings, "Search", Icons.Filled.Search, navigator.current) {
+                            selectDestination(it)
+                        }
+                        DrawerItem(Destination.OnlineSync, "Online Sync", Icons.Filled.Sync, navigator.current) {
                             selectDestination(it)
                         }
                     }
@@ -271,6 +279,12 @@ fun ReaderApp(graph: ReaderGraph) {
                         modifier = content,
                     )
                     Destination.LogHistory -> LogHistoryRoute(content)
+                    Destination.OnlineSync -> OnlineSyncRoute(
+                        graph,
+                        onMerge = { navigator.push(Destination.Merge) },
+                        modifier = content,
+                    )
+                    Destination.Merge -> Unit // the Merge screen is not built yet
                     is Destination.BookDetail -> BookDetailRoute(
                         graph,
                         destination.bookId,

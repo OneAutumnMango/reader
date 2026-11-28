@@ -31,6 +31,8 @@ private const val UNNAMED_FOLDER = "Sync folder"
 
 data class SyncUiState(
     val folderName: String? = null,
+    /** This install's ID, to tell its conflict copies apart from other devices. */
+    val deviceId: String = "",
     val deviceName: String = "",
     val running: Boolean = false,
     val report: SyncReport = SyncReport(),
@@ -202,6 +204,7 @@ class SyncController(
             mutableState.update {
                 it.copy(
                     folderName = name,
+                    deviceId = saved.deviceId,
                     deviceName = saved.deviceName,
                     lastChanges = saved.lastChanges,
                     lastSyncAt = saved.lastSyncAt,
